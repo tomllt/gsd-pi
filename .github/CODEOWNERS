@@ -1,0 +1,36 @@
+# CODEOWNERS
+# Defines required reviewers per path. GitHub enforces these on PRs.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Format: <pattern>  <@user or @org/team>
+# Last matching rule wins.
+
+# Default: maintainers review everything not explicitly matched below
+*                                   @jeremymcs
+
+# Core agent orchestration — RFC required, senior review only
+packages/pi-agent-core/             @jeremymcs
+src/resources/extensions/gsd/       @jeremymcs
+
+# AI/LLM provider integrations
+packages/pi-ai/                     @jeremymcs
+
+# Terminal UI
+packages/pi-tui/                    @jeremymcs
+
+# Native bindings — platform-specific, needs careful review
+native/                             @jeremymcs
+
+# CI/CD and release pipeline — high blast radius
+.github/                            @jeremymcs
+scripts/                            @jeremymcs
+Dockerfile                          @jeremymcs
+
+# Security-sensitive files — always require maintainer sign-off
+.secretscanignore                   @jeremymcs
+scripts/secret-scan.sh              @jeremymcs
+scripts/install-hooks.sh            @jeremymcs
+
+# Contributor-facing docs — keep accurate, maintainers approve
+CONTRIBUTING.md                     @jeremymcs
+VISION.md                           @jeremymcs
