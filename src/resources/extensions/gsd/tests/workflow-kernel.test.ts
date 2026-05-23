@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for pure auto-mode workflow kernel decisions.
 
 import assert from "node:assert/strict";

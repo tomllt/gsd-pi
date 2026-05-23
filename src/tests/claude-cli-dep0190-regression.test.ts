@@ -1,4 +1,4 @@
-// GSD2 — Regression test for Issue #5017 (DEP0190 from claude-cli-check.ts and readiness.ts)
+// gsd-pi — Regression test for Issue #5017 (DEP0190 from claude-cli-check.ts and readiness.ts)
 //
 // Issue #5017: on Windows the binary probe used `execFileSync(cmd, args, { shell: true })`
 // which Node 22+ rejects with `[DEP0190] DeprecationWarning: Passing args to a child

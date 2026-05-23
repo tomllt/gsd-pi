@@ -1,4 +1,4 @@
-// GSD2 - Claude Code stream adapter regression tests
+// gsd-pi - Claude Code stream adapter regression tests
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -2069,7 +2069,7 @@ describe("buildBashPermissionPattern", () => {
 
 	test("chained commands — extracts pattern from the meaningful segment", () => {
 		assert.equal(buildBashPermissionPattern("cd /foo && gh pr list --limit 5"), "Bash(gh pr list:*)");
-		assert.equal(buildBashPermissionPattern("cd C:/Users/djeff/repos/gsd-2 && gh pr list --limit 5"), "Bash(gh pr list:*)");
+		assert.equal(buildBashPermissionPattern("cd C:/Users/djeff/repos/gsd-pi && gh pr list --limit 5"), "Bash(gh pr list:*)");
 		assert.equal(buildBashPermissionPattern("cd /tmp && git push origin main"), "Bash(git push:*)");
 		assert.equal(buildBashPermissionPattern("export FOO=1 && npm install lodash"), "Bash(npm install:*)");
 		assert.equal(buildBashPermissionPattern("mkdir -p out; docker ps -a"), "Bash(docker ps:*)");
@@ -2078,7 +2078,7 @@ describe("buildBashPermissionPattern", () => {
 
 	test("skips trailing || true / || : error suppressors", () => {
 		assert.equal(
-			buildBashPermissionPattern("cd C:/Users/djeff/repos/gsd-2 && gh pr create --dry-run --title \"test\" --body \"test\" 2>&1 || true"),
+			buildBashPermissionPattern("cd C:/Users/djeff/repos/gsd-pi && gh pr create --dry-run --title \"test\" --body \"test\" 2>&1 || true"),
 			"Bash(gh pr create:*)",
 		);
 		assert.equal(buildBashPermissionPattern("gh pr list || true"), "Bash(gh pr list:*)");
@@ -2341,7 +2341,7 @@ describe("bashCommandMatchesSavedRules — compound command bypass", () => {
 			setupSettings(["Bash(gh pr create:*)"]);
 			setCwd(tempDir);
 			assert.equal(
-				bashCommandMatchesSavedRules('cd C:/Users/djeff/repos/gsd-2 && gh pr create --dry-run --title "test" --body "test" 2>&1 || true'),
+				bashCommandMatchesSavedRules('cd C:/Users/djeff/repos/gsd-pi && gh pr create --dry-run --title "test" --body "test" 2>&1 || true'),
 				true,
 			);
 			assert.equal(

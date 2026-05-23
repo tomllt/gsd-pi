@@ -1,4 +1,4 @@
-// GSD-2 — ID-based path resolution for GSD project files and directories
+// gsd-pi — ID-based path resolution for GSD project files and directories
 /**
  * GSD Paths — ID-based path resolution
  *

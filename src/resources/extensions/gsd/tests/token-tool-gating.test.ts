@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for opt-in GSD tool surface reduction.
 
 import assert from "node:assert/strict";

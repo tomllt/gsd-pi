@@ -1,4 +1,4 @@
-// GSD2 + skill-manifest — per-unit-type skill allowlist resolver (RFC #4779)
+// gsd-pi + skill-manifest — per-unit-type skill allowlist resolver (RFC #4779)
 //
 // Each auto-mode unit type can declare which skills are relevant to it. This
 // trims the set of skills considered for activation in the per-unit prompt,

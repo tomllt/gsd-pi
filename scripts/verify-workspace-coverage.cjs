@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GSD-2 + scripts/verify-workspace-coverage.cjs — CI gate: every linkable workspace package must have test coverage
+// gsd-pi + scripts/verify-workspace-coverage.cjs — CI gate: every linkable workspace package must have test coverage
 'use strict'
 
 const { readdirSync, existsSync, statSync } = require('fs')

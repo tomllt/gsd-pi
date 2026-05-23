@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Always-on ambient health signal rendered below the editor.
 
 import type { ExtensionContext } from "@gsd/pi-coding-agent";

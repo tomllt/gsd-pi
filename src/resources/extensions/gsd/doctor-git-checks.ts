@@ -1,4 +1,4 @@
-// GSD-2 doctor git health checks
+// gsd-pi doctor git health checks
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";

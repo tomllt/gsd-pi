@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Timestamp formatting regression tests for transcript metadata.
 
 import { test, describe } from "node:test";

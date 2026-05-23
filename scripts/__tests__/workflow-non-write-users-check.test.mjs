@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for agent workflow trigger guard policy.
 
 import assert from "node:assert/strict";

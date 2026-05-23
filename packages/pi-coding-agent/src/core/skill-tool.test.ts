@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests skill invocation and prompt-only skill visibility behavior.
 
 import assert from "node:assert/strict";

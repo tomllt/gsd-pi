@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: VS Code extension activation and command registration for GSD.
 
 import * as vscode from "vscode";
@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(client);
 
 	// Log stderr to an output channel
-	const outputChannel = vscode.window.createOutputChannel("GSD-2 Agent");
+	const outputChannel = vscode.window.createOutputChannel("gsd-pi Agent");
 	context.subscriptions.push(outputChannel);
 
 	client.onError((msg) => {

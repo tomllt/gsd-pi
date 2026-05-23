@@ -1,4 +1,4 @@
-// GSD2 — Tests for auditOrphanedMilestoneBranches bootstrap audit
+// gsd-pi — Tests for auditOrphanedMilestoneBranches bootstrap audit
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";

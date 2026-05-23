@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Schema migration DDL steps for the GSD database facade.
 
 import type { DbAdapter } from "./db-adapter.js";

@@ -1,4 +1,4 @@
-# GSD-2 e2e tests
+# gsd-pi e2e tests
 
 End-to-end tests that spawn the **real built** `gsd` binary as a child process
 and exercise it through realistic flows.

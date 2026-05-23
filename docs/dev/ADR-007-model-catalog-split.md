@@ -115,7 +115,7 @@ packages/pi-ai/src/models/
 
 ```typescript
 // models/index.ts
-// GSD-2 — Model registry (split by provider for maintainability)
+// gsd-pi — Model registry (split by provider for maintainability)
 
 import { ANTHROPIC_MODELS } from "./generated/anthropic.js";
 import { OPENAI_MODELS } from "./generated/openai.js";

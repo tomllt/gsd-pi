@@ -1,4 +1,4 @@
-// GSD-2 + Visual Brief artifact policy
+// gsd-pi + Visual Brief artifact policy
 
 import { join } from "node:path";
 import { getAgentDir } from "@gsd/pi-coding-agent";

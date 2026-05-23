@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: VS Code extension RPC client for communicating with the GSD agent.
 
 import { ChildProcess, spawn } from "node:child_process";

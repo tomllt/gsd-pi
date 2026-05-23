@@ -1,4 +1,4 @@
-// GSD-2 — ADR-013 Phase 6 preflight scanner.
+// gsd-pi — ADR-013 Phase 6 preflight scanner.
 //
 // Read-only detection of rows in the legacy knowledge surfaces (decisions
 // table, `.gsd/KNOWLEDGE.md`) that lack a corresponding `memories` row.

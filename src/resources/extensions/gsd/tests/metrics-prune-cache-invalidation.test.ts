@@ -1,4 +1,4 @@
-// GSD-2 + metrics prune cache invalidation: pruned units must not reappear after snapshotUnitMetricsByScope
+// gsd-pi + metrics prune cache invalidation: pruned units must not reappear after snapshotUnitMetricsByScope
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

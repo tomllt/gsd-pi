@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared pull request evidence generator for GSD shipping paths.
 
 export type PrChangeType = "feat" | "fix" | "refactor" | "test" | "docs" | "chore";

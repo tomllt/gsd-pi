@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Successful auto-mode iteration cleanup helper.
 
 export interface WorkflowIterationRecoveryState {

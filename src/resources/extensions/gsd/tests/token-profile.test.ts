@@ -1,4 +1,4 @@
-// GSD-2 — Token profile behavior tests.
+// gsd-pi — Token profile behavior tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-// gsd-2 + Phase C deletion regression: createAutoWorktree no longer copies .gsd/
+// gsd-pi + Phase C deletion regression: createAutoWorktree no longer copies .gsd/
 //
 // Verifies that createAutoWorktree on a project with a real (non-symlinked)
 // .gsd/ does NOT populate .gsd/milestones/ inside the worktree. Pre-Phase-C,

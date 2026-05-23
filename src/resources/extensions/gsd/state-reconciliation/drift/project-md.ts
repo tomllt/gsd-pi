@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: ADR-017 unregistered-milestone drift handler. Detects
 // milestones whose on-disk directory has meaningful content (ROADMAP/
 // CONTEXT/SUMMARY) but no DB row, then fails closed with an explicit recovery

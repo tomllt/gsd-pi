@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Built-in terminal theme definitions for interactive TUI rendering.
 /**
  * Built-in theme definitions.

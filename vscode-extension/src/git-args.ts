@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Pure git argument builders for agent-scoped VS Code actions.
 
 export function buildAgentGitAddArgs(files: string[]): string[] {

@@ -1,4 +1,4 @@
-# GSD-2 Database Map
+# gsd-pi Database Map
 
 > Complete schema, access layer, migration history, and cross-reference to the prompt system.
 

@@ -1,4 +1,4 @@
-// GSD-2 — Shared cmux event channel contracts
+// gsd-pi — Shared cmux event channel contracts
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**

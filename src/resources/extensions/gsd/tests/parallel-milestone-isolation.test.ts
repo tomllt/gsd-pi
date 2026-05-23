@@ -1,4 +1,4 @@
-// gsd-2 + Parallel-worker isolation regression (Phase B coordination)
+// gsd-pi + Parallel-worker isolation regression (Phase B coordination)
 //
 // Two simulated workers attempt to claim leases on the same project. The
 // lease infrastructure must guarantee:

@@ -1,4 +1,4 @@
-// GSD-2 - /gsd migrate audit helpers.
+// gsd-pi - /gsd migrate audit helpers.
 // File Purpose: Legacy archive, migration manifest, and projection verification support.
 
 import { cpSync, existsSync, readFileSync } from "node:fs";
@@ -88,7 +88,7 @@ export async function archiveLegacyPlanningDirectory(
     sourcePath,
     archivePath: relToGsd(targetRoot, archivePath),
     strategy: "full-source-copy",
-    note: "Full .planning source copied so legacy content without a GSD-2 field is not lost.",
+    note: "Full .planning source copied so legacy content without a gsd-pi field is not lost.",
   };
 
   await saveFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

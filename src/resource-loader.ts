@@ -20,7 +20,7 @@ function loadPiCodingAgentModule(): Promise<PiCodingAgentModule> {
 // Resolve resources directory — prefer dist/resources/ (stable, set at build time)
 // over src/resources/ (live working tree, changes with git branch).
 //
-// Why this matters: with `npm link`, src/resources/ points into the gsd-2 repo's
+// Why this matters: with `npm link`, src/resources/ points into the gsd-pi repo's
 // working tree. Switching branches there changes src/resources/ for ALL projects
 // that use gsd — causing stale/broken extensions to be synced to ~/.gsd/agent/.
 // dist/resources/ is populated by the build step (`npm run copy-resources`) and

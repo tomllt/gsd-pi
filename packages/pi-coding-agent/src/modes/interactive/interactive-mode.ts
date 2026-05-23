@@ -1,6 +1,6 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Interactive TUI mode and session UI rendering.
-// GSD2 - Interactive TUI mode for coding-agent sessions.
+// gsd-pi - Interactive TUI mode for coding-agent sessions.
 /**
  * Interactive mode for the coding agent.
  * Handles TUI rendering and user interaction, delegating business logic to AgentSession.

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies auto-mode artifacts and manages recovery placeholders.
 /**
  * Auto-mode Recovery — artifact resolution, verification, blocker placeholders,

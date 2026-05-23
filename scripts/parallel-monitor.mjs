@@ -276,7 +276,7 @@ function extractCostFromNdjson(mid) {
 
 // Auto-detect the GSD loader path — works across npm global, homebrew, and local installs
 function findGsdLoader() {
-  // 1. Check if we're running from inside the gsd-2 repo itself
+  // 1. Check if we're running from inside the gsd-pi repo itself
   const repoLoader = path.resolve(import.meta.dirname, '..', 'dist', 'loader.js');
   if (fs.existsSync(repoLoader)) return repoLoader;
   

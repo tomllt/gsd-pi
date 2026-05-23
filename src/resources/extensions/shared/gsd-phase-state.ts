@@ -1,5 +1,5 @@
 /**
- * GSD2 Phase State — cross-extension coordination
+ * gsd-pi Phase State — cross-extension coordination
  * Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
  *
  * Lightweight module-level state that GSD auto-mode writes to and the

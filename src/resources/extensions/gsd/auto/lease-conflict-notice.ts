@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Formats user-facing auto-mode milestone lease conflict notices.
 
 const LEASE_HELD_RE = /^Milestone\s+(\S+)\s+is held by worker\s+(.+?)\s+until\s+(.+?)\.?$/;

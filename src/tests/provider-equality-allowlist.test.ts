@@ -1,6 +1,6 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Provider equality guardrail tests for ADR-012.
-// gsd-2: provider-equality guardrail test (ADR-012)
+// gsd-pi: provider-equality guardrail test (ADR-012)
 //
 // Purpose: prevent regressions of bug class #4478 — gating API-shape-dependent
 // behavior on `model.provider === "<transport>"` instead of `model.api`.

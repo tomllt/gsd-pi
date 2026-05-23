@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Applies custom-engine reconcile outcomes to auto-mode loop side effects.
 
 import type { CustomEngineReconcileOutcome } from "./workflow-custom-engine-reconcile.js";

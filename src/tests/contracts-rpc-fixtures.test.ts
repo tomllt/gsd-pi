@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies Phase 1 RPC contracts remain compatible with Phase 0 golden fixtures.
 
 import assert from "node:assert/strict";

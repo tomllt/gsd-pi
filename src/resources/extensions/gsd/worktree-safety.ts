@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Worktree Safety module contract for validating source-writing Unit roots.
 
 import { existsSync, lstatSync, type Stats } from "node:fs";

@@ -1,4 +1,4 @@
-// GSD-2 — Worktree State Projection module: directional state-flow rules between project root and auto-worktree.
+// gsd-pi — Worktree State Projection module: directional state-flow rules between project root and auto-worktree.
 /**
  * Worktree State Projection module — first-class Module for directional
  * state-file flow between the project root and the auto-worktree.

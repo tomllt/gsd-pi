@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Sidecar queue scheduling and dequeue adapter for auto-mode loop.
 
 import type { SidecarItem } from "./session.js";

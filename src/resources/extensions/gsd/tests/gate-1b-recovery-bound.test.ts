@@ -1,4 +1,4 @@
-// GSD-2 + Gate 1b recovery counter bound — regression tests for H1 fix (#5012)
+// gsd-pi + Gate 1b recovery counter bound — regression tests for H1 fix (#5012)
 //
 // Verifies that checkAutoStartAfterDiscuss stops emitting plan-blocked recovery
 // hints (with triggerTurn:true) after MAX_PLAN_BLOCKED_RECOVERIES attempts and

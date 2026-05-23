@@ -10,6 +10,7 @@
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -33,7 +34,7 @@ const GSD_ALIASES = {
   '@gsd/pi-ai':           new URL('../dist-test/packages/pi-ai/src/index.js', import.meta.url).href,
   '@gsd/pi-agent-core':   new URL('../dist-test/packages/pi-agent-core/src/index.js', import.meta.url).href,
   '@gsd/pi-tui':          new URL('../dist-test/packages/pi-tui/src/index.js', import.meta.url).href,
-  '@gsd/native':          new URL('../dist-test/packages/native/src/index.js', import.meta.url).href,
+  '@gsd/native':          new URL('../dist-test/packages/native/dist/index.js', import.meta.url).href,
 };
 
 export function resolve(specifier, context, nextResolve) {
@@ -42,16 +43,32 @@ export function resolve(specifier, context, nextResolve) {
     return nextResolve(GSD_ALIASES[specifier], context);
   }
 
-  // 2. .ts relative imports inside dist-test → .js
+  // 2. .ts imports inside dist-test → .js, preserving query/hash
+  // cache busters used by dynamic import tests.
+  if (specifier.startsWith('file:') && specifier.startsWith(DIST_TEST) && isTsSpecifier(specifier)) {
+    return nextResolve(rewriteTsSpecifierToJs(specifier), context);
+  }
+
   if (
-    specifier.endsWith('.ts') &&
+    isTsSpecifier(specifier) &&
     (specifier.startsWith('./') || specifier.startsWith('../')) &&
     context.parentURL &&
     context.parentURL.startsWith(DIST_TEST)
   ) {
-    const jsSpecifier = specifier.slice(0, -3) + '.js';
+    const jsSpecifier = rewriteTsSpecifierToJs(specifier);
     return nextResolve(jsSpecifier, context);
   }
 
   return nextResolve(specifier, context);
 }
+
+function isTsSpecifier(specifier) {
+  const pathPart = specifier.split(/[?#]/, 1)[0];
+  return pathPart.endsWith('.ts');
+}
+
+function rewriteTsSpecifierToJs(specifier) {
+  return specifier.replace(/\.ts(?=([?#]|$))/, '.js');
+}
+
+registerHooks({ resolve });

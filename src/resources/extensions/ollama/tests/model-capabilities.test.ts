@@ -1,4 +1,4 @@
-// GSD2 — Tests for Ollama model capability detection
+// gsd-pi — Tests for Ollama model capability detection
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {

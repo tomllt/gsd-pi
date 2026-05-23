@@ -1,6 +1,6 @@
 ## Review Migrated .gsd Directory
 
-A `/gsd migrate` command just wrote a `.gsd/` directory from an old `.planning` source. Your job is to audit the output and verify it meets GSD-2 standards before the user starts working with it. This review is read-only: report issues and recommended fixes, but do not edit files in place.
+A `/gsd migrate` command just wrote a `.gsd/` directory from an old `.planning` source. Your job is to audit the output and verify it meets gsd-pi standards before the user starts working with it. This review is read-only: report issues and recommended fixes, but do not edit files in place.
 
 ### Source
 - Old `.planning` directory: `{{sourcePath}}`
@@ -63,4 +63,4 @@ Issues: <list any problems found>
 Recommended fixes: <list any fixes needed>
 ```
 
-If the overall result is FAIL, explain what needs manual attention. If PASS WITH NOTES, explain what's imperfect but acceptable. If PASS, confirm the `.gsd` directory is ready for GSD-2 auto-mode.
+If the overall result is FAIL, explain what needs manual attention. If PASS WITH NOTES, explain what's imperfect but acceptable. If PASS, confirm the `.gsd` directory is ready for gsd-pi auto-mode.

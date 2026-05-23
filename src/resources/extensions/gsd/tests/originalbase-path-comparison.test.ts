@@ -1,4 +1,4 @@
-// GSD-2 — Regression tests for originalBase path comparison correctness (M5 fix)
+// gsd-pi — Regression tests for originalBase path comparison correctness (M5 fix)
 //
 // After commit ade55a7f5, getAutoWorktreeOriginalBase() returns ws.projectRoot
 // which is realpath-normalized. Callers that compare it with string === against

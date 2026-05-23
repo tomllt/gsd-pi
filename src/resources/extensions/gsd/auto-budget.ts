@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Pure budget and context guard decisions for GSD auto-mode.
 /**
  * Budget alert level tracking and enforcement for auto-mode.

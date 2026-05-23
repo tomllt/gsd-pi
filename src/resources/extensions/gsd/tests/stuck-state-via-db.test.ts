@@ -1,4 +1,4 @@
-// gsd-2 + Stuck-state DB-migration regression (Phase C)
+// gsd-pi + Stuck-state DB-migration regression (Phase C)
 //
 // stuck-state.json file IO has been deleted. The auto-loop now reconstructs
 // recentUnits from unit_dispatches (Phase B ledger) and persists

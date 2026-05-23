@@ -1,5 +1,5 @@
 /**
- * GSD-2 schema migration smoke (forward only).
+ * gsd-pi schema migration smoke (forward only).
  *
  * Seeds a `.gsd/gsd.db` SQLite file at an older `schema_version` and runs
  * the **real built `gsd` binary** (`gsd headless query`, no LLM required)

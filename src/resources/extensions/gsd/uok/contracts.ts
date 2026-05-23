@@ -1,4 +1,4 @@
-// GSD2 UOK Contract Types and Versioning
+// gsd-pi UOK Contract Types and Versioning
 
 export const CURRENT_UOK_CONTRACT_VERSION = "1" as const;
 

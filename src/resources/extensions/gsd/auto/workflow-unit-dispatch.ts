@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit dispatch contract adapter for auto-mode loop.
 
 import type { SidecarItem } from "./session.js";

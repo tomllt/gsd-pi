@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Host-owned verification verdict policy for auto-mode units.
 
 import type { VerificationResult as VerificationGateResult } from "./types.js";

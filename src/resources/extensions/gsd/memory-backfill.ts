@@ -1,4 +1,4 @@
-// GSD2 — Decisions -> memories backfill (ADR-013 step 5)
+// gsd-pi — Decisions -> memories backfill (ADR-013 step 5)
 //
 // Idempotent migration that copies every decisions row (active and
 // superseded — see Stage 2a note below) into the memories table with

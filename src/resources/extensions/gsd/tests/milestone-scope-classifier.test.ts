@@ -1,4 +1,4 @@
-// GSD-2 — #4781: classifier behavior matrix. Pure-function tests, no I/O.
+// gsd-pi — #4781: classifier behavior matrix. Pure-function tests, no I/O.
 
 import test from "node:test";
 import assert from "node:assert/strict";

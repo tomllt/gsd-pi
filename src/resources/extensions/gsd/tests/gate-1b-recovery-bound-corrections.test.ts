@@ -1,4 +1,4 @@
-// GSD-2 + Gate 1b recovery bound corrections — regression tests for the two bugs
+// gsd-pi + Gate 1b recovery bound corrections — regression tests for the two bugs
 // found in peer review of the H1 fix (commit f0e1d42a2):
 //   1. Escalation message must describe /gsd (counter reset) AND /gsd-debug (diagnose).
 //   2. planBlockedRecoveryCount must NOT increment when pi.sendMessage throws.

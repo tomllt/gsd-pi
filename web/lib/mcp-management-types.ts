@@ -1,4 +1,4 @@
-// GSD-2 — Browser-safe MCP management contracts.
+// gsd-pi — Browser-safe MCP management contracts.
 // File Purpose: Shared TypeScript interfaces for app MCP connection management.
 
 export type WebMcpTransport = "stdio" | "http" | "unsupported"

@@ -1,4 +1,4 @@
-// gsd-2 / execute-summary-save PROJECT registration hard-fail tests
+// gsd-pi / execute-summary-save PROJECT registration hard-fail tests
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";

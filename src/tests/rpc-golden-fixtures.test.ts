@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Characterization tests for shared RPC golden fixture records.
 
 import assert from "node:assert/strict";

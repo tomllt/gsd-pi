@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: State-aware home menu for the bare /gsd command.
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";

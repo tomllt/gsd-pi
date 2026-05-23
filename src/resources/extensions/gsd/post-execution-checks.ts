@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Post-execution validation checks for completed GSD task output.
 
 /**

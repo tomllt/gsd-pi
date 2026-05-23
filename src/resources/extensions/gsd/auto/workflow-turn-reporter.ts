@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Thin adapter for workflow turn observer reporting.
 
 import type {

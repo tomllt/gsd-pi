@@ -1,4 +1,4 @@
-// GSD2 - Tests for terminal style primitives
+// gsd-pi - Tests for terminal style primitives
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";

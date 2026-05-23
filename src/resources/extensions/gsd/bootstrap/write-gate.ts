@@ -1,4 +1,4 @@
-// GSD2 - Write gate runtime persistence and policy guards.
+// gsd-pi - Write gate runtime persistence and policy guards.
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 

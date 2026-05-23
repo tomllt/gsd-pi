@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Assistant message rail renderer for interactive terminal sessions.
 import type { AssistantMessage } from "@gsd/pi-ai";
 import { Container, Markdown, type MarkdownTheme, Spacer, Text } from "@gsd/pi-tui";

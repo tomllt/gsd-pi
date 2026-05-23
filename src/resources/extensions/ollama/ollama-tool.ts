@@ -1,4 +1,4 @@
-// GSD2 — LLM-callable Ollama management tool
+// gsd-pi — LLM-callable Ollama management tool
 /**
  * Registers an ollama_manage tool that the LLM can call to interact
  * with the local Ollama instance — list models, pull new ones, check status.

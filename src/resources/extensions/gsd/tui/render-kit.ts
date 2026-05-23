@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared terminal rendering helpers for GSD extension TUI surfaces.
 
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@gsd/pi-tui";

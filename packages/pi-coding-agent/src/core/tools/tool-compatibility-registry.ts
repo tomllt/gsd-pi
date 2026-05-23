@@ -1,4 +1,4 @@
-// GSD-2 — Tool Compatibility Registry (ADR-005 Phase 2)
+// gsd-pi — Tool Compatibility Registry (ADR-005 Phase 2)
 // Maps tool names to their provider compatibility metadata.
 // Used by the model router to filter tools incompatible with the selected provider.
 

@@ -1,4 +1,4 @@
-<!-- Project/App: GSD-2 -->
+<!-- Project/App: gsd-pi -->
 <!-- File Purpose: ADR for drift-driven design of the State Reconciliation Module. -->
 
 # ADR-017: Drift-Driven State Reconciliation

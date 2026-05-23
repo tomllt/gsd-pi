@@ -1,5 +1,5 @@
 /**
- * GSD-2 / guided-flow — regression tests for #4573
+ * gsd-pi / guided-flow — regression tests for #4573
  *
  * Covers two recovery paths:
  *   - maybeHandleReadyPhraseWithoutFiles: nudge when LLM emits

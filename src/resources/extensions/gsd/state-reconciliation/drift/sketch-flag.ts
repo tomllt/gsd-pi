@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: ADR-017 stale-sketch-flag drift handler. Relocated from
 // gsd-db.ts where autoHealSketchFlags previously lived with zero callers.
 //

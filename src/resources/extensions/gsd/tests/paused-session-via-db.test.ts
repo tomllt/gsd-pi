@@ -1,4 +1,4 @@
-// gsd-2 + Paused-session via runtime_kv (Phase C pt 2 — paused-session.json migration)
+// gsd-pi + Paused-session via runtime_kv (Phase C pt 2 — paused-session.json migration)
 //
 // runtime/paused-session.json is gone. The metadata that the old file
 // stored now lives in runtime_kv (global scope, key PAUSED_SESSION_KV_KEY).

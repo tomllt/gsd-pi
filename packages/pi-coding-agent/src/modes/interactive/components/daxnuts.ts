@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/daxnuts.ts - Animated Daxnuts easter egg component.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/daxnuts.ts - Animated Daxnuts easter egg component.
 /**
  * POWERED BY DAXNUTS - Easter egg for OpenCode + Kimi K2.5
  *

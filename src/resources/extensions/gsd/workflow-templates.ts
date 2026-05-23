@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Workflow template registry loading, matching, and display helpers.
 
 /**

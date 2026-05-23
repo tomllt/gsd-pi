@@ -1,4 +1,4 @@
-// GSD-2 - Loader child-process entrypoint resolution helpers.
+// gsd-pi - Loader child-process entrypoint resolution helpers.
 
 import { existsSync as defaultExistsSync } from "node:fs"
 import { join, resolve } from "node:path"

@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/auto-dashboard.ts - Auto-mode progress widget rendering and dashboard helpers.
+// gsd-pi + src/resources/extensions/gsd/auto-dashboard.ts - Auto-mode progress widget rendering and dashboard helpers.
 
 /**
  * Auto-mode Dashboard — progress widget rendering, elapsed time formatting,

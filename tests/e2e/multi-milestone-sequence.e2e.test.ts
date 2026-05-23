@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: E2E gate for headless multi-milestone sequencing through auto-mode.
 
 import { execFileSync } from "node:child_process";

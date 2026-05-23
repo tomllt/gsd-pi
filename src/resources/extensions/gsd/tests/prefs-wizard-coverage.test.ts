@@ -1,4 +1,4 @@
-// GSD-2 + prefs-wizard-coverage.test.ts - Behavioral coverage for preferences wizard persistence.
+// gsd-pi + prefs-wizard-coverage.test.ts - Behavioral coverage for preferences wizard persistence.
 
 import test from "node:test";
 import assert from "node:assert/strict";

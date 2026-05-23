@@ -1,4 +1,4 @@
-// GSD-2 Web — Collects workflow visualizer data for browser API routes.
+// gsd-pi Web — Collects workflow visualizer data for browser API routes.
 
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for interactive terminal tool execution rendering.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
@@ -173,7 +173,7 @@ describe("ToolExecutionComponent", () => {
 	test("renders compact capitalized read rows from file_path args", () => {
 		const rendered = renderToolCollapsed(
 			"Read",
-			{ file_path: "~/Github/gsd-2/src/resources/extensions/gsd/health-widget-core.ts" },
+			{ file_path: "~/projects/gsd-pi/src/resources/extensions/gsd/health-widget-core.ts" },
 			{ content: [{ type: "text", text: "hidden body output" }], isError: false },
 		);
 

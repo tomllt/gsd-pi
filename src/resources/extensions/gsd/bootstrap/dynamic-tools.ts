@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Registers workspace-aware dynamic filesystem and shell tools.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";

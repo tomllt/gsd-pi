@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies the guided requirements discussion prompt renders core requirements and persistence contracts.
 
 import test from "node:test";

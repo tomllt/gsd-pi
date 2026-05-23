@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: E2E gate for headless auto-mode pause and blocked recovery behavior.
 
 import { execFileSync } from "node:child_process";

@@ -280,7 +280,7 @@ gsd --version     # 输出已安装版本
 
 ```bash
 git clone https://github.com/open-gsd/gsd-pi.git
-cd gsd-2/docker
+cd gsd-pi/docker
 ```
 
 **第 3 步：创建并进入沙箱：**

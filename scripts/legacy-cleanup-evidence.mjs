@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Runs representative checks and produces Phase 8 legacy cleanup telemetry evidence.
 
 import { spawn } from "node:child_process";

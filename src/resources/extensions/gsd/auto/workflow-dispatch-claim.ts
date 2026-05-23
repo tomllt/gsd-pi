@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Best-effort unit dispatch claim adapter for auto-mode loop.
 
 import type { AutoSession } from "./session.js";

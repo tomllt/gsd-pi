@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Compact connected status message formatting for GSD TUI notifications.
 
 const STATUS_INDENT = "    ";

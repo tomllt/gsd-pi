@@ -8,7 +8,7 @@ Instrument code so that a cold-start agent can understand what happened by readi
 </objective>
 
 <context>
-GSD-2's `VISION.md` lists "agent-first observability" as a principle, and the system prompt calls it out: "A future version of you will land in this codebase with no memory… you add observability because you're the one who'll need it at 3am." GSD-2 already exemplifies this — `activity/*.jsonl`, `journal/*.jsonl`, `metrics.json`, `doctor-history.jsonl` — but new code doesn't get that treatment automatically.
+gsd-pi's `VISION.md` lists "agent-first observability" as a principle, and the system prompt calls it out: "A future version of you will land in this codebase with no memory… you add observability because you're the one who'll need it at 3am." gsd-pi already exemplifies this — `activity/*.jsonl`, `journal/*.jsonl`, `metrics.json`, `doctor-history.jsonl` — but new code doesn't get that treatment automatically.
 
 This skill is the thinking process for adding it. Not "add logs everywhere" — add the *right* signals at the *right* decision points.
 
@@ -62,7 +62,7 @@ log.info({
 });
 ```
 
-Use the project's existing logger if one exists. In gsd-2, follow the patterns in `src/resources/extensions/gsd/activity-log.ts` and `src/resources/extensions/gsd/journal.ts` — structured JSONL, one event per line, with `ts`, `event`, and domain-specific fields.
+Use the project's existing logger if one exists. In gsd-pi, follow the patterns in `src/resources/extensions/gsd/activity-log.ts` and `src/resources/extensions/gsd/journal.ts` — structured JSONL, one event per line, with `ts`, `event`, and domain-specific fields.
 
 Avoid:
 - `console.log("here")` — what does "here" mean in six months?
@@ -86,14 +86,14 @@ await writeAtomically(
 );
 ```
 
-A fresh agent reading `.gsd/runtime/` sees what happened last, what was retried, and where the process stopped. Pattern exists already in gsd-2 — reuse the `atomic-write.ts` helpers and the `.gsd/runtime/` and `.gsd/forensics/` directories.
+A fresh agent reading `.gsd/runtime/` sees what happened last, what was retried, and where the process stopped. Pattern exists already in gsd-pi — reuse the `atomic-write.ts` helpers and the `.gsd/runtime/` and `.gsd/forensics/` directories.
 
 ## Step 4: Health and status surfaces
 
 For long-running processes:
 
 - **Health endpoint** (HTTP server) or **status file** (CLI tool). Cheap to call, no side effects. Returns current state: `{status: "healthy" | "degraded" | "down", ...diagnostics}`.
-- **Digest view** — a small representation of recent work. In gsd-2, this is `STATE.md` and the health widget. In a server, it's `/internal/status` with last 10 request summaries.
+- **Digest view** — a small representation of recent work. In gsd-pi, this is `STATE.md` and the health widget. In a server, it's `/internal/status` with last 10 request summaries.
 - **Minimal metrics** — counters for the 3–5 things that matter (requests, errors, active jobs). Not everything — just what drives alerts.
 
 Don't build a metrics empire. Build exactly what you'd check at 3am.

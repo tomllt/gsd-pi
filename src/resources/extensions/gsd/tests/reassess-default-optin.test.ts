@@ -1,4 +1,4 @@
-// GSD-2 — ADR-003 §4 behavior contract: reassess-roadmap is opt-in.
+// gsd-pi — ADR-003 §4 behavior contract: reassess-roadmap is opt-in.
 // Companion to (eventually replacing) the source-grep assertions in
 // token-profile.test.ts. This file verifies the dispatch rule's guard
 // behavior directly rather than inspecting source text.

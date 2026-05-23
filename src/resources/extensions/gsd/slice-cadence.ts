@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Slice-cadence merge and milestone resquash git operations.
 /**
  * Slice-cadence collapse — #4765.

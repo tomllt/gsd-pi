@@ -1,4 +1,4 @@
-// GSD2 UOK Contract Versioning and DB Authority Tests
+// gsd-pi UOK Contract Versioning and DB Authority Tests
 
 import test from "node:test";
 import assert from "node:assert/strict";

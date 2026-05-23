@@ -1,4 +1,4 @@
-// GSD-2 — MCP connections API route.
+// gsd-pi — MCP connections API route.
 // File Purpose: Exposes app-side MCP connection management actions.
 
 import {

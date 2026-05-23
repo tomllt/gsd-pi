@@ -1,4 +1,4 @@
-// GSD2 TUI Tests - Built-in terminal theme palette coverage.
+// gsd-pi TUI Tests - Built-in terminal theme palette coverage.
 import test from "node:test";
 import assert from "node:assert/strict";
 

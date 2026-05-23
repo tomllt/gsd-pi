@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Interactive terminal footer renderer for workspace, model, usage, context, and extension status.
 
 import { type Component, truncateToWidth, visibleWidth } from "@gsd/pi-tui";

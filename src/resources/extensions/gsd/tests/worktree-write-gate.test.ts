@@ -1,4 +1,4 @@
-// GSD-2 worktree-isolation write gate (#5199).
+// gsd-pi worktree-isolation write gate (#5199).
 //
 // Regression coverage for shouldBlockWorktreeWrite — the helper that prevents
 // the LLM from authoring code at the project root when `git.isolation: worktree`

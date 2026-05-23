@@ -31,7 +31,7 @@ import type { AutoSession } from "../auto/session.ts";
 // ─── Fixture helpers ────────────────────────────────────────────────────────
 
 function tempDbPath(): string {
-  const dir = mkdtempSync(join(tmpdir(), "gsd-2945-"));
+  const dir = mkdtempSync(join(tmpdir(), "gsd-pi-2945-"));
   return join(dir, "test.db");
 }
 
@@ -46,7 +46,7 @@ function cleanupDb(dbPath: string): void {
 }
 
 function createTempProject(): { basePath: string } {
-  const basePath = mkdtempSync(join(tmpdir(), "gsd-2945-project-"));
+  const basePath = mkdtempSync(join(tmpdir(), "gsd-pi-2945-project-"));
   mkdirSync(join(basePath, ".gsd", "milestones", "M001"), { recursive: true });
   return { basePath };
 }
@@ -270,7 +270,7 @@ describe("#2945 Bug 3: mergeAndExit must teardown worktree after successful merg
     // this test can no longer assert via a deps mock. Rewritten to use
     // a real git fixture and verify the worktree directory is removed
     // from disk after the merge.
-    const tmpBase = realpathSync(mkdtempSync(join(tmpdir(), "gsd-2945-bug3-")));
+    const tmpBase = realpathSync(mkdtempSync(join(tmpdir(), "gsd-pi-2945-bug3-")));
     // ADR-016 phase 3 (#5693): Lifecycle.restoreToProjectRoot now chdirs to
     // s.originalBasePath. Save cwd before the test so we can restore it
     // before rmSync removes tmpBase — otherwise the next test in this file

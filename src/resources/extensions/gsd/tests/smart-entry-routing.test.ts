@@ -1,4 +1,4 @@
-// GSD-2 — Smart entry routing behavior tests.
+// gsd-pi — Smart entry routing behavior tests.
 // Verifies guided wizard choices resolve to the correct execution path.
 
 import test from "node:test";

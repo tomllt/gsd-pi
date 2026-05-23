@@ -1,4 +1,4 @@
-// GSD-2 - Shared target metadata for tool output rendering.
+// gsd-pi - Shared target metadata for tool output rendering.
 
 export type ToolTargetKind = "file" | "directory" | "search" | "command";
 

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for notification overlay wrapping and width-safe rendering.
 
 import { describe, test } from "node:test";

@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/dynamic-border.ts - Width-adaptive border with optional spinner.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/dynamic-border.ts - Width-adaptive border with optional spinner.
 
 import type { TUI } from "@gsd/pi-tui";
 import { visibleWidth } from "@gsd/pi-tui";

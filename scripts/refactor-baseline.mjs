@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Read-only baseline metrics harness for the long-running refactor program.
 
 import { createHash } from "node:crypto";
@@ -640,7 +640,7 @@ export async function timeCommand(root, spec) {
 
 export function renderSummary(report) {
   const lines = [
-    "GSD-2 Refactor Baseline",
+    "gsd-pi Refactor Baseline",
     `Generated: ${report.generatedAt}`,
     `Root: ${report.root}`,
     `Schema version: ${report.schemaVersion}`,

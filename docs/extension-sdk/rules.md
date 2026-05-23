@@ -1,8 +1,8 @@
 # Rules
 
-// GSD-2 Extension SDK — Non-negotiable rules, gotchas, and contribution requirements
+// gsd-pi Extension SDK — Non-negotiable rules, gotchas, and contribution requirements
 
-Non-negotiable rules, common gotchas, and contribution requirements for GSD-2 extensions. Violating any non-negotiable rule will block your PR.
+Non-negotiable rules, common gotchas, and contribution requirements for gsd-pi extensions. Violating any non-negotiable rule will block your PR.
 
 ---
 

@@ -1,4 +1,4 @@
-// GSD-2 + Subagent launch contract and child process safety helpers.
+// gsd-pi + Subagent launch contract and child process safety helpers.
 
 import * as fs from "node:fs";
 import * as path from "node:path";

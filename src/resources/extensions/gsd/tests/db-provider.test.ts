@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for SQLite provider loading and fallback behavior.
 
 import { describe, test } from "node:test";

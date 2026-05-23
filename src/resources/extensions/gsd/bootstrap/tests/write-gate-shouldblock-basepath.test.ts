@@ -1,4 +1,4 @@
-// GSD-2 write-gate bootstrap — regression tests for basePath threading on
+// gsd-pi write-gate bootstrap — regression tests for basePath threading on
 // shouldBlockContextWrite / shouldBlockPendingGate (R1).
 //
 // The underlying bug: readers defaulted to process.cwd() and so missed the

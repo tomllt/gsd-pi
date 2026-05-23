@@ -1,4 +1,4 @@
-// gsd-2 + Stuck-detector retry coupling regression (Phase B / codex MEDIUM B3)
+// gsd-pi + Stuck-detector retry coupling regression (Phase B / codex MEDIUM B3)
 //
 // Rule 2b previously tripped on 3 same-unit appearances regardless of
 // retry budget. With unit_dispatches.attempt_n + next_run_at driving in-DB

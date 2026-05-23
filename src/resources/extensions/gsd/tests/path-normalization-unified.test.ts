@@ -1,4 +1,4 @@
-// GSD-2 + Unified path normalization tests: normalizeRealPath and tryRealpath parity
+// gsd-pi + Unified path normalization tests: normalizeRealPath and tryRealpath parity
 
 import { describe, test, before, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Parity tests for GSD workflow task completion over native and MCP transports.
 // ADR-008 validation criterion #3 — behavior-parity lock-in for gsd_task_complete.
 //

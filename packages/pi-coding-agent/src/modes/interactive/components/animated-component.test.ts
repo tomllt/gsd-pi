@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/animated-component.test.ts - Animated component lifecycle tests.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/animated-component.test.ts - Animated component lifecycle tests.
 
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";

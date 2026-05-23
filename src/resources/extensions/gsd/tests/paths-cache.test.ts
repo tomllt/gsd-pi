@@ -1,4 +1,4 @@
-// GSD2 — paths cache normalization and clearPathCache() invalidation tests
+// gsd-pi — paths cache normalization and clearPathCache() invalidation tests
 
 import { describe, test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

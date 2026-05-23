@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSD-2 — Reject source-grep tests
+# gsd-pi — Reject source-grep tests
 # Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 #
 # Fails CI if a PR adds or modifies a test file that reads a source file with

@@ -1,4 +1,4 @@
-// gsd-2 / Deep planning mode — Artifact validator entry point.
+// gsd-pi / Deep planning mode — Artifact validator entry point.
 //
 // Validates PROJECT.md, REQUIREMENTS.md, and per-milestone ROADMAP.md
 // against the contract spec in .planning/phases/11-deep-planning-mode/11-CONTRACTS.md.

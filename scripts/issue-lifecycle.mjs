@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Comment on canonical issue lifecycle labels and recycle stale needs-info issues.
 
 import { readFileSync } from "node:fs";

@@ -1,4 +1,4 @@
-// GSD2 UOK Timeline Reconstruction from Authoritative DB Records
+// gsd-pi UOK Timeline Reconstruction from Authoritative DB Records
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

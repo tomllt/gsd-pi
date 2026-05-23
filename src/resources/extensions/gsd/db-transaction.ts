@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Transaction depth helper for the GSD database facade.
 
 export interface DbTransactionControls {

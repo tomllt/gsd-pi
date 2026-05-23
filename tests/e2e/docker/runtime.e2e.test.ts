@@ -1,5 +1,5 @@
 /**
- * GSD-2 Docker runtime e2e smoke.
+ * gsd-pi Docker runtime e2e smoke.
  *
  * Builds the `runtime-local` Dockerfile target from the *current source*
  * (via `npm pack` → COPY into the image) and runs `gsd --version` inside

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for database open attempt and error state tracking.
 
 import { describe, test } from "node:test";

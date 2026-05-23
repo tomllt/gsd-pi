@@ -1,4 +1,4 @@
-// GSD-2 — Guided workflow Unit context.
+// gsd-pi — Guided workflow Unit context.
 // Tracks the guided Unit whose queued turn should use manifest Tool Contract policy.
 
 export interface GuidedUnitContext {

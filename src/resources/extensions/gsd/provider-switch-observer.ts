@@ -1,4 +1,4 @@
-// GSD-2 — ADR-005 Phase 3b: surface ProviderSwitchReport from pi-ai.
+// gsd-pi — ADR-005 Phase 3b: surface ProviderSwitchReport from pi-ai.
 //
 // pi-ai builds a ProviderSwitchReport on every cross-provider transform but
 // only logs it to stderr when GSD_VERBOSE=1. This module installs a

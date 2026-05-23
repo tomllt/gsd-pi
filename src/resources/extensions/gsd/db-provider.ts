@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: SQLite provider loading and fallback helpers for the GSD database facade.
 
 export type DbProviderName = "node:sqlite" | "better-sqlite3";

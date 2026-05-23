@@ -1,4 +1,4 @@
-// GSD-2 — Guided roadmap slice detection regression tests.
+// gsd-pi — Guided roadmap slice detection regression tests.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

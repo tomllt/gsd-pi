@@ -1,4 +1,4 @@
-// GSD-2 — Smart entry routing decisions.
+// gsd-pi — Smart entry routing decisions.
 // Pure route selection for /gsd guided wizard choices.
 
 export type SmartEntryIsolationMode = "worktree" | "branch" | "none";

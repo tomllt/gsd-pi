@@ -1,4 +1,4 @@
-// gsd-2 / merge-self-branch-guard.test.ts — regressions for #5024 and #6250
+// gsd-pi / merge-self-branch-guard.test.ts — regressions for #5024 and #6250
 //
 // mergeMilestoneToMain() must recover from stale/corrupt integration metadata
 // that points at milestone branches (integrationBranch recorded as

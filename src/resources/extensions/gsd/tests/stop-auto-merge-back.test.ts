@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Stop-auto worktree exit strategy regression tests.
 /**
  * stop-auto-merge-back.test.ts — Regression test for #5576.

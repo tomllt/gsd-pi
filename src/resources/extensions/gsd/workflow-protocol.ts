@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared capped workflow protocol and doctor-heal prompt payload helpers.
 
 const DEFAULT_WORKFLOW_PROTOCOL_EXCERPT_CHARS = 4_000;

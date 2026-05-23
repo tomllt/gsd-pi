@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Project/App: GSD-2
+ * Project/App: gsd-pi
  * File Purpose: Compile source and test files into reusable dist-test artifacts.
  *
  * Compile all TypeScript source + test files to dist-test/ using esbuild.

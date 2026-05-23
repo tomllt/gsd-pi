@@ -1,8 +1,8 @@
 <!-- GSD Pi - Getting started guide -->
 
-# Getting Started With GSD2
+# Getting Started With GSD Pi
 
-GSD2, published from this repository as GSD Pi, is a local-first coding agent for planning, implementing, and verifying project work from your terminal.
+GSD Pi, published from this repository as `@opengsd/gsd-pi`, is a local-first coding agent for planning, implementing, and verifying project work from your terminal.
 
 This guide gets you from a clean machine to your first GSD session.
 
@@ -57,7 +57,7 @@ gsd upgrade
 
 `gsd update` is an alias for the same command. Inside a GSD session, use `/gsd update` instead.
 
-If `gsd` reports a version mismatch with synced resources, or you previously installed the unscoped `gsd-pi` package, see [Upgrade from older GSD-2 installs](./troubleshooting.md#upgrade-from-older-gsd-2-installs) in Troubleshooting.
+If `gsd` reports a version mismatch with synced resources, or you previously installed the unscoped `gsd-pi` package, see [Upgrade from older gsd-pi installs](./troubleshooting.md#upgrade-from-older-gsd-pi-installs) in Troubleshooting.
 
 ## Configure GSD
 

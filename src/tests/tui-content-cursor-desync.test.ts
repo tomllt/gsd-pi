@@ -1,4 +1,4 @@
-// GSD-2 + src/tests/tui-content-cursor-desync.test.ts - Regression coverage for TUI hardware cursor baselines.
+// gsd-pi + src/tests/tui-content-cursor-desync.test.ts - Regression coverage for TUI hardware cursor baselines.
 
 /**
  * Regression test for #3764: TUI input clears and jumps up after PR #3744.

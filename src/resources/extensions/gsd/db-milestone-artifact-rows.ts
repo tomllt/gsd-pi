@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Milestone and artifact row mappers for the GSD database facade.
 
 export interface MilestoneRow {

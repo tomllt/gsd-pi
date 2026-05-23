@@ -1,8 +1,8 @@
-# Contributing to GSD-2
+# Contributing to gsd-pi
 
-We're glad you're here. GSD-2 is an open project and contributions are welcome across the entire codebase. We hold a high bar for what gets merged — not to be gatekeepers, but because every change ships to real users and stability matters.
+We're glad you're here. gsd-pi is an open project and contributions are welcome across the entire codebase. We hold a high bar for what gets merged — not to be gatekeepers, but because every change ships to real users and stability matters.
 
-Read [VISION.md](VISION.md) before contributing. It defines what GSD-2 is, what it isn't, and what we won't accept.
+Read [VISION.md](VISION.md) before contributing. It defines what gsd-pi is, what it isn't, and what we won't accept.
 
 ## Before you start
 
@@ -13,7 +13,7 @@ Read [VISION.md](VISION.md) before contributing. It defines what GSD-2 is, what 
 
 ### First-time contributors
 
-We are not a fan of drive-by first-time contributions. If this is your first PR to GSD-2, you **must** open an issue first describing the problem or feature, wait for a maintainer response, and link the issue in your PR. First-time PRs that show up with no prior issue will be closed without review. This is not optional — it exists because triaging unsolicited code from unknown contributors is more expensive than the contribution is worth.
+We are not a fan of drive-by first-time contributions. If this is your first PR to gsd-pi, you **must** open an issue first describing the problem or feature, wait for a maintainer response, and link the issue in your PR. First-time PRs that show up with no prior issue will be closed without review. This is not optional — it exists because triaging unsolicited code from unknown contributors is more expensive than the contribution is worth.
 
 Once you have one merged PR, this requirement no longer applies to you.
 
@@ -55,7 +55,7 @@ If `verify:pr` fails after running tests (e.g. `Cannot find module '@gsd/*'` err
 
 ### Cross-platform note
 
-GSD-2 runs on macOS, Linux, and Windows:
+gsd-pi runs on macOS, Linux, and Windows:
 
 - **Git hooks** are executed by Git's bundled shell, so they work from any terminal (CMD, PowerShell, Git Bash).
 - **Shell scripts** in `scripts/` use `#!/usr/bin/env bash`. On Windows, Git may convert these to CRLF line endings, which breaks the shebang. If you hit shebang errors when running lint scripts locally, create a `.gitattributes` file in the repo root with `*.sh text eol=lf` to force LF checkout. Do not commit this file.

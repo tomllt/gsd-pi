@@ -1,4 +1,4 @@
-// GSD-2 — Deep planning mode dispatch behavior contract.
+// gsd-pi — Deep planning mode dispatch behavior contract.
 // Verifies the new deep-mode dispatch rules guard correctly on prefs.planning_depth
 // and on artifact presence, and that light mode behavior is unaffected.
 

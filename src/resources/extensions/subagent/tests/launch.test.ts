@@ -1,4 +1,4 @@
-// GSD-2 + Subagent launch module regression tests.
+// gsd-pi + Subagent launch module regression tests.
 
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";

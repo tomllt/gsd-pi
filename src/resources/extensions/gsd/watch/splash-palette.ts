@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared RGB palette for the pre-theme GSD watch splash.
 
 export const splashPalette = {

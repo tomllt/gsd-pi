@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Runtime counters for telemetry-gated legacy compatibility paths.
 
 import { mkdirSync, writeFileSync } from "node:fs";

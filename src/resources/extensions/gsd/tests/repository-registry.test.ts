@@ -1,4 +1,4 @@
-// GSD-2 + Repository registry seam tests.
+// gsd-pi + Repository registry seam tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
  * Derive a package root from an import.meta.url, returning null on failure.
  *
  * The Next.js standalone build bakes import.meta.url as the CI runner's
- * absolute path (e.g. file:///home/runner/work/gsd-2/gsd-2/src/web/bridge-service.ts).
+ * absolute path (e.g. file:///home/runner/work/gsd-pi/gsd-pi/src/web/bridge-service.ts).
  * On Windows, fileURLToPath() rejects this Linux path with
  * "File URL path must be absolute".
  *

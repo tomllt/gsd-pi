@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/skill-invocation-message.ts - Skill invocation message renderer.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/skill-invocation-message.ts - Skill invocation message renderer.
 
 import { Markdown, type MarkdownTheme, Text } from "@gsd/pi-tui";
 import type { ParsedSkillBlock } from "../../../core/agent-session.js";

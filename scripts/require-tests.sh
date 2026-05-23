@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSD-2 — Require tests with source changes
+# gsd-pi — Require tests with source changes
 # Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 #
 # Fails CI if a PR changes source files but includes no test file changes.

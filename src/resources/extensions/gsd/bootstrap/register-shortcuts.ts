@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Registers GSD keyboard shortcuts for dashboard, notifications, and parallel overlays.
 
 import { existsSync } from "node:fs";

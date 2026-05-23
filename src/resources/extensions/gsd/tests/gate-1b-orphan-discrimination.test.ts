@@ -1,5 +1,5 @@
 /**
- * GSD-2 / guided-flow — regression tests for Gate 1b orphan discrimination
+ * gsd-pi / guided-flow — regression tests for Gate 1b orphan discrimination
  *
  * Gate 1b in checkAutoStartAfterDiscuss discriminates between two "queued" states:
  *   (a) plan-blocked: discuss completed (CONTEXT.md on disk), but gsd_plan_milestone

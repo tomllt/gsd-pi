@@ -1,4 +1,4 @@
-// GSD-2 — #4780: slice-summary excerpts replace full inlining in
+// gsd-pi — #4780: slice-summary excerpts replace full inlining in
 // buildCompleteMilestonePrompt. Verify (a) the excerpt helper emits
 // frontmatter fields + section heads + on-demand path, (b) the closer
 // prompt lists all slice SUMMARY paths under "On-demand Slice Summaries",

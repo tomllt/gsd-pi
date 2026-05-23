@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for /gsd notifications command handling and overlay launch behavior.
 
 import test from "node:test";

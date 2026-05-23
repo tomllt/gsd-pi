@@ -1,4 +1,4 @@
-// GSD-2 — SQLite unavailable bootstrap gate regression tests.
+// gsd-pi — SQLite unavailable bootstrap gate regression tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

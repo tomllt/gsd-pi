@@ -1,6 +1,6 @@
 # API Reference
 
-// GSD-2 Extension SDK — Complete API surface reference
+// gsd-pi Extension SDK — Complete API surface reference
 
 This document covers every public method and type exposed by the Extension SDK. For usage patterns and examples, see [Building Extensions](./building-extensions.md).
 

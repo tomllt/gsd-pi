@@ -1,4 +1,4 @@
-# GSD-2 Prompt System Map
+# gsd-pi Prompt System Map
 
 > Complete dependency graph of all prompts, how they're loaded, assembled, dispatched, and how they chain into each other.
 

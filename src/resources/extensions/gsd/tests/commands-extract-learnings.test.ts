@@ -1,4 +1,4 @@
-// GSD2 commands-extract-learnings tests
+// gsd-pi commands-extract-learnings tests
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";

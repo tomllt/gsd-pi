@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Startup welcome screen rendering for the GSD terminal experience.
 
 /**

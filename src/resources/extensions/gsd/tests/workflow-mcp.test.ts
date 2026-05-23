@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests workflow MCP launch config, tool surface, and stdio elicitation behavior.
 
 import test from "node:test";

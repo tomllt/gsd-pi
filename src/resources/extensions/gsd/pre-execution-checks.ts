@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Pre-execution validation checks for GSD task plans.
 
 /**

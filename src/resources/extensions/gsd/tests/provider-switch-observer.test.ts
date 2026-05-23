@@ -1,4 +1,4 @@
-// GSD-2 — ADR-005 Phase 3b: ProviderSwitchObserver Tests
+// gsd-pi — ADR-005 Phase 3b: ProviderSwitchObserver Tests
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";

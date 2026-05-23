@@ -1,5 +1,5 @@
 /**
- * GSD-2 e2e fake-LLM helpers.
+ * gsd-pi e2e fake-LLM helpers.
  *
  * Compose a JSONL transcript and run `gsd --print` against it. The fake
  * provider replays the transcript turn-by-turn (see

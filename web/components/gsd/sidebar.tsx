@@ -1,6 +1,6 @@
 "use client"
 
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Browser sidebar and milestone navigation with workflow controls.
 
 import { useMemo, useState, useSyncExternalStore } from "react"

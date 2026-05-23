@@ -1,4 +1,4 @@
-// GSD2 — Regression test: auto-mode resume resolves resource-loader.js from deployed path (#3949)
+// gsd-pi — Regression test: auto-mode resume resolves resource-loader.js from deployed path (#3949)
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 import test from "node:test";
 import assert from "node:assert/strict";

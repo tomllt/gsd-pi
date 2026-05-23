@@ -1,4 +1,4 @@
-// GSD2 — Regression tests for git-checkpoint rollback (#3576)
+// gsd-pi — Regression tests for git-checkpoint rollback (#3576)
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from "node:test";

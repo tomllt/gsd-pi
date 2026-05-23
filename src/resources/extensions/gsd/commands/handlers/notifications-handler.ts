@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Handles /gsd notifications commands and opens the notification history overlay.
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";

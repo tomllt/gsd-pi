@@ -1,4 +1,4 @@
-// gsd-2 / Deep planning mode — Helper to set planning_depth in .gsd/PREFERENCES.md.
+// gsd-pi / Deep planning mode — Helper to set planning_depth in .gsd/PREFERENCES.md.
 //
 // Persists the user's deep-mode opt-in across sessions. Reads the existing
 // preferences file (if any), parses its YAML frontmatter, sets/updates

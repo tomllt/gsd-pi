@@ -1,4 +1,4 @@
-// GSD-2 — Milestone scope classifier (#4781 / ADR-003 companion).
+// gsd-pi — Milestone scope classifier (#4781 / ADR-003 companion).
 //
 // Pure heuristics over milestone planning fields. Produces a PipelineVariant
 // that downstream dispatch logic can use to shape the auto-mode sequence.

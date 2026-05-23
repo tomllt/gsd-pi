@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Keyboard input parsing and matching for terminal applications.
 
 /**

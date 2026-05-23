@@ -1,4 +1,4 @@
-// GSD-2 — Expected worktree condition warning suppression tests.
+// gsd-pi — Expected worktree condition warning suppression tests.
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";

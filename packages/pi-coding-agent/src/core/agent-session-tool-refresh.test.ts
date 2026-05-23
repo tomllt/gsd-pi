@@ -1,4 +1,4 @@
-// GSD2 - Agent session workspace-root refresh regression tests
+// gsd-pi - Agent session workspace-root refresh regression tests
 // Regression test for #3616: newSession() must restore the full tool set
 // when cwd is unchanged.
 //

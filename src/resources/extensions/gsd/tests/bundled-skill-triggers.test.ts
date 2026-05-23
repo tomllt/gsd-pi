@@ -1,4 +1,4 @@
-// GSD-2 — BUNDLED_SKILL_TRIGGERS regression test
+// gsd-pi — BUNDLED_SKILL_TRIGGERS regression test
 //
 // Guards the skill-trigger table in system-context.ts against accidental
 // regression. Every entry must have a non-empty trigger + skill, and the

@@ -133,8 +133,8 @@ describe('session-lock-multipath', async () => {
       assert.ok(r2.acquired, 'second base lock acquired');
 
       const registered = _getRegisteredLockDirs();
-      const gsd2 = gsdRoot(base2);
-      assert.ok(registered.includes(gsd2), 'second gsdDir is registered');
+      const gsdRoot2 = gsdRoot(base2);
+      assert.ok(registered.includes(gsdRoot2), 'second gsdDir is registered');
 
       releaseSessionLock(base2);
     } finally {

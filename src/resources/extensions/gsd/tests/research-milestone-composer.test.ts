@@ -1,4 +1,4 @@
-// GSD-2 — #4782 phase 3 batch 2: research-milestone migrated through composer.
+// gsd-pi — #4782 phase 3 batch 2: research-milestone migrated through composer.
 
 import test from "node:test";
 import assert from "node:assert/strict";

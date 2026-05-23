@@ -1,4 +1,4 @@
-// gsd-2 + Unit dispatch ledger (DB-backed coordination, Phase B)
+// gsd-pi + Unit dispatch ledger (DB-backed coordination, Phase B)
 //
 // Records every auto-mode unit dispatch (plan-slice, run-task, summarize, …)
 // with worker_id, fencing token, status lifecycle, and retry metadata. The

@@ -1,4 +1,4 @@
-// gsd-2 / Deep planning mode — Regression coverage for hasPendingDeepStage()
+// gsd-pi / Deep planning mode — Regression coverage for hasPendingDeepStage()
 // being exported and consumed by the showSmartEntry deep-mode kickoff branch.
 //
 // Context: PR #5094 wires a deep-mode branch into showSmartEntry that calls

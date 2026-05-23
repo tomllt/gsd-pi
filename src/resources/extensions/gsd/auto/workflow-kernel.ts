@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Pure workflow-loop decisions for auto-mode before side-effect adapters run.
 
 export type WorkflowLoopAction =

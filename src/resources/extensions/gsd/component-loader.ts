@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Loads modern component.yaml definitions and legacy skill/agent formats.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';

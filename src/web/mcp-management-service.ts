@@ -1,4 +1,4 @@
-// GSD-2 — Web MCP management service.
+// gsd-pi — Web MCP management service.
 // File Purpose: Bridges app API routes to the shared MCP management module.
 
 import { execFile } from "node:child_process"

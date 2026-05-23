@@ -1,4 +1,4 @@
-// GSD-2 — #4781 phase 2: dispatch-rule gates read pipeline variant from DB.
+// gsd-pi — #4781 phase 2: dispatch-rule gates read pipeline variant from DB.
 // Behavior tests (not source-grep) — construct a real tmpdir DB, insert a
 // milestone whose planning fields classify to the target variant, exercise
 // DISPATCH_RULES.match(), assert the gate result.

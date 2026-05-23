@@ -1,5 +1,5 @@
 /**
- * GSD-2 — MCP manager tests.
+ * gsd-pi — MCP manager tests.
  *
  * File Purpose: Behaviour coverage for shared MCP config management and
  * side-effect-free connection testing.

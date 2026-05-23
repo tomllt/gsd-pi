@@ -1,6 +1,6 @@
 # 从 v1 迁移
 
-如果你有仍在使用原始 Get Shit Done（v1）`.planning` 目录结构的项目，可以把它们迁移到 GSD-2 的 `.gsd` 格式。
+如果你有仍在使用 Get Shit Done v1（现由社区以 [get-shit-done-redux](https://github.com/open-gsd/get-shit-done-redux) 继续维护）`.planning` 目录结构的项目，可以把它们迁移到 gsd-pi 的 `.gsd` 格式。
 
 ## 运行迁移
 

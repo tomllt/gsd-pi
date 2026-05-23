@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for workspace package test file selection.
 
 import assert from 'node:assert/strict';

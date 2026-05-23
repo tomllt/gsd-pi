@@ -1,4 +1,4 @@
-// GSD-2 + Regression tests for checkAutoStartAfterDiscuss Gate 1a (R2)
+// gsd-pi + Regression tests for checkAutoStartAfterDiscuss Gate 1a (R2)
 //
 // When a depth-verification gate is still pending (the LLM emitted the
 // confirmation question via ask_user_questions or plain chat but the user has

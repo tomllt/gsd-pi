@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Resolves expected auto-mode artifact paths across project and worktree projections.
 // GSD Auto-mode — Artifact Path Resolution
 //

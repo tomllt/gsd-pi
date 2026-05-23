@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto Orchestration module interfaces and ADR-015 invariant adapter contracts.
 
 import type { GSDState } from "../types.js";

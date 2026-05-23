@@ -1,5 +1,5 @@
 /**
- * GSD-2 native TS↔Rust ABI smoke.
+ * gsd-pi native TS↔Rust ABI smoke.
  *
  * Loads `@gsd/native` from a fresh node:test worker and exercises a few
  * core entrypoints — grep (ripgrep), xxHash32, fuzzyFind, glob. Catches:

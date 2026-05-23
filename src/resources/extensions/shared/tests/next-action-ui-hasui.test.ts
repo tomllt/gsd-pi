@@ -1,4 +1,4 @@
-// GSD2 — Regression test for next-action-ui ctx.hasUI short-circuit (bare /gsd lockup)
+// gsd-pi — Regression test for next-action-ui ctx.hasUI short-circuit (bare /gsd lockup)
 
 /**
  * Regression test for the bare /gsd lockup investigated in

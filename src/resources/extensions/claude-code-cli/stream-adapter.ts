@@ -1,4 +1,4 @@
-// GSD2 - Claude Code CLI provider stream adapter
+// gsd-pi - Claude Code CLI provider stream adapter
 /**
  * Stream adapter: bridges the Claude Agent SDK into GSD's streamSimple contract.
  *

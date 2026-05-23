@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for auto-mode verification retry backoff decisions.
 
 import test from "node:test";

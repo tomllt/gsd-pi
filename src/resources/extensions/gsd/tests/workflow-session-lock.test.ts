@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for auto-mode session-lock validation adapter.
 
 import assert from "node:assert/strict";

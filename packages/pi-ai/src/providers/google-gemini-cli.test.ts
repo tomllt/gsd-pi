@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests Google Gemini CLI compatible provider behavior.
 
 import test from "node:test";

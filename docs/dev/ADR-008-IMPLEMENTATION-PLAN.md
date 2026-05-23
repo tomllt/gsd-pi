@@ -1,6 +1,6 @@
 # ADR-008 Implementation Plan
 
-**Related ADR:** [ADR-008-gsd-tools-over-mcp-for-provider-parity.md](/Users/jeremymcspadden/Github/gsd-2/docs/ADR-008-gsd-tools-over-mcp-for-provider-parity.md)
+**Related ADR:** [ADR-008-gsd-tools-over-mcp-for-provider-parity.md](./ADR-008-gsd-tools-over-mcp-for-provider-parity.md)
 **Status:** Draft
 **Date:** 2026-04-09
 

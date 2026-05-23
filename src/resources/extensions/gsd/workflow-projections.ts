@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Projection renderers for GSD workflow database rows.
 // GSD Extension — Projection Renderers (DB -> Markdown)
 // Renders PLAN.md, ROADMAP.md, SUMMARY.md, and STATE.md from database rows.

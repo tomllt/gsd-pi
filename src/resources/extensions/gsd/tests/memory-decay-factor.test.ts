@@ -1,4 +1,4 @@
-// gsd-2 / memoryDecayFactor unit tests
+// gsd-pi / memoryDecayFactor unit tests
 //
 // Pure-function boundary tests for the V28 time-decay scoring helper.
 // The function maps last_hit_at → multiplier in [0.7, 1.0] used by

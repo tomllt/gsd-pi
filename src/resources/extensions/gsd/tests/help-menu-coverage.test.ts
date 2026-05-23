@@ -1,4 +1,4 @@
-// GSD-2 — Verify /gsd help menu covers all registered commands
+// gsd-pi — Verify /gsd help menu covers all registered commands
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, test } from "node:test";

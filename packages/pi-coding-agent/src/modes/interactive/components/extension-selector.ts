@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/extension-selector.ts - Extension option selector.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/extension-selector.ts - Extension option selector.
 /**
  * Generic selector component for extensions.
  * Displays a list of string options with keyboard navigation.

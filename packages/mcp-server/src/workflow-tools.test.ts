@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests packaged workflow tools exposed by the GSD MCP server.
 
 import { describe, it } from "node:test";

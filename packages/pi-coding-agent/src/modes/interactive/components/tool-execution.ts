@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Interactive terminal tool execution renderer for commands, tool calls, diffs, images, and summaries.
 import {
 	Box,

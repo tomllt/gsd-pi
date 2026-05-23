@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: ADR-017 stale-worker drift handler. Detects session-lock
 // artifacts whose owning PID is no longer alive (typical after SIGKILL or
 // laptop sleep where the heartbeat wasn't released cleanly), and clears them

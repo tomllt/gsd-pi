@@ -1,4 +1,4 @@
-// GSD-2 Web — Browser-safe TypeScript interfaces for the workflow visualizer.
+// gsd-pi Web — Browser-safe TypeScript interfaces for the workflow visualizer.
 // Mirrors upstream types from src/resources/extensions/gsd/visualizer-data.ts
 // and src/resources/extensions/gsd/metrics.ts — do NOT import from those
 // modules directly, as they use Node.js APIs unavailable in the browser.

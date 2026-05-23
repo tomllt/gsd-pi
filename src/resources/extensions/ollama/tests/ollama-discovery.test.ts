@@ -1,4 +1,4 @@
-// GSD2 — Tests for Ollama model discovery and enrichment
+// gsd-pi — Tests for Ollama model discovery and enrichment
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { discoverModels } from "../ollama-discovery.js";

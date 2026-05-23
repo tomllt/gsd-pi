@@ -1,12 +1,12 @@
-# GSD-2 — VS Code Extension
+# gsd-pi — VS Code Extension
 
-Control the [GSD-2 coding agent](https://github.com/open-gsd/gsd-pi) directly from VS Code. Run autonomous coding sessions, chat with `@gsd`, monitor agent activity in real-time, review and accept/reject changes, and manage your workflow — all without leaving the editor.
+Control the [gsd-pi coding agent](https://github.com/open-gsd/gsd-pi) directly from VS Code. Run autonomous coding sessions, chat with `@gsd`, monitor agent activity in real-time, review and accept/reject changes, and manage your workflow — all without leaving the editor.
 
 ![GSD Extension Overview](docs/images/overview.png)
 
 ## Requirements
 
-- **GSD-2** installed globally: `npm install -g @opengsd/gsd-pi`
+- **gsd-pi** installed globally: `npm install -g @opengsd/gsd-pi`
 - **Node.js** >= 22.0.0
 - **Git** installed and on PATH
 - **VS Code** >= 1.95.0

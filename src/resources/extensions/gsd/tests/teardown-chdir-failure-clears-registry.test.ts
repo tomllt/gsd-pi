@@ -1,4 +1,4 @@
-// GSD-2 + Regression test: teardownAutoWorktree clears activeWorkspace even when process.chdir throws
+// gsd-pi + Regression test: teardownAutoWorktree clears activeWorkspace even when process.chdir throws
 
 /**
  * Regression (H3 broadened scope): `teardownAutoWorktree` must clear `activeWorkspace`

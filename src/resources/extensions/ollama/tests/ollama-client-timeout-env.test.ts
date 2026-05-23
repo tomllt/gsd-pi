@@ -1,4 +1,4 @@
-// GSD2 — Tests for OLLAMA_PROBE_TIMEOUT_MS / OLLAMA_REQUEST_TIMEOUT_MS env vars (#5003 / #4982)
+// gsd-pi — Tests for OLLAMA_PROBE_TIMEOUT_MS / OLLAMA_REQUEST_TIMEOUT_MS env vars (#5003 / #4982)
 //
 // Pinned defaults: 1500 ms probe, 10 000 ms request. The defaults must be
 // preserved when the env var is unset, empty, non-numeric, zero, or negative

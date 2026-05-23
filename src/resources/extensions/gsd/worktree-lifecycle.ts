@@ -1,4 +1,4 @@
-// GSD-2 — Worktree Lifecycle module: owns milestone entry/exit lifecycle behind a small, typed Interface.
+// gsd-pi — Worktree Lifecycle module: owns milestone entry/exit lifecycle behind a small, typed Interface.
 /**
  * Worktree Lifecycle module — first-class Module for worktree create/enter/exit/merge.
  *

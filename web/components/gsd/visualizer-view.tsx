@@ -1,4 +1,4 @@
-// GSD-2 Web — Workflow visualizer browser view.
+// gsd-pi Web — Workflow visualizer browser view.
 
 "use client"
 

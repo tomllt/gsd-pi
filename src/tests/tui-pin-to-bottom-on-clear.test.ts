@@ -1,4 +1,4 @@
-// GSD-2 — TUI pin-to-bottom regression test
+// gsd-pi — TUI pin-to-bottom regression test
 //
 // When the TUI does a full redraw with clear (`\x1b[2J`), the rendered block
 // must be anchored so its last line lands at the terminal's bottom row. Before

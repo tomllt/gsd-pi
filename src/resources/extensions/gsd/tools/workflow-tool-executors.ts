@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Adapts shared GSD workflow handlers for MCP executor calls.
 
 import { ensureDbOpen } from "../bootstrap/dynamic-tools.js";

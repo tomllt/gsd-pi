@@ -1,4 +1,4 @@
-// gsd-2 + Auto-mode worker process registry (DB-backed coordination, Phase B)
+// gsd-pi + Auto-mode worker process registry (DB-backed coordination, Phase B)
 //
 // IMPORTANT — naming clarification (codex review LOW N1):
 // This module is the AUTO-MODE PROCESS REGISTRY. It tracks long-running

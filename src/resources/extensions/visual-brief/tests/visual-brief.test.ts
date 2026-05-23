@@ -1,4 +1,4 @@
-// GSD-2 + Visual Brief command tests
+// gsd-pi + Visual Brief command tests
 
 import test from "node:test";
 import assert from "node:assert/strict";

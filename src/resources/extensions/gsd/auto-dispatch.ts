@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Declarative auto-mode dispatch rules and dispatch resolver.
 
 /**

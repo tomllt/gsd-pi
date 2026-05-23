@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for clearing stale GSD run UI surfaces.
 
 import test from "node:test";

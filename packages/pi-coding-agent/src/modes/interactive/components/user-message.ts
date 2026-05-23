@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Left-edge user message rail renderer for interactive chat transcripts.
 
 import { Container, Markdown, type MarkdownTheme } from "@gsd/pi-tui";

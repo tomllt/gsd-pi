@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared command gate for validation-blocked milestones.
 
 import { existsSync } from "node:fs";

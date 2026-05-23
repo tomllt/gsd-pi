@@ -1,4 +1,4 @@
-// GSD-2 + db-writer path containment: regression tests for path.relative-based traversal guard
+// gsd-pi + db-writer path containment: regression tests for path.relative-based traversal guard
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

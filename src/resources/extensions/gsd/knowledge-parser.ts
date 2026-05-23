@@ -1,4 +1,4 @@
-// GSD-2 — KNOWLEDGE.md parsing helpers shared by the consolidation scanner,
+// gsd-pi — KNOWLEDGE.md parsing helpers shared by the consolidation scanner,
 // the Patterns/Lessons backfill, and the hybrid projection renderer
 // (ADR-013 Stage 2a/2b).
 //

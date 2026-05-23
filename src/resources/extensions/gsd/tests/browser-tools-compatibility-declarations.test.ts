@@ -1,4 +1,4 @@
-// GSD-2 — ADR-005 Phase 2: Verify browser tool compatibility declarations.
+// gsd-pi — ADR-005 Phase 2: Verify browser tool compatibility declarations.
 //
 // Locks in the declarations that always-image-producing browser tools
 // (browser_screenshot, browser_zoom_region) carry `producesImages: true` so

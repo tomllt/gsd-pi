@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verification evidence row contract for GSD workflow database consumers.
 
 export interface VerificationEvidenceRow {

@@ -1,4 +1,4 @@
-// GSD-2 + Regression tests for deterministic policy error classification (#4973)
+// gsd-pi + Regression tests for deterministic policy error classification (#4973)
 //
 // When gsd_summary_save returns context_write_blocked (a deterministic write-gate
 // rejection), the retry controller must NOT re-dispatch with escalating model tiers.

@@ -1,4 +1,4 @@
-// GSD-2 - /gsd migrate safety helpers.
+// gsd-pi - /gsd migrate safety helpers.
 // File Purpose: Path resolution, target guards, backup, and restore support for v1 migration.
 
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";

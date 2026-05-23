@@ -1,4 +1,4 @@
-// GSD2 — Tests for input-controller image pasting behavior
+// gsd-pi — Tests for input-controller image pasting behavior
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, beforeEach } from "node:test";

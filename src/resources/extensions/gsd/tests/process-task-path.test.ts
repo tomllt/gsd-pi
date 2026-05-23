@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for canonical process recommendations by task size.
 
 import test from "node:test";

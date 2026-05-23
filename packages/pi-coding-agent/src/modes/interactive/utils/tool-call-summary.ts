@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Compact tool-call summaries for transcript tree rows.
 
 import { shortenPath } from "./shorten-path.js";

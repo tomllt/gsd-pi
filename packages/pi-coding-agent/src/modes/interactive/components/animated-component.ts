@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/animated-component.ts - Shared animated component lifecycle.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/animated-component.ts - Shared animated component lifecycle.
 
 import type { Component } from "@gsd/pi-tui";
 

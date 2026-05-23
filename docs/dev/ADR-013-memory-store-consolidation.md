@@ -1,4 +1,4 @@
-// GSD2 — ADR-013: Memory Store Consolidation
+// gsd-pi — ADR-013: Memory Store Consolidation
 
 # ADR-013: Memory Store Consolidation
 

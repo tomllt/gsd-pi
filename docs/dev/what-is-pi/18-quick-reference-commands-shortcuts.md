@@ -64,7 +64,7 @@ pi list                               # List packages
 
 *This document was generated from the Pi documentation. Source files are at:*
 ```
-/Users/lexchristopherson/.nvm/versions/node/v22.20.0/lib/node_modules/@mariozechner/pi-coding-agent/
+~/.nvm/versions/node/v22.20.0/lib/node_modules/@mariozechner/pi-coding-agent/
 ```
 
 *Companion document: **Pi-Extensions-Complete-Guide.md** (on Desktop)*

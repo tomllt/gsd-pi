@@ -1,4 +1,4 @@
-// GSD-2 — Regression tests for #3512: gsd-auto-wrapup mid-turn interruption
+// gsd-pi — Regression tests for #3512: gsd-auto-wrapup mid-turn interruption
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, test } from "node:test";

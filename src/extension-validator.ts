@@ -1,4 +1,4 @@
-// GSD-2 — Extension Package Format Validator
+// gsd-pi — Extension Package Format Validator
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**

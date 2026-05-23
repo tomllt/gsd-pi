@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: VS Code change-tracker event and snapshot helpers.
 
 import * as path from "node:path";

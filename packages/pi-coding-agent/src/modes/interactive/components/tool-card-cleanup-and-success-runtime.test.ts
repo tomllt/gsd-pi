@@ -1,6 +1,6 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Runtime tests for TUI tool cards, success notifications, and blocking errors.
-// GSD2 TUI Tests - Runtime coverage for tool-card cleanup and success notification rendering.
+// gsd-pi TUI Tests - Runtime coverage for tool-card cleanup and success notification rendering.
 // Runtime regression tests for the post-compaction tool-card cleanup and the
 // green-bordered success-notification rendering. Replaces the source-grep
 // `src/tests/tui-running-and-success-box.test.ts` that was deleted in #4875

@@ -1,4 +1,4 @@
-// GSD2 + skill-manifest.test — unit coverage for the skill manifest resolver
+// gsd-pi + skill-manifest.test — unit coverage for the skill manifest resolver
 //
 // Focused tests for `resolveSkillManifest` and `filterSkillsByManifest`.
 // Covers the wildcard semantics, the newly seeded unit-type entries

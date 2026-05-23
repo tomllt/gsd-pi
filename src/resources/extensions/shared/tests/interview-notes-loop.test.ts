@@ -1,4 +1,4 @@
-// GSD2 — Regression test for interview-ui "None of the above" notes loop
+// gsd-pi — Regression test for interview-ui "None of the above" notes loop
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**

@@ -1,4 +1,4 @@
-// GSD-2 — Deep planning mode artifact validator tests.
+// gsd-pi — Deep planning mode artifact validator tests.
 // Verifies validateArtifact() correctly accepts valid PROJECT.md / REQUIREMENTS.md /
 // ROADMAP.md fixtures and flags specific malformations with the expected error codes.
 

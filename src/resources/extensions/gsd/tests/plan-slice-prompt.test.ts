@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies GSD planning prompt placeholder rendering and DB-backed tool guidance.
 
 import test from "node:test";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Memory-pressure measurement adapter for auto-mode loop.
 
 import { createRequire } from "node:module";

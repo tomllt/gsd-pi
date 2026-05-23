@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-mode ScheduleWakeup state shared between the tool and runUnit.
 
 export interface ScheduledWakeup {

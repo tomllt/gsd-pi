@@ -1,4 +1,4 @@
-// GSD2 - Agent session lifecycle and workspace runtime coordination
+// gsd-pi - Agent session lifecycle and workspace runtime coordination
 /**
  * AgentSession - Core abstraction for agent lifecycle and session management.
  *

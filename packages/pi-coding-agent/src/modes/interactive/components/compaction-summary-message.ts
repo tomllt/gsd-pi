@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/compaction-summary-message.ts - Compaction summary message renderer.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/compaction-summary-message.ts - Compaction summary message renderer.
 
 import { Markdown, type MarkdownTheme, Text } from "@gsd/pi-tui";
 import type { CompactionSummaryMessage } from "../../../core/messages.js";

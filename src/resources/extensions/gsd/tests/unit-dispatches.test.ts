@@ -1,4 +1,4 @@
-// gsd-2 + Unit dispatch ledger tests (Phase B coordination — partial unique index, retry metadata)
+// gsd-pi + Unit dispatch ledger tests (Phase B coordination — partial unique index, retry metadata)
 
 import test from "node:test";
 import assert from "node:assert/strict";

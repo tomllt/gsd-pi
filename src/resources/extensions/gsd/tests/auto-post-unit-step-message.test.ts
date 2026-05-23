@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for step-mode completion messages in auto-post-unit.
 
 import test from "node:test";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: State manifest snapshot and restore orchestration for GSD workflow data.
 
 import {

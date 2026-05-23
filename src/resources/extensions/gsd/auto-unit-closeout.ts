@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-mode unit closeout metrics, activity capture, and ghost-run detection.
 
 /**

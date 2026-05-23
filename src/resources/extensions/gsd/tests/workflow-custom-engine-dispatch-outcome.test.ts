@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for custom-engine dispatch outcome side-effect adapter.
 
 import assert from "node:assert/strict";

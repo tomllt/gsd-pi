@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Runtime state derivation from GSD workflow database and legacy files.
 // GSD Extension — State Derivation
 // DB-authoritative runtime derivation with explicit legacy filesystem fallback.

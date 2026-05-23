@@ -1,4 +1,4 @@
-// GSD2 — KNOWLEDGE.md -> memories backfill (ADR-013 Stage 2b).
+// gsd-pi — KNOWLEDGE.md -> memories backfill (ADR-013 Stage 2b).
 //
 // Idempotent migration of `.gsd/KNOWLEDGE.md` Patterns and Lessons rows into
 // the `memories` table. Patterns become memories with `category: "pattern"`;

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tracks database open attempt and error status for the GSD database facade.
 
 export type DbOpenPhase = "open" | "initSchema" | "vacuum-recovery";

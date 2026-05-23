@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Handles operational /gsd subcommands.
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";
 

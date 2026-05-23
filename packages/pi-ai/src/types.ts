@@ -1,4 +1,4 @@
-// GSD2 - Shared AI provider type definitions
+// gsd-pi - Shared AI provider type definitions
 import type { AssistantMessageEventStream } from "./utils/event-stream.js";
 
 export type { AssistantMessageEventStream } from "./utils/event-stream.js";

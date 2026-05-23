@@ -1,4 +1,4 @@
-// GSD-2 + Workspace handle: single source of truth for path resolution per milestone
+// gsd-pi + Workspace handle: single source of truth for path resolution per milestone
 
 import { join, resolve } from "node:path";
 import { type GsdPathContract, resolveGsdPathContract, normalizeRealPath } from "./paths.js";

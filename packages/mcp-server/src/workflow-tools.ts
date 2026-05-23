@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Registers packaged workflow tools exposed by the GSD MCP server.
 
 /**

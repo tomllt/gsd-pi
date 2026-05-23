@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Validates planning and task template quality-gate content.
 
 import { readFileSync } from "node:fs";

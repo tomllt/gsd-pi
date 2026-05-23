@@ -1,4 +1,4 @@
-// GSD2 - Adaptive mode selection for the interactive terminal UI
+// gsd-pi - Adaptive mode selection for the interactive terminal UI
 
 export type TuiMode = "chat" | "workflow" | "validation" | "debug" | "compact";
 export type TuiAdaptiveMode = "auto" | TuiMode;

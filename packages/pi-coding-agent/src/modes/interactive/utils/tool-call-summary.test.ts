@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Compact tool-call summary regression tests.
 
 import assert from "node:assert/strict";

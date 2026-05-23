@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for SQLite schema metadata helpers.
 
 import { describe, test } from "node:test";

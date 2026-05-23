@@ -1,4 +1,4 @@
-// gsd-2 + Command queue tests (Phase B coordination — IPC inbox + broadcast NULL semantics)
+// gsd-pi + Command queue tests (Phase B coordination — IPC inbox + broadcast NULL semantics)
 
 import test from "node:test";
 import assert from "node:assert/strict";

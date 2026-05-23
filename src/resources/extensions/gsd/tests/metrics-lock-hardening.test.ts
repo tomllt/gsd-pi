@@ -1,4 +1,4 @@
-// GSD-2 + metrics-lock-hardening.test.ts: regression tests for metrics lock hardening (M3)
+// gsd-pi + metrics-lock-hardening.test.ts: regression tests for metrics lock hardening (M3)
 /**
  * Verifies M3 lock hardening properties:
  *   1. Stale-lock detection: orphaned lock files (mtime > threshold) are forcibly

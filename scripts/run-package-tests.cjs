@@ -1,4 +1,4 @@
-// GSD-2 + scripts/run-package-tests.cjs — run `node --test` across every linkable workspace package
+// gsd-pi + scripts/run-package-tests.cjs — run `node --test` across every linkable workspace package
 'use strict'
 
 const { spawnSync } = require('child_process')

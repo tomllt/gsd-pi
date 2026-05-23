@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Interactive terminal bash execution renderer with streaming output and recommended command cards.
 
 import { Container, Loader, Spacer, Text, type TUI } from "@gsd/pi-tui";

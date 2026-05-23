@@ -1,4 +1,4 @@
-// GSD2 — Ollama Extension: First-class local LLM support
+// gsd-pi — Ollama Extension: First-class local LLM support
 /**
  * Ollama Extension
  *

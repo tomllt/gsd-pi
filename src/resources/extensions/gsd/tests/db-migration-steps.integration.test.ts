@@ -1,4 +1,4 @@
-// gsd-2 (GSD2) + db migration `:memory:` integration tests
+// gsd-pi (gsd-pi) + db migration `:memory:` integration tests
 //
 // Covers the gap left by the FakeAdapter unit tests for the gsd-db split
 // (PR #5308): those assert SQL strings, not that DDL actually executes.

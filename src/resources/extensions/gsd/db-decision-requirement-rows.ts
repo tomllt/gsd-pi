@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Decision and requirement row mappers for the GSD database facade.
 
 import type { Decision, DecisionMadeBy, Requirement, RequirementCounts } from "./types.js";

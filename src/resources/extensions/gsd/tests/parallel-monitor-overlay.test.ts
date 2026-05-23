@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for parallel monitor overlay rendering and input handling.
 
 import { describe, it } from "node:test";

@@ -1,4 +1,4 @@
-// GSD-2 + Workspace handle tests: createWorkspace and scopeMilestone
+// gsd-pi + Workspace handle tests: createWorkspace and scopeMilestone
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

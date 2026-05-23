@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/config-selector.ts - Package resource selector.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/config-selector.ts - Package resource selector.
 /**
  * TUI component for managing package resources (enable/disable)
  */

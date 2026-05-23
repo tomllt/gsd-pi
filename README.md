@@ -53,7 +53,7 @@ After migration, routine upgrades use:
 gsd upgrade
 ```
 
-You can also run `npx @opengsd/gsd-pi@latest` to launch the installer from the new package. For deeper recovery steps, see [Upgrade GSD Pi](./docs/user-docs/getting-started.md#upgrade-gsd-pi) and [Upgrade from older GSD-2 installs](./docs/user-docs/troubleshooting.md#upgrade-from-older-gsd-2-installs).
+You can also run `npx @opengsd/gsd-pi@latest` to launch the installer from the new package. For deeper recovery steps, see [Upgrade GSD Pi](./docs/user-docs/getting-started.md#upgrade-gsd-pi) and [Upgrade from older gsd-pi installs](./docs/user-docs/troubleshooting.md#upgrade-from-older-gsd-pi-installs).
 
 ## Quick Start
 
@@ -63,7 +63,7 @@ gsd
 
 Run the setup flow, choose your preferred model provider, and open a project directory. GSD stores project planning and runtime state in `.gsd/`.
 
-For a full first-run walkthrough, see [Getting Started With GSD2](./docs/user-docs/getting-started.md).
+For a full first-run walkthrough, see [Getting Started With gsd-pi](./docs/user-docs/getting-started.md).
 
 ## Common Session Commands
 

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for GitHub sync markdown formatters.
 
 import { describe, it } from "node:test";

@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/selector-footers.test.ts - Selector footer consistency coverage.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/selector-footers.test.ts - Selector footer consistency coverage.
 
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";

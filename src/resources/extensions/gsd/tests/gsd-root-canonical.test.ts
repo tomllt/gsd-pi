@@ -1,4 +1,4 @@
-// GSD-2 + gsd-root-canonical: gsdRoot() result is realpath-canonicalized before caching
+// gsd-pi + gsd-root-canonical: gsdRoot() result is realpath-canonicalized before caching
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

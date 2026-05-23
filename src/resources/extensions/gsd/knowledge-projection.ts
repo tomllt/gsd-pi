@@ -1,4 +1,4 @@
-// GSD2 — KNOWLEDGE.md hybrid projection renderer (ADR-013 Stage 2b).
+// gsd-pi — KNOWLEDGE.md hybrid projection renderer (ADR-013 Stage 2b).
 //
 // Renders `.gsd/KNOWLEDGE.md` as a hybrid file:
 //   - Rules section: read directly from the existing KNOWLEDGE.md (manual,

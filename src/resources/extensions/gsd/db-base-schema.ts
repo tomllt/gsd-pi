@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Base table, index, and view DDL for the GSD database facade.
 
 import type { DbAdapter } from "./db-adapter.js";

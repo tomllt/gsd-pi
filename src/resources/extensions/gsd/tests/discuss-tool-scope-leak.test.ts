@@ -1,4 +1,4 @@
-// GSD-2 — Behavioural regression test for #3616.
+// gsd-pi — Behavioural regression test for #3616.
 //
 // Bug: After a discuss session narrows the active tool set via setActiveTools,
 // the narrowed list persisted into the next auto-mode session because newSession()

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Summarize prompt-context debug events from GSD debug logs.
 
 const fs = require("node:fs");

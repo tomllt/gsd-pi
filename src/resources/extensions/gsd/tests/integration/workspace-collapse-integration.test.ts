@@ -1,4 +1,4 @@
-// GSD-2 + Integration regression suite for workspace collapse (feat/workspace-collapse)
+// gsd-pi + Integration regression suite for workspace collapse (feat/workspace-collapse)
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

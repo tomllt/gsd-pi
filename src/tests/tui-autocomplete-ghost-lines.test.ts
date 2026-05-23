@@ -1,4 +1,4 @@
-// GSD-2 + src/tests/tui-autocomplete-ghost-lines.test.ts - Regression coverage for TUI shrink clearing near autocomplete rows.
+// gsd-pi + src/tests/tui-autocomplete-ghost-lines.test.ts - Regression coverage for TUI shrink clearing near autocomplete rows.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

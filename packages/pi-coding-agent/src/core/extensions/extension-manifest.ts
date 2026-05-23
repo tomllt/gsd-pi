@@ -1,4 +1,4 @@
-// GSD-2 — Extension Manifest: Types and reading for extension-manifest.json
+// gsd-pi — Extension Manifest: Types and reading for extension-manifest.json
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { existsSync, readFileSync } from "node:fs";

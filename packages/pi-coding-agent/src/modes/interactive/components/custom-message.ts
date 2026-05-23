@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/custom-message.ts - Extension custom message renderer.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/custom-message.ts - Extension custom message renderer.
 
 import type { TextContent } from "@gsd/pi-ai";
 import type { Component } from "@gsd/pi-tui";

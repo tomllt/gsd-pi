@@ -1,4 +1,4 @@
-// GSD2 UOK Dispatch Envelope Builder
+// gsd-pi UOK Dispatch Envelope Builder
 
 import type {
   DispatchExplanation,

@@ -1,4 +1,4 @@
-// GSD-2 + /gsd brief command behavior tests
+// gsd-pi + /gsd brief command behavior tests
 
 import test from "node:test";
 import assert from "node:assert/strict";

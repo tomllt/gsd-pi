@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Worktree Lifecycle Module — typed-result contract tests for enterMilestone (ADR-016).
 import test from "node:test";
 import assert from "node:assert/strict";

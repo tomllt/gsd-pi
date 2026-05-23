@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/theme-selector.test.ts - Theme selector live-preview regression coverage.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/theme-selector.test.ts - Theme selector live-preview regression coverage.
 
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";

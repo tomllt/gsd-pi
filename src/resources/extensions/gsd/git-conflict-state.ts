@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Detect unresolved Git conflict state before automation runs.
 
 import { execFileSync } from "node:child_process";

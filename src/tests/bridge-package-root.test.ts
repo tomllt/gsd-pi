@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
  * standalone build.
  *
  * The Next.js standalone build bakes import.meta.url into compiled chunks as
- * the CI runner's absolute Linux path (file:///home/runner/work/gsd-2/gsd-2/…).
+ * the CI runner's absolute Linux path (file:///home/runner/work/gsd-pi/gsd-pi/…).
  * On Windows, fileURLToPath() rejects this with "File URL path must be
  * absolute". The fix wraps the derivation in safePackageRootFromImportUrl()
  * so the module-level constant never throws, and resolveBridgeRuntimeConfig

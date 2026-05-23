@@ -1,4 +1,4 @@
-// gsd-2 / Deep planning mode — Markdown → structured object parsers for artifact validation.
+// gsd-pi / Deep planning mode — Markdown → structured object parsers for artifact validation.
 //
 // Each parser converts a markdown artifact into a typed object suitable for
 // JSON Schema validation. The parsers are intentionally minimal — they only

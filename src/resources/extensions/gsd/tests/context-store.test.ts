@@ -1,4 +1,4 @@
-// GSD-2 + context-store.test.ts — Regression coverage for DB-backed context query helpers.
+// gsd-pi + context-store.test.ts — Regression coverage for DB-backed context query helpers.
 
 import { describe, test, afterEach } from "node:test";
 import assert from "node:assert/strict";

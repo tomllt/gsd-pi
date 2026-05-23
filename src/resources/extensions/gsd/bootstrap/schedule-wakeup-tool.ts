@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Registers the auto-mode ScheduleWakeup continuation tool.
 
 import { Type } from "@sinclair/typebox";

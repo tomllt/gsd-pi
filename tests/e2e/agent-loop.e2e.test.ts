@@ -1,5 +1,5 @@
 /**
- * GSD-2 agent-loop e2e tests.
+ * gsd-pi agent-loop e2e tests.
  *
  * Drives the real `gsd` binary through scripted prompt → tool → response
  * cycles using the fake LLM provider (packages/pi-ai/src/providers/fake.ts).

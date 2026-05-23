@@ -1,5 +1,5 @@
 /**
- * GSD-2 e2e harness: temporary project scaffolding.
+ * gsd-pi e2e harness: temporary project scaffolding.
  *
  * Creates a fresh isolated tmp dir for an e2e test, optionally seeded
  * with a git repo and/or a minimal `.gsd/` skeleton. Caller wires cleanup

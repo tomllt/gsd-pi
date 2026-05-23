@@ -1,4 +1,4 @@
-// GSD-2 — UnitContextManifest (#4782 phase 1).
+// gsd-pi — UnitContextManifest (#4782 phase 1).
 //
 // Declarative description of what context each auto-mode unit type needs
 // in its system prompt. Establishes the contract that later phases will

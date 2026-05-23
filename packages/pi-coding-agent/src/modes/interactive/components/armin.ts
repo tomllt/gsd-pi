@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/armin.ts - Animated Armin easter egg component.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/armin.ts - Animated Armin easter egg component.
 /**
  * Armin says hi! A fun easter egg with animated XBM art.
  */

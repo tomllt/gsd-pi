@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/tests/orphan-merge-bootstrap.test.ts
+// gsd-pi + src/resources/extensions/gsd/tests/orphan-merge-bootstrap.test.ts
 // Regression: bootstrap must actively merge orphan completed-but-unmerged
 // milestones, not just seed `s.currentMilestoneId` (the seed approach was
 // silently overwritten at auto-start.ts:948 — caught in audit of PR #5549).

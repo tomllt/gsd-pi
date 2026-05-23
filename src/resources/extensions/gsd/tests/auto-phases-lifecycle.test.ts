@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-loop phase lifecycle regression tests.
 import test from "node:test";
 import assert from "node:assert/strict";

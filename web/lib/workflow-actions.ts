@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Derive browser workflow action labels and commands from workspace state.
 /**
  * Pure derivation of the primary workflow action based on workspace state.

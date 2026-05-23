@@ -1,5 +1,5 @@
 /**
- * GSD-2 e2e sanity tests.
+ * gsd-pi e2e sanity tests.
  *
  * Smallest possible vertical slice that exercises the e2e harness through
  * a real spawn of the built `gsd` binary. If this suite passes, the harness

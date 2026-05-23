@@ -1,4 +1,4 @@
-// GSD2 — Regression tests: DB anti-pattern guardrails in prompt templates
+// gsd-pi — Regression tests: DB anti-pattern guardrails in prompt templates
 
 import test from "node:test";
 import assert from "node:assert/strict";

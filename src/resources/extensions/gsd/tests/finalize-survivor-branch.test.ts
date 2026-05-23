@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/tests/finalize-survivor-branch.test.ts
+// gsd-pi + src/resources/extensions/gsd/tests/finalize-survivor-branch.test.ts
 // Regression: an error from `_mergeBranchMode` (made fail-loud in commit
 // 68ef58a3c) must be caught at the survivor-finalize call site so bootstrap
 // surfaces an error notify instead of an unhandled exception propagating to

@@ -1,5 +1,5 @@
 /**
- * GSD2 Metrics — regression test for parallel-mode atomic merge
+ * gsd-pi Metrics — regression test for parallel-mode atomic merge
  *
  * Verifies that concurrent metrics.json writers do not silently discard
  * each other's entries (last-writer-wins). Two child processes each write

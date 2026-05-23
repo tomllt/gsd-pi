@@ -1,6 +1,6 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Registers Context Mode execution tools.
-// GSD2 — Exec (context-mode) tool registration.
+// gsd-pi — Exec (context-mode) tool registration.
 //
 // Exposes the Context Mode runtime tools in-process. Default-on; opt out with
 // `context_mode.enabled: false` in preferences.

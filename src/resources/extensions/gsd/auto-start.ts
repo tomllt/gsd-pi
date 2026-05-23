@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-mode bootstrap, worktree recovery, and fresh-start initialization.
 /**
  * Auto-mode bootstrap — fresh-start initialization path.

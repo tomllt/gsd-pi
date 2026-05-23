@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for safe terminal syntax highlighting fallback.
 
 import test from "node:test";

@@ -1,5 +1,5 @@
 /**
- * GSD2 web dashboard RTK metric behavior tests.
+ * gsd-pi web dashboard RTK metric behavior tests.
  */
 
 import test from "node:test"

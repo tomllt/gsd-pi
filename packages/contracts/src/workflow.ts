@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Canonical workflow MCP tool metadata shared across package boundaries.
 
 export type WorkflowToolWritePolicy = "read" | "write";

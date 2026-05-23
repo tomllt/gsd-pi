@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/__tests__/collapsible-message.test.ts - Collapsible message behavior tests.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/__tests__/collapsible-message.test.ts - Collapsible message behavior tests.
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";

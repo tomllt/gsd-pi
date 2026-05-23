@@ -46,7 +46,7 @@ function git(args: string[], cwd: string): string {
 }
 
 function makeBaseRepo(): string {
-  const base = mkdtempSync(join(tmpdir(), "gsd-2821-"));
+  const base = mkdtempSync(join(tmpdir(), "gsd-pi-2821-"));
   git(["init", "-b", "main"], base);
   git(["config", "user.name", "Test"], base);
   git(["config", "user.email", "test@test.com"], base);
@@ -64,8 +64,8 @@ describe("#2821 Bug 1 — ASSESSMENT file force-synced on resume", () => {
   let wtBase: string;
 
   beforeEach(() => {
-    mainBase = mkdtempSync(join(tmpdir(), "gsd-2821-main-"));
-    wtBase = mkdtempSync(join(tmpdir(), "gsd-2821-wt-"));
+    mainBase = mkdtempSync(join(tmpdir(), "gsd-pi-2821-main-"));
+    wtBase = mkdtempSync(join(tmpdir(), "gsd-pi-2821-wt-"));
     mkdirSync(join(mainBase, ".gsd", "milestones", "M011", "slices", "S01"), {
       recursive: true,
     });

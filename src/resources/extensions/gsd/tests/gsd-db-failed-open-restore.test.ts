@@ -1,4 +1,4 @@
-// GSD-2 + gsd-db failed-open restore: previous workspace connection survives a failed openDatabaseByWorkspace
+// gsd-pi + gsd-db failed-open restore: previous workspace connection survives a failed openDatabaseByWorkspace
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

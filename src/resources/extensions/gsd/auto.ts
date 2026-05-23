@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-mode orchestration, session lifecycle, and stop handling.
 /**
  * GSD Auto Mode — Fresh Session Per Unit

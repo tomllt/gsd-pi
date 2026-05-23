@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Main auto-mode execution loop.
 /**
  * auto/loop.ts — Main auto-mode execution loop.

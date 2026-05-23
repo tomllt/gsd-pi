@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/bash-execution.test.ts - Bash execution renderer regression coverage.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/bash-execution.test.ts - Bash execution renderer regression coverage.
 
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";

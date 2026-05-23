@@ -1,4 +1,4 @@
-// GSD-2 + scripts/lib/workspace-manifest.cjs — single source of truth for linkable @gsd/* packages
+// gsd-pi + scripts/lib/workspace-manifest.cjs — single source of truth for linkable @gsd/* packages
 'use strict'
 
 const { readdirSync, readFileSync, existsSync, statSync } = require('fs')

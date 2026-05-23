@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for verification evidence cross-reference mismatch policy.
 
 import test from "node:test";

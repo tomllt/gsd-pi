@@ -1,4 +1,4 @@
-// GSD2 — Regression test for Issue #4946 isVersionGreater (commands-extensions.ts)
+// gsd-pi — Regression test for Issue #4946 isVersionGreater (commands-extensions.ts)
 //
 // Covers the inline npm-version comparator that replaced the `semver` import in
 // commands-extensions.ts. The original import broke `tsc -p tsconfig.json` whenever

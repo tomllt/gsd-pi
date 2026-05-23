@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Provider-boundary token payload audit helpers.
 
 import type { Context, ImageContent, Message, TextContent, Tool } from "@gsd/pi-ai";

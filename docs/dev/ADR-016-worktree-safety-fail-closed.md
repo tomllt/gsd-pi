@@ -1,4 +1,4 @@
-<!-- Project/App: GSD-2 -->
+<!-- Project/App: gsd-pi -->
 <!-- File Purpose: ADR for fail-closed Worktree Safety behavior. -->
 
 # ADR-016: Fail Closed for Source-Writing Worktree Safety

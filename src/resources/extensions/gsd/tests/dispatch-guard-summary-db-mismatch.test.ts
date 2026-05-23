@@ -1,4 +1,4 @@
-// GSD-2 dispatch-guard regression test: SUMMARY/DB mismatch fail-closed behavior (#4663)
+// gsd-pi dispatch-guard regression test: SUMMARY/DB mismatch fail-closed behavior (#4663)
 //
 // Sibling bug to #4658 / PR #4660. A failure-path SUMMARY file on disk
 // must not let the cross-milestone dispatch guard treat an "active"

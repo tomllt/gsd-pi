@@ -1,5 +1,5 @@
 /**
- * GSD-2 e2e harness: artifact collection.
+ * gsd-pi e2e harness: artifact collection.
  *
  * Each e2e test gets a unique artifacts directory. Logs, screenshots, and
  * traces written here are uploaded by CI on failure. Locally they help

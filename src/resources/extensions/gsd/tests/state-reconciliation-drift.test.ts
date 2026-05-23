@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: ADR-017 contract tests for drift-driven State Reconciliation.
 // Covers sketch-flag (#5700), merge-state (#5701), stale-render (#5702),
 // stale-worker (#5703), unregistered-milestone (#5704), roadmap-divergence

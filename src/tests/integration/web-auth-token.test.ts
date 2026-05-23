@@ -1,5 +1,5 @@
 /**
- * GSD2 Web auth token behavior tests.
+ * gsd-pi Web auth token behavior tests.
  */
 
 import test from 'node:test'

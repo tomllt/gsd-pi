@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Markdown projection renderer for GSD workflow database rows.
 // GSD Markdown Renderer — DB → Markdown file generation
 //

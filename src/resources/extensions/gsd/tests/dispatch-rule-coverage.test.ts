@@ -1,4 +1,4 @@
-// gsd-2 / dispatch rule coverage canary test
+// gsd-pi / dispatch rule coverage canary test
 //
 // Iterates DISPATCH_RULES in order against representative GSDState stubs and
 // asserts that the first matching rule has the expected name and unitType

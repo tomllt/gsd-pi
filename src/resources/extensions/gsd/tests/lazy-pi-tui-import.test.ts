@@ -1,4 +1,4 @@
-// GSD2 — Shared barrel import behavior without TUI dependency loading
+// gsd-pi — Shared barrel import behavior without TUI dependency loading
 
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-# GSD-2 Prompt ↔ Database Combined Map
+# gsd-pi Prompt ↔ Database Combined Map
 
 > How each prompt in the pipeline reads and writes the database, and which DB state drives which prompt to fire.
 

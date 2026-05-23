@@ -1,4 +1,4 @@
-// GSD-2 — Regression test for pi-migration.ts public exports consumed by cli.ts
+// gsd-pi — Regression test for pi-migration.ts public exports consumed by cli.ts
 //
 // Guards against the TS2304 regression introduced by 080c6ac1e where
 // src/cli.ts called `getPiDefaultModelAndProvider()` without importing it.

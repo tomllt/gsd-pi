@@ -1,4 +1,4 @@
-// GSD-2 + Durable subagent run status, tracking names, and result artifact store.
+// gsd-pi + Durable subagent run status, tracking names, and result artifact store.
 
 import * as fs from "node:fs";
 import * as path from "node:path";

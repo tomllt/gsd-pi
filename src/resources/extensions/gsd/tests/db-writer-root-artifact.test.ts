@@ -1,4 +1,4 @@
-// GSD-2 + db-writer root-artifact path guard: regression tests for M1 fix
+// gsd-pi + db-writer root-artifact path guard: regression tests for M1 fix
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

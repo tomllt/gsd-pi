@@ -1,4 +1,4 @@
-// GSD-2 — Extension template import path validation
+// gsd-pi — Extension template import path validation
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from "node:test";

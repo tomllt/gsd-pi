@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for extracted GSD database migration DDL steps.
 
 import { describe, test } from "node:test";

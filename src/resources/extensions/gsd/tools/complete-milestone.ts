@@ -1,7 +1,7 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Complete-milestone tool handler for GSD workflow state and summaries.
 
-// GSD2 complete-milestone tool handler
+// gsd-pi complete-milestone tool handler
 /**
  * complete-milestone handler — the core operation behind gsd_complete_milestone.
  *

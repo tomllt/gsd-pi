@@ -1,4 +1,4 @@
-// GSD-2 + metrics.ts: token & cost tracking for auto-mode units
+// gsd-pi + metrics.ts: token & cost tracking for auto-mode units
 /**
  * GSD Metrics — Token & Cost Tracking
  *

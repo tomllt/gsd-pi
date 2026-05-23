@@ -8,7 +8,7 @@ Shape an HTTP or GraphQL API so callers get predictable, evolvable, and honest s
 </objective>
 
 <context>
-GSD-2 has `design-an-interface` for general module-interface design; this skill is the HTTP/GraphQL specialization. REST and GraphQL carry baggage — status codes, verbs, nullability, pagination — that a generic interface-design discussion glosses over.
+gsd-pi has `design-an-interface` for general module-interface design; this skill is the HTTP/GraphQL specialization. REST and GraphQL carry baggage — status codes, verbs, nullability, pagination — that a generic interface-design discussion glosses over.
 
 Invocation points:
 - Adding a new public API endpoint

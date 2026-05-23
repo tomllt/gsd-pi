@@ -1,4 +1,4 @@
-// GSD2 — Ollama slash commands
+// gsd-pi — Ollama slash commands
 
 /**
  * Registers /ollama slash commands for managing local Ollama models.

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared recommended transcript rendering primitives for assistant, tool, command, footer, and auto-mode TUI surfaces.
 
 import { alignRight, padRight, style, truncateToWidth, visibleWidth } from "@gsd/pi-tui";

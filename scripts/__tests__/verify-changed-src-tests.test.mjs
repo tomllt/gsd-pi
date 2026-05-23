@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for changed-source focused test selection.
 
 import assert from 'node:assert/strict';

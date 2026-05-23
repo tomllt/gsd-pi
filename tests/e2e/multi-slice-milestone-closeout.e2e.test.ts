@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: E2E gate for multi-slice headless milestone closeout agreement.
 
 import { execFileSync } from "node:child_process";

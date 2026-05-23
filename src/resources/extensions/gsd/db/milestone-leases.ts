@@ -1,4 +1,4 @@
-// gsd-2 + Milestone leases with fencing tokens (DB-backed coordination, Phase B)
+// gsd-pi + Milestone leases with fencing tokens (DB-backed coordination, Phase B)
 //
 // One worker at a time may hold a lease on a given milestone. Leases carry a
 // monotonic fencing token that increments on every successful takeover, so

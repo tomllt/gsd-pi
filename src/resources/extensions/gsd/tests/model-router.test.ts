@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies model routing decisions and legacy provider-default telemetry.
 import test, { describe } from "node:test";
 import assert from "node:assert/strict";

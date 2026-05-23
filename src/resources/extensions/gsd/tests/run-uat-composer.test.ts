@@ -1,4 +1,4 @@
-// GSD-2 — #4782 phase 3: run-uat migrated to compose context via manifest.
+// gsd-pi — #4782 phase 3: run-uat migrated to compose context via manifest.
 // Regression test: prompt still carries the declared artifacts in the
 // expected shape after the migration.
 

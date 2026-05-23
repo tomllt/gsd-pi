@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies low-risk auto-prompt duplication cuts render through prompt builders.
 
 import test from "node:test";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: VS Code extension manifest and pure helper behavior tests.
 
 import assert from "node:assert/strict";

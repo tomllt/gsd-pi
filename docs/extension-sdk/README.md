@@ -1,8 +1,8 @@
-# GSD-2 Extension SDK
+# gsd-pi Extension SDK
 
-// GSD-2 Extension SDK — Entry point and overview for extension development
+// gsd-pi Extension SDK — Entry point and overview for extension development
 
-The authoritative guide for building GSD-2 extensions. All extension contributors must follow this SDK. Extensions add tools, commands, event hooks, UI components, and custom behaviors to GSD-2 without modifying core code.
+The authoritative guide for building gsd-pi extensions. All extension contributors must follow this SDK. Extensions add tools, commands, event hooks, UI components, and custom behaviors to gsd-pi without modifying core code.
 
 ---
 
@@ -31,7 +31,7 @@ mkdir -p ~/.gsd/agent/extensions/my-extension
   "id": "my-extension",
   "name": "My Extension",
   "version": "1.0.0",
-  "description": "A minimal GSD-2 extension",
+  "description": "A minimal gsd-pi extension",
   "tier": "community",
   "requires": { "platform": ">=2.29.0" },
   "provides": {
@@ -105,6 +105,6 @@ The entry point must be `index.ts` and must use a default export that receives `
 |----------|------|-------|
 | Global | `~/.gsd/agent/extensions/` | Available in all GSD sessions |
 | Project-local | `.gsd/extensions/` | Available only in the current project |
-| Bundled | `src/resources/extensions/` | Ships with GSD-2 (core extensions) |
+| Bundled | `src/resources/extensions/` | Ships with gsd-pi (core extensions) |
 
 Extensions are discovered at startup. Global and project-local extensions load alongside bundled ones. See [Manifest Spec](manifest-spec.md) for how load order and tiers work.

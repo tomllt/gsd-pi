@@ -1,4 +1,4 @@
-// GSD-2 auto-start regression test: cleanStaleRuntimeUnits is DB-gated (#4663)
+// gsd-pi auto-start regression test: cleanStaleRuntimeUnits is DB-gated (#4663)
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";

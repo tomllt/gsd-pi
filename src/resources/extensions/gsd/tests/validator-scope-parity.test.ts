@@ -1,4 +1,4 @@
-// GSD-2 + Tests verifying writer/validator path parity via MilestoneScope (C3)
+// gsd-pi + Tests verifying writer/validator path parity via MilestoneScope (C3)
 //
 // Critical invariant: a writer that constructs paths via scope.contextFile() /
 // scope.roadmapFile() and a validator that resolves paths via the scope-based

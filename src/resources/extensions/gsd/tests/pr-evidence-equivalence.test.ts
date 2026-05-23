@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Golden-fixture equivalence tests pinning PR-body output for buildPrEvidence and formatSwarmLanePRBody.
 
 import test from "node:test";

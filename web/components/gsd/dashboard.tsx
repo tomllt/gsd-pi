@@ -1,6 +1,6 @@
 "use client"
 
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Browser dashboard for live GSD workspace progress and actions.
 
 import { useEffect, useState, useCallback } from "react"

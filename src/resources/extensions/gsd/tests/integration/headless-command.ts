@@ -318,7 +318,7 @@ function parseJsonlLines(output: string): JsonlEvent[] {
 async function main(): Promise<void> {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  // Resolve gsd-2 repo root (6 levels up from tests/integration/)
+  // Resolve gsd-pi repo root (6 levels up from tests/integration/)
   const repoRoot = join(__dirname, "..", "..", "..", "..", "..", "..");
 
   console.log("=== GSD Headless Command Integration Test ===\n");

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Pure spawn planning for the VS Code GSD RPC client.
 
 import type { SpawnOptions } from "node:child_process";

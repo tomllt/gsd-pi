@@ -1,4 +1,4 @@
-// GSD2 — Ecosystem extension loader for ./.gsd/extensions/
+// gsd-pi — Ecosystem extension loader for ./.gsd/extensions/
 // Discovers and registers single-file extensions that consume GSDExtensionAPI.
 // Trust-gated (mirrors pi's `.pi/extensions/` model) and isolated from pi's
 // own loader chain — handlers run in GSD's own dispatch step, not pi's.

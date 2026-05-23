@@ -1,4 +1,4 @@
-// GSD-2 — UnitContextComposer (#4782 phase 2).
+// gsd-pi — UnitContextComposer (#4782 phase 2).
 //
 // Reads a unit type's manifest and orchestrates artifact inlining through
 // a caller-provided resolver. Returns a joined context block suitable for

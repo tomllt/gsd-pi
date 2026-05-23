@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for post-execution retry bypass and verification gate failure handling.
 /**
  * post-exec-retry-bypass.test.ts — Tests for post-execution blocking failure retry bypass.

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: VS Code change-tracker helper behavior tests.
 
 import test from "node:test";

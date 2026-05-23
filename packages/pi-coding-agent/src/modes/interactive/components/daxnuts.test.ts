@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/daxnuts.test.ts - Daxnuts component color-mode regression coverage.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/daxnuts.test.ts - Daxnuts component color-mode regression coverage.
 
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";

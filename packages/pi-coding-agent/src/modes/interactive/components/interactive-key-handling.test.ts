@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/interactive-key-handling.test.ts - Interactive component key handling regressions.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/interactive-key-handling.test.ts - Interactive component key handling regressions.
 
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";

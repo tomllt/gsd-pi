@@ -1,4 +1,4 @@
-// GSD2 - Write gate regression tests.
+// gsd-pi - Write gate regression tests.
 /**
  * Unit tests for the CONTEXT.md write-gate (D031 guard chain).
  *

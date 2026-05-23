@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-tui/src/components/input.ts - Single-line terminal input component with editing, paste, and undo support.
+// gsd-pi + packages/pi-tui/src/components/input.ts - Single-line terminal input component with editing, paste, and undo support.
 
 import { getEditorKeybindings } from "../keybindings.js";
 import { decodeKittyPrintable } from "../keys.js";

@@ -1,4 +1,4 @@
-// GSD-2 — Worktree DB same-file reconciliation regression tests.
+// gsd-pi — Worktree DB same-file reconciliation regression tests.
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -27,7 +27,7 @@ describe("#2823: reconcileWorktreeDb same-file guard", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "gsd-2823-"));
+    tmpDir = mkdtempSync(join(tmpdir(), "gsd-pi-2823-"));
   });
 
   afterEach(() => {

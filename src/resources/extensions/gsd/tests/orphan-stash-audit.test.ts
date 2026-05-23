@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/tests/orphan-stash-audit.test.ts
+// gsd-pi + src/resources/extensions/gsd/tests/orphan-stash-audit.test.ts
 // Regression: orphaned gsd-preflight-stash entries from completed milestones
 // must be auto-applied at startup so the user's pre-merge work returns.
 

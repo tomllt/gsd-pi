@@ -1,4 +1,4 @@
-// GSD2 — Known model capability table for Ollama models
+// gsd-pi — Known model capability table for Ollama models
 
 /**
  * Maps well-known Ollama model families to their capabilities.

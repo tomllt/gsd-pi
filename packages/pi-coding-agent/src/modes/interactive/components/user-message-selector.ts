@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: User message selector for branching from prior user turns.
 
 import { type Component, Container, getEditorKeybindings, Spacer, Text, truncateToWidth } from "@gsd/pi-tui";

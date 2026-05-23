@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Mid-execution escalation artifact and state helpers for GSD tasks.
 // GSD Extension — ADR-011 Phase 2 Mid-Execution Escalation
 //

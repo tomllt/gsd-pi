@@ -1,4 +1,4 @@
-// GSD-2 + Regression test: teardownAutoWorktree clears activeWorkspace even when removeWorktree fails
+// gsd-pi + Regression test: teardownAutoWorktree clears activeWorkspace even when removeWorktree fails
 
 /**
  * Regression: `teardownAutoWorktree` must clear `activeWorkspace` (and therefore

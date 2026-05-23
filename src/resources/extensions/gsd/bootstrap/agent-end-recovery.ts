@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/bootstrap/agent-end-recovery.ts - Handles provider and agent-end recovery for GSD auto-mode.
+// gsd-pi + src/resources/extensions/gsd/bootstrap/agent-end-recovery.ts - Handles provider and agent-end recovery for GSD auto-mode.
 
 import type { ExtensionAPI, ExtensionContext } from "@gsd/pi-coding-agent";
 

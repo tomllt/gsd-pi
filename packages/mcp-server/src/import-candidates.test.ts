@@ -1,4 +1,4 @@
-// GSD-2 — Regression tests for importLocalModule candidate resolution (#3954)
+// gsd-pi — Regression tests for importLocalModule candidate resolution (#3954)
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 

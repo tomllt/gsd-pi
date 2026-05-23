@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Handles /gsd closeout recovery commands for failed git closeout.
 
 import type { ExtensionCommandContext } from "@gsd/pi-coding-agent";

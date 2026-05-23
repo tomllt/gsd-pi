@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Clears stale GSD run surfaces before starting new workflow work.
 
 import type { ExtensionCommandContext } from "@gsd/pi-coding-agent";

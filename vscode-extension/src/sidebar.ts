@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: VS Code sidebar webview provider for GSD agent controls and status.
 
 import * as vscode from "vscode";

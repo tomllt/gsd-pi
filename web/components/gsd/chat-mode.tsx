@@ -1,6 +1,6 @@
 "use client"
 
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Browser chat mode shell with workflow actions and bridge-backed input.
 
 import Image from "next/image"

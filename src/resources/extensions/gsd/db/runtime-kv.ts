@@ -1,4 +1,4 @@
-// gsd-2 + Non-correctness-critical key-value storage (Phase C — file-state migration)
+// gsd-pi + Non-correctness-critical key-value storage (Phase C — file-state migration)
 //
 // STRICT INVARIANT (re-stated from gsd-db.ts createRuntimeKvTableV25):
 // runtime_kv is for SOFT state only. UI cursors, dashboard caches,

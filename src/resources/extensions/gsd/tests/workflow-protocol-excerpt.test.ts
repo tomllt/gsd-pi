@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for capped GSD workflow protocol and doctor-heal payload helpers.
 
 import test from "node:test";

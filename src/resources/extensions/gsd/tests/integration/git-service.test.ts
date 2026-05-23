@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Git service integration and commit-message tests.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';

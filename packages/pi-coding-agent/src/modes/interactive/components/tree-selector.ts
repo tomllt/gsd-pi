@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Session tree selector with filtering, labels, and branch navigation.
 
 import {

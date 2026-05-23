@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Suggest possible duplicate issues without closing them.
 
 export const DEDUPE_MARKER = "<!-- gsd-issue-dedupe -->";

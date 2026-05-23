@@ -1,4 +1,4 @@
-// GSD-2 — Deep planning mode setPlanningDepth helper.
+// gsd-pi — Deep planning mode setPlanningDepth helper.
 // Verifies the helper correctly creates and updates .gsd/PREFERENCES.md while
 // preserving existing frontmatter keys and body content.
 

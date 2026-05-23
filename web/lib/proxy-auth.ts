@@ -1,5 +1,5 @@
 /**
- * GSD2 Web proxy auth decision logic.
+ * gsd-pi Web proxy auth decision logic.
  */
 
 export type WebProxyAuthRequest = {

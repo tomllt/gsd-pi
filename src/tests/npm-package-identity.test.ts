@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression coverage for the public npm package identity.
 
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-// GSD2 — Tests for gsd_milestone_status read-only query tool
+// gsd-pi — Tests for gsd_milestone_status read-only query tool
 
 import test from "node:test";
 import assert from "node:assert/strict";

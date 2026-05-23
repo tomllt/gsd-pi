@@ -1,4 +1,4 @@
-// GSD2 Shared Phase State Coordination Tests
+// gsd-pi Shared Phase State Coordination Tests
 
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";

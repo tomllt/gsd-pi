@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared RPC protocol fixture records for Phase 0 characterization and Phase 1 contracts work.
 
 export const rpcGoldenCommands = [

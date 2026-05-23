@@ -1,4 +1,4 @@
-// GSD-2 — Regression test for #3615: unstructured "continue" must inject task context
+// gsd-pi — Regression test for #3615: unstructured "continue" must inject task context
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";

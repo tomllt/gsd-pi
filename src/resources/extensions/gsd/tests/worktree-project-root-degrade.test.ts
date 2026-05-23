@@ -1,4 +1,4 @@
-// GSD-2 + Worktree dispatch guard: degrade empty worktrees over real project roots.
+// gsd-pi + Worktree dispatch guard: degrade empty worktrees over real project roots.
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-// GSD-2 — ADR-013 Phase 6 preflight scanner tests.
+// gsd-pi — ADR-013 Phase 6 preflight scanner tests.
 //
 // Locks in the four states the scanner must distinguish:
 //   1. Clean — no gaps, no warning emitted.

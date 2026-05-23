@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: SQLite schema metadata helpers for the GSD database facade and migrations.
 
 import type { DbAdapter } from "./db-adapter.js";

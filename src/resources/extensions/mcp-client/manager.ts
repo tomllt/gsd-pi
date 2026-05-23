@@ -1,5 +1,5 @@
 /**
- * GSD-2 — Shared MCP connection management.
+ * gsd-pi — Shared MCP connection management.
  *
  * File Purpose: Reads, writes, and tests user-configured MCP server entries
  * for runtime tools, TUI commands, and app settings surfaces.

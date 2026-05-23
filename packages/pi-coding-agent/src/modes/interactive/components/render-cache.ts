@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared render cache helper for interactive TUI components.
 
 export class RenderCache {

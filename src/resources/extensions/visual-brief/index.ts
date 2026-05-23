@@ -1,4 +1,4 @@
-// GSD-2 + Visual Brief bundled extension marker
+// gsd-pi + Visual Brief bundled extension marker
 
 import type { ExtensionAPI } from "@gsd/pi-coding-agent";
 

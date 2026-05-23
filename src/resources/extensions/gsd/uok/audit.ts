@@ -1,4 +1,4 @@
-// GSD2 UOK Audit Events and DB-First Projection Writes
+// gsd-pi UOK Audit Events and DB-First Projection Writes
 
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";

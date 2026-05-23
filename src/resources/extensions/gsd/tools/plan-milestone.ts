@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Plans milestone roadmap state through DB-backed workflow tools.
 
 import { clearParseCache } from "../files.js";

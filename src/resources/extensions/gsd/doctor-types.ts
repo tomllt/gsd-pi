@@ -1,4 +1,4 @@
-// GSD-2 doctor report types
+// gsd-pi doctor report types
 export type DoctorSeverity = "info" | "warning" | "error";
 export type DoctorIssueCode =
   | "invalid_preferences"

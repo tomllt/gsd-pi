@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies web UI request fixtures conform to shared RPC contracts.
 
 import test from "node:test"

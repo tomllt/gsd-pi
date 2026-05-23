@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Integration tests for pre-execution check retry and pause wiring.
 /**
  * pre-execution-pause-wiring.test.ts — Integration tests for pre-execution check → retry/pause wiring.

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for the TUI header lifecycle fixes —
 // header is suppressed (zero lines) when auto-mode activates, the wizard
 // step status badge is cleared, the NEXT-mode footer hint renders when

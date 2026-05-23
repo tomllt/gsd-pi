@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-tui/src/__tests__/utils.test.ts - ANSI-aware utility regression coverage.
+// gsd-pi + packages/pi-tui/src/__tests__/utils.test.ts - ANSI-aware utility regression coverage.
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";

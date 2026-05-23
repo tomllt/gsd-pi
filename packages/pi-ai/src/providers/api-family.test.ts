@@ -1,4 +1,4 @@
-// gsd-2 / pi-ai: api-family predicate tests
+// gsd-pi / pi-ai: api-family predicate tests
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 

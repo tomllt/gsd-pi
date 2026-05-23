@@ -1,4 +1,4 @@
-// GSD-2 write-gate bootstrap — regression test for required basePath (commit A3)
+// gsd-pi write-gate bootstrap — regression test for required basePath (commit A3)
 //
 // Verifies that persistWriteGateSnapshot / loadWriteGateSnapshot are pinned to
 // the basePath argument and do not silently fall back to process.cwd(). The

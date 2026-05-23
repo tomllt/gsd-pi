@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/working-output-messages.ts - Formats and audits user-facing working-state messages.
+// gsd-pi + src/resources/extensions/gsd/working-output-messages.ts - Formats and audits user-facing working-state messages.
 
 export type WorkingOutputSurface =
   | "loader"

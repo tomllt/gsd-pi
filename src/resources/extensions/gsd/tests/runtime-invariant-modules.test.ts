@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: ADR-015 runtime invariant module contract tests.
 
 import test from "node:test";

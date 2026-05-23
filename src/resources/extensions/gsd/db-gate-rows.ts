@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Quality gate row mapper for the GSD database facade.
 
 import type { GateId, GateRow, GateScope, GateStatus, GateVerdict } from "./types.js";

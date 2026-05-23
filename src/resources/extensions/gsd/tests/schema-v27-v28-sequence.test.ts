@@ -1,4 +1,4 @@
-// gsd-2 / V27 + V28 schema migration regression tests
+// gsd-pi / V27 + V28 schema migration regression tests
 //
 // Same bug class as #4591 (schema-v21-sequence): a migration block can be
 // added but the SCHEMA_VERSION constant left unchanged, causing fresh-install

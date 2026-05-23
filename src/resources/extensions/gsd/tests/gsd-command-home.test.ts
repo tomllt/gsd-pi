@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Behavior tests for the state-aware /gsd home menu.
 
 import test from "node:test";

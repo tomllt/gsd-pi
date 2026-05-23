@@ -1,5 +1,5 @@
 /**
- * GSD-2 — Regression tests for merge cwd restore (#2929)
+ * gsd-pi — Regression tests for merge cwd restore (#2929)
  * merge-cwd-restore.test.ts — Regression tests for #2929.
  *
  * Verifies:

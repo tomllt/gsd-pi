@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Applies custom-engine verification outcomes to auto-mode loop side effects.
 
 import type { CustomEngineVerifyRetryOutcome } from "./workflow-custom-engine-retry.js";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Git-fixture integration tests for verify-changed-src-tests --since codepath.
 
 import assert from 'node:assert/strict';

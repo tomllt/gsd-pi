@@ -1,4 +1,4 @@
-// GSD2 — HTTP client for Ollama REST API
+// gsd-pi — HTTP client for Ollama REST API
 
 /**
  * Low-level HTTP client for the Ollama REST API.

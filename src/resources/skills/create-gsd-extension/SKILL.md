@@ -67,7 +67,7 @@ All domain knowledge in `references/`:
 **Infrastructure:** model-provider-management.md, remote-execution-overrides.md, packaging-distribution.md, mode-behavior.md
 **Spec:** `docs/extension-sdk/manifest-spec.md` — manifest format, tiers, validation
 **Testing:** `docs/extension-sdk/testing.md` — mock patterns, test conventions
-**SDK:** `docs/extension-sdk/` — the authoritative GSD-2 extension guide
+**SDK:** `docs/extension-sdk/` — the authoritative gsd-pi extension guide
 **Gotchas:** key-rules-gotchas.md
 </reference_index>
 

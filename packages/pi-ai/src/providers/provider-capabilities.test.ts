@@ -1,4 +1,4 @@
-// GSD-2 — Provider Capabilities Registry Tests (ADR-005 Phase 1)
+// gsd-pi — Provider Capabilities Registry Tests (ADR-005 Phase 1)
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 

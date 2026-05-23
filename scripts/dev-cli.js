@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GSD2 - Dev CLI wrapper for running the source-mode CLI.
+// gsd-pi - Dev CLI wrapper for running the source-mode CLI.
 
 import { spawn, spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'

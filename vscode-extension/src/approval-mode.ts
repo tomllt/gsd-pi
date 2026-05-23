@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Pure approval-mode helpers for the VS Code extension.
 
 export type ApprovalMode = "ask" | "auto-approve" | "plan-only";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Mutable auto-mode session state container.
 /**
  * AutoSession — encapsulates all mutable auto-mode state into a single instance.

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Closeout git failure discovery, retry, and manual resolution helpers.
 
 import { execFileSync } from "node:child_process";

@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-tui/src/components/__tests__/box.test.ts - Box width-discipline regression coverage.
+// gsd-pi + packages/pi-tui/src/components/__tests__/box.test.ts - Box width-discipline regression coverage.
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";

@@ -1,4 +1,4 @@
-// gsd-2 + Worker IPC command queue (DB-backed coordination, Phase B)
+// gsd-pi + Worker IPC command queue (DB-backed coordination, Phase B)
 //
 // New infrastructure for dispatcher-to-worker IPC (cancel signals, pause
 // requests, etc.). NOT a replacement for any existing on-disk queue and

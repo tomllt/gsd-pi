@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Handles manual milestone validation verdict overrides.
 
 import type { ExtensionCommandContext } from "@gsd/pi-coding-agent";

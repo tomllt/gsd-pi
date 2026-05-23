@@ -1,4 +1,4 @@
-// GSD2 TUI Tests - Chat frame card visual contract coverage.
+// gsd-pi TUI Tests - Chat frame card visual contract coverage.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import stripAnsi from "strip-ansi";

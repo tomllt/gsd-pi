@@ -1,4 +1,4 @@
-// GSD-2 — Unit tests for /gsd worktree formatter and dispatcher
+// gsd-pi — Unit tests for /gsd worktree formatter and dispatcher
 import test from "node:test";
 import assert from "node:assert/strict";
 

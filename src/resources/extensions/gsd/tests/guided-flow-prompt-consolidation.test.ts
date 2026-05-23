@@ -1,5 +1,5 @@
 /**
- * GSD2 — regression test for #5183: prompt consolidation.
+ * gsd-pi — regression test for #5183: prompt consolidation.
  *
  * The PR removed `guided-execute-task.md` and `guided-complete-slice.md` and
  * routed `guided-flow.ts` callers to `buildExecuteTaskPrompt` /

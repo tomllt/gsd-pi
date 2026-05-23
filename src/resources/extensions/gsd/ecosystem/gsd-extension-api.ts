@@ -1,4 +1,4 @@
-// GSD2 — Ecosystem Extension API wrapper
+// gsd-pi — Ecosystem Extension API wrapper
 // Wraps pi's ExtensionAPI to expose typed GSD context (phase + active unit)
 // to extensions loaded from `./.gsd/extensions/`. The wrapper intercepts only
 // `on("before_agent_start", ...)` so GSD can dispatch ecosystem handlers AFTER

@@ -1,4 +1,4 @@
-// GSD-2 — #4782 phase 1: schema tests + CI coverage guard for manifests.
+// gsd-pi — #4782 phase 1: schema tests + CI coverage guard for manifests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

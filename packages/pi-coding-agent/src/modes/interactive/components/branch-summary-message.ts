@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/branch-summary-message.ts - Branch summary message renderer.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/branch-summary-message.ts - Branch summary message renderer.
 
 import { Box, Markdown, type MarkdownTheme, Spacer, Text } from "@gsd/pi-tui";
 import type { BranchSummaryMessage } from "../../../core/messages.js";

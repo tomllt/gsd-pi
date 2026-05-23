@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for cmux integration, layout, and CLI isolation.
 import test, { describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";

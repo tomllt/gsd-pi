@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/countdown-timer.ts - Dialog countdown timer lifecycle.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/countdown-timer.ts - Dialog countdown timer lifecycle.
 /**
  * Reusable countdown timer for dialog components.
  */

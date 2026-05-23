@@ -1,5 +1,5 @@
 /**
- * GSD-2 Studio launch-only e2e.
+ * gsd-pi Studio launch-only e2e.
  *
  * Smallest possible runtime check: builds (assumed pre-built) of the Studio
  * Electron app launch into one window with the renderer DOM mounted, and

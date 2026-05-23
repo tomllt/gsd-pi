@@ -1,4 +1,4 @@
-// GSD-2 + packages/pi-coding-agent/src/modes/interactive/components/provider-manager.ts - Provider management selector.
+// gsd-pi + packages/pi-coding-agent/src/modes/interactive/components/provider-manager.ts - Provider management selector.
 /**
  * TUI component for managing provider configurations.
  * Shows providers with auth status, discovery support, and model counts.

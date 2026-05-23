@@ -1,4 +1,4 @@
-// GSD-2 — #4782 phase 3 batch 3: complete-slice migrated through composer.
+// gsd-pi — #4782 phase 3 batch 3: complete-slice migrated through composer.
 
 import test from "node:test";
 import assert from "node:assert/strict";

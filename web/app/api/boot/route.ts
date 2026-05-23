@@ -1,4 +1,4 @@
-// GSD-2 Web — Boot route: records boot timestamp and cancels pending shutdown
+// gsd-pi Web — Boot route: records boot timestamp and cancels pending shutdown
 import { collectBootPayload, resolveProjectCwd } from "../../../../src/web/bridge-service.ts";
 import { cancelShutdown, recordBoot } from "../../../lib/shutdown-gate";
 

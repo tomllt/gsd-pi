@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Workflow template commands for starting, listing, and dispatching workflows.
 
 /**

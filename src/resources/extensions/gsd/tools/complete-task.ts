@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Complete-task tool handler for GSD workflow state and summaries.
 
 /**

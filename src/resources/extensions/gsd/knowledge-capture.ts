@@ -1,4 +1,4 @@
-// GSD2 — KNOWLEDGE.md write-side cutover (ADR-013 Stage 2c).
+// gsd-pi — KNOWLEDGE.md write-side cutover (ADR-013 Stage 2c).
 //
 // Replaces the legacy `appendKnowledge` file-append path for Patterns and
 // Lessons with `createMemory` calls. Rules (K###) continue to flow through

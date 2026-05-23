@@ -1,4 +1,4 @@
-// GSD-2 — Web MCP management contract tests.
+// gsd-pi — Web MCP management contract tests.
 // File Purpose: Verifies the app-facing MCP service uses the shared manager.
 
 import test from "node:test";

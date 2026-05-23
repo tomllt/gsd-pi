@@ -1,4 +1,4 @@
-// GSD2 — Claude CLI binary detection for onboarding
+// gsd-pi — Claude CLI binary detection for onboarding
 // Lightweight check used at onboarding time (before extensions load).
 // The full readiness check with caching lives in the claude-code-cli extension.
 //

@@ -1,4 +1,4 @@
-// GSD-2 + Tests for MilestoneScope threading through AutoSession state (C2)
+// gsd-pi + Tests for MilestoneScope threading through AutoSession state (C2)
 //
 // Strategy: construct AutoSession directly + call createWorkspace/scopeMilestone
 // to mirror the rebuildScope() helper in auto.ts — avoids importing the full

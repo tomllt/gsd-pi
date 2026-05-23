@@ -1,4 +1,4 @@
-// GSD2 - Dev CLI child-process spawn helpers.
+// gsd-pi - Dev CLI child-process spawn helpers.
 
 import { join } from 'node:path'
 

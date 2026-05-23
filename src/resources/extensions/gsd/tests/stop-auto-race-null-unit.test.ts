@@ -1,4 +1,4 @@
-// GSD-2 — stopAuto race current-unit guard regression tests.
+// gsd-pi — stopAuto race current-unit guard regression tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies VS Code display helpers consume shared RPC contract payloads.
 
 import test from "node:test";

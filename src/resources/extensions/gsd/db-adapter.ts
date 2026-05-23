@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Normalized SQLite adapter wrapper used by the GSD database facade.
 
 export interface DbStatement {

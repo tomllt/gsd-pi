@@ -1,7 +1,7 @@
 {
-  "name": "gsd-2",
-  "displayName": "GSD-2",
-  "description": "VS Code integration for the GSD-2 coding agent — sidebar dashboard, @gsd chat participant, activity feed, conversation history, code lens, session forking, slash command completion, workflow controls, and 33 commands",
+  "name": "gsd-pi",
+  "displayName": "gsd-pi",
+  "description": "VS Code integration for the gsd-pi coding agent — sidebar dashboard, @gsd chat participant, activity feed, conversation history, code lens, session forking, slash command completion, workflow controls, and 33 commands",
   "publisher": "FluxLabs",
   "version": "0.3.0",
   "icon": "logo.jpg",
@@ -340,7 +340,7 @@
         "id": "gsd.agent",
         "name": "gsd",
         "fullName": "GSD Agent",
-        "description": "GSD-2 coding agent",
+        "description": "gsd-pi coding agent",
         "isSticky": true
       }
     ],

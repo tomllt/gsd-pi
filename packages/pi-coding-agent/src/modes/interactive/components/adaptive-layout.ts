@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Adaptive command-center dashboard for the interactive TUI.
 
 import { style, truncateToWidth, type Component } from "@gsd/pi-tui";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Bootstrap behavior tests for completed milestone orphan merges.
 import test from "node:test";
 import assert from "node:assert/strict";

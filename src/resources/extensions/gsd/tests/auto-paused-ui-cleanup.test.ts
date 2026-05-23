@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Behavior tests for auto-loop cleanup after paused provider exits.
 import { test } from "node:test";
 import assert from "node:assert/strict";

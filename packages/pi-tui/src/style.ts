@@ -1,4 +1,4 @@
-// GSD2 - Terminal style primitives for framed TUI surfaces
+// gsd-pi - Terminal style primitives for framed TUI surfaces
 
 import { truncateToWidth, visibleWidth } from "./utils.js";
 

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for shared GSD TUI render helpers.
 
 import { describe, test } from "node:test";

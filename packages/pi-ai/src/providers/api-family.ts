@@ -1,4 +1,4 @@
-// gsd-2 / pi-ai: API-shape family predicates
+// gsd-pi / pi-ai: API-shape family predicates
 //
 // Rule (see docs/dev/ADR-012-provider-id-vs-api-shape.md):
 //   Gate API-shape-dependent behavior (tool schemas, request payload shape,

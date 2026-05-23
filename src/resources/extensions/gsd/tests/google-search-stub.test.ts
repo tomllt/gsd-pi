@@ -1,4 +1,4 @@
-// GSD-2 — Tests for google-search deprecation stub (STUB-01, STUB-02)
+// gsd-pi — Tests for google-search deprecation stub (STUB-01, STUB-02)
 import test from "node:test";
 import assert from "node:assert/strict";
 

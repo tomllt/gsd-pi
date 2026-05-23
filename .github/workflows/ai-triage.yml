@@ -1,4 +1,4 @@
-# Project/App: GSD-2
+# Project/App: gsd-pi
 # File Purpose: Triage new and updated issues and pull requests.
 
 name: AI Triage
@@ -97,7 +97,7 @@ jobs:
               core.info('Added default label: needs-triage');
             }
 
-            const prompt = `You are a GitHub issue/PR triage bot for the GSD-2 project. Your job is to:
+            const prompt = `You are a GitHub issue/PR triage bot for the gsd-pi project. Your job is to:
             1. Classify the ${type} with appropriate labels
             2. Detect if it violates project guidelines
 
@@ -154,7 +154,7 @@ jobs:
             - "complexity-without-value": Adds abstraction/indirection without user-visible improvement
             - "heavy-orchestration": Duplicates what agent infrastructure already provides
             - "missing-info": Issue is too vague to act on (no repro steps, no context)
-            - "off-topic": Not related to GSD-2 at all
+            - "off-topic": Not related to gsd-pi at all
             - "security-in-public": Appears to report a security vulnerability publicly
 
             If aligned is false, provide a brief, polite explanation (2-3 sentences) of why this was flagged.

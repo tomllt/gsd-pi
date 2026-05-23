@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for DB-backed milestone planning.
 
 import test from 'node:test';

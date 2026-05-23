@@ -1,6 +1,6 @@
-# Frontier Techniques for GSD-2
+# Frontier Techniques for gsd-pi
 
-Research into cutting-edge AI agent techniques that map directly to GSD-2's architecture, ranked by impact and feasibility.
+Research into cutting-edge AI agent techniques that map directly to gsd-pi's architecture, ranked by impact and feasibility.
 
 **Date:** 2026-03-25
 **Status:** Research / Pre-RFC
@@ -23,7 +23,7 @@ Research into cutting-edge AI agent techniques that map directly to GSD-2's arch
 
 ## Executive Summary
 
-GSD-2 is a multi-layered, event-driven agent platform with strong extensibility primitives: a skill system, file-based memory, session branching, compaction, and 16+ extension lifecycle hooks. These existing primitives create natural integration points for six frontier techniques that could fundamentally change how GSD operates.
+gsd-pi is a multi-layered, event-driven agent platform with strong extensibility primitives: a skill system, file-based memory, session branching, compaction, and 16+ extension lifecycle hooks. These existing primitives create natural integration points for six frontier techniques that could fundamentally change how GSD operates.
 
 The techniques fall into three categories:
 
@@ -70,7 +70,7 @@ SkillRL demonstrates that agents with learned skill libraries outperform baselin
 | **General Skills** | Universal strategic guidance applicable across tasks | "When editing TypeScript files, always check for type errors via LSP before committing" |
 | **Task-Specific Skills** | Category-level heuristics for specific skill domains | "The `fix-issue` skill should check CI status before opening a PR, not after" |
 
-### Why It Fits GSD-2
+### Why It Fits gsd-pi
 
 GSD already has every primitive needed:
 
@@ -181,7 +181,7 @@ Total: ~150ms (max of parallel set)
 | Bash(cmd) | Bash(cmd) | Maybe | Depends on side effects |
 | Write(file) | Read(file) | Yes | Read after write needs write to complete |
 
-### Why It Fits GSD-2
+### Why It Fits gsd-pi
 
 The model already emits multiple `tool_use` blocks in a single response. GSD processes them, but the execution path in `agent-loop.ts` handles them in sequence. The parallelism opportunity is sitting right there.
 
@@ -277,7 +277,7 @@ Based on [Speculative Tool Calls research](https://arxiv.org/pdf/2512.15834), th
 | **Learned patterns** | Use the skill library evolution data to predict tool sequences | 60-80% |
 | **Model pre-query** | Ask a fast/cheap model to predict tool calls | 70-85% |
 
-### Why It Fits GSD-2
+### Why It Fits gsd-pi
 
 The #1 latency bottleneck in GSD is the round-trip: user prompt → model thinks → model requests tool → tool executes → result sent back → model thinks again. Speculative execution attacks the highest-latency step.
 
@@ -604,7 +604,7 @@ Read auth.ts
 Result: Branch B succeeds after 2 actions, not 5+
 ```
 
-### Why It Fits GSD-2
+### Why It Fits gsd-pi
 
 GSD already has session branching primitives:
 - `fork()` creates a branch from any message

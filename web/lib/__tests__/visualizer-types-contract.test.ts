@@ -1,4 +1,4 @@
-// GSD-2 Web — Tests for browser visualizer data helpers and current payload shape.
+// gsd-pi Web — Tests for browser visualizer data helpers and current payload shape.
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";

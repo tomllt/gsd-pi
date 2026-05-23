@@ -1,4 +1,4 @@
-<!-- Project/App: GSD-2 -->
+<!-- Project/App: gsd-pi -->
 <!-- File Purpose: Token consumption savings PR evidence summary. -->
 
 # Token Consumption Savings Evidence

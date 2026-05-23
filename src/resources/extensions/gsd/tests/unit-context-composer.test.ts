@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests unit context composer rendering, budgets, and reassess-roadmap prompt integration.
 
 import test from "node:test";

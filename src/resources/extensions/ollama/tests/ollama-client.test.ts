@@ -1,4 +1,4 @@
-// GSD2 — Tests for Ollama HTTP client
+// gsd-pi — Tests for Ollama HTTP client
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { getOllamaHost } from "../ollama-client.js";

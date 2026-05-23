@@ -1,4 +1,4 @@
-// GSD-2 — Tests verifying gsdRootCache is decoupled from per-turn clearPathCache()
+// gsd-pi — Tests verifying gsdRootCache is decoupled from per-turn clearPathCache()
 
 import { describe, test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

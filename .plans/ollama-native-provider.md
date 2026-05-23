@@ -4,7 +4,7 @@
 
 ## Problem
 
-Ollama support in GSD2 currently requires manual `models.json` configuration. Users must:
+Ollama support in gsd-pi currently requires manual `models.json` configuration. Users must:
 1. Know the OpenAI-compatibility endpoint (`localhost:11434/v1`)
 2. Manually list every model they want to use
 3. Set compat flags (`supportsDeveloperRole: false`, etc.)
@@ -14,7 +14,7 @@ There's an `ollama-cloud` provider for hosted Ollama, and a discovery adapter th
 
 ## Goal
 
-Make Ollama the easiest way to use GSD2 — zero config when Ollama is running locally. All Ollama functionality lives in a single extension: `src/resources/extensions/ollama/`.
+Make Ollama the easiest way to use gsd-pi — zero config when Ollama is running locally. All Ollama functionality lives in a single extension: `src/resources/extensions/ollama/`.
 
 ## Architecture
 

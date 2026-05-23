@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Validate-milestone tool handler for GSD workflow quality gates.
 
 /**

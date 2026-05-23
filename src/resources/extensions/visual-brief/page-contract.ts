@@ -1,4 +1,4 @@
-// GSD-2 + Visual Brief page contract
+// gsd-pi + Visual Brief page contract
 
 import type { VisualBriefMode } from "./prompts.js";
 

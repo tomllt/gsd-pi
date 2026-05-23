@@ -1,6 +1,6 @@
-# GSD-2 Long-Running Refactor Plan-Of-Plans
+# gsd-pi Long-Running Refactor Plan-Of-Plans
 
-Project/App: GSD-2
+Project/App: gsd-pi
 File Purpose: Complete phase-by-phase implementation roadmap for reducing complexity, token usage, build/test time, and app/process drift without a big-bang rewrite.
 
 **Status:** Replanned - SRC-first execution
@@ -10,7 +10,7 @@ File Purpose: Complete phase-by-phase implementation roadmap for reducing comple
 
 ## Objective
 
-Create a decision-complete implementation roadmap for the long-running GSD-2 refactor. This document plans the full program before implementation starts. It is not a mandate to execute every phase at the same time.
+Create a decision-complete implementation roadmap for the long-running gsd-pi refactor. This document plans the full program before implementation starts. It is not a mandate to execute every phase at the same time.
 
 The refactor should:
 

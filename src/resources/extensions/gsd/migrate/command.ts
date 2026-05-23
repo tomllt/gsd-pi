@@ -6,7 +6,7 @@
  * All business logic lives in the pipeline modules (S01–S03).
  *
  * After a successful write, offers a read-only review that audits the output
- * for GSD-2 standards compliance.
+ * for gsd-pi standards compliance.
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";
@@ -341,7 +341,7 @@ export async function handleMigrate(
       `Legacy source archived at ${execution.legacyArchive.archivePath}`,
       `Migration audit written at ${execution.audit.migrationPath}`,
       "",
-      "The agent can now review the migrated output against GSD-2 standards —",
+      "The agent can now review the migrated output against gsd-pi standards —",
       "checking structure, content quality, deriveState() round-trip, and",
       "requirement statuses. The review is read-only by default.",
     ],

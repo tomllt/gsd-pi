@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Visual contract tests for the assistant message open surface.
 
 import { describe, test } from "node:test";

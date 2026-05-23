@@ -8,7 +8,7 @@ Turn a pile of outdated packages into a series of small, verifiable upgrades wit
 </objective>
 
 <context>
-GSD-2 ships a `/gsd start dep-upgrade` workflow template (`src/resources/extensions/gsd/workflow-templates/dep-upgrade.md`) that structures the phases: assess → upgrade → fix breaks → verify. This skill is the execution-level detail inside the upgrade phase — how to batch, how to verify, how to recover from a breaking upgrade without losing the good ones.
+gsd-pi ships a `/gsd start dep-upgrade` workflow template (`src/resources/extensions/gsd/workflow-templates/dep-upgrade.md`) that structures the phases: assess → upgrade → fix breaks → verify. This skill is the execution-level detail inside the upgrade phase — how to batch, how to verify, how to recover from a breaking upgrade without losing the good ones.
 
 Invocation points:
 - `/gsd start dep-upgrade` workflow is running

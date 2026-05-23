@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Shared prompt fixture definitions for Phase 0 characterization and Phase 2 reduction targets.
 
 export const promptGoldenUnits = [

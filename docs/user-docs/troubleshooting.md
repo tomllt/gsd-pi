@@ -18,7 +18,7 @@ It checks:
 
 ## Common Issues
 
-### Upgrade from older GSD-2 installs
+### Upgrade from older gsd-pi installs
 
 **Symptoms:** `gsd` exits with a version or managed-resource mismatch, or an old global `gsd-pi` install still shadows the new package.
 

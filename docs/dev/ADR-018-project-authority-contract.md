@@ -1,4 +1,4 @@
-<!-- Project/App: GSD-2 -->
+<!-- Project/App: gsd-pi -->
 <!-- File Purpose: ADR for PROJECT.md authority and projection semantics. -->
 
 # ADR-018: PROJECT Authority Contract

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for the GSD health widget state and footer hint rendering.
 
 import test from "node:test";

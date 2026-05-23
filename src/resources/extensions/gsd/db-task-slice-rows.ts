@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Task and slice row mappers for the GSD database facade.
 
 export interface SliceRow {

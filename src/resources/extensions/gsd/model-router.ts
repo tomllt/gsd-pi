@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Routes work to appropriate models while preserving configured ceilings.
 
 import type { ComplexityTier, ClassificationResult, TaskMetadata } from "./complexity-classifier.js";

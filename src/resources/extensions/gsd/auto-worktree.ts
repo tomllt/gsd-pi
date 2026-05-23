@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-mode worktree lifecycle, merge, and cleanup management.
 
 /**

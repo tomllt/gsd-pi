@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Ship command for creating pull requests from GSD milestone evidence.
 
 /**

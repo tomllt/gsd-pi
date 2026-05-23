@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for the Worktree Safety module contract.
 
 import { afterEach, beforeEach, describe, test } from "node:test";

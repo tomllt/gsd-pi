@@ -1,4 +1,4 @@
-// GSD-2 — Pending auto-start handoff state.
+// gsd-pi — Pending auto-start handoff state.
 // Stores discuss-to-auto handoff entries keyed by project root.
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";

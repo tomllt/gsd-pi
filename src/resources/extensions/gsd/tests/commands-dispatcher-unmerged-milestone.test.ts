@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Dispatcher regression tests for completed-but-unmerged milestone branches.
 
 import test from "node:test";

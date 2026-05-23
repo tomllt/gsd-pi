@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for auto-mode custom-engine verification retry adapter.
 
 import assert from "node:assert/strict";

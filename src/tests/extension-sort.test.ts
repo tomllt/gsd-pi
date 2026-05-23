@@ -1,4 +1,4 @@
-// GSD-2 — Extension Sort Tests
+// gsd-pi — Extension Sort Tests
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import test, { describe } from 'node:test'

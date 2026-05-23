@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Runtime tests for adaptive command-center terminal layout rendering.
 
 import assert from "node:assert/strict";

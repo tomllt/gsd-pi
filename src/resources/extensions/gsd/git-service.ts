@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Git operations, commit-message formatting, and turn git actions.
 /**
  * GSD Git Service

@@ -1,4 +1,4 @@
-// GSD2 — Regression test: pendingProviderRegistrations must be flushed exactly once (#3576)
+// gsd-pi — Regression test: pendingProviderRegistrations must be flushed exactly once (#3576)
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from "node:test";

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Notification history overlay with severity filtering and width-safe TUI rendering.
 
 import type { Theme } from "@gsd/pi-coding-agent";

@@ -2,7 +2,7 @@
 
 ## Context
 
-GSD-2 has a well-structured extension system with three discovery paths (bundled, global/community, project-local) that are **already wired up** through pi's `DefaultPackageManager.addAutoDiscoveredResources()`. However, two critical gaps remain:
+gsd-pi has a well-structured extension system with three discovery paths (bundled, global/community, project-local) that are **already wired up** through pi's `DefaultPackageManager.addAutoDiscoveredResources()`. However, two critical gaps remain:
 
 1. `sortExtensionPaths()` (topological dependency sort) is implemented but **never called** — `dependencies.extensions` in manifests is decorative
 2. The GSD extension registry (enable/disable) only applies to **bundled** extensions — community extensions bypass it entirely

@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Tests for adaptive TUI mode selection and command-center layout rendering.
 
 import assert from "node:assert/strict";

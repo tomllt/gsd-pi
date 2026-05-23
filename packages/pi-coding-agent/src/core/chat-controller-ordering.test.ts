@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for streamed interactive chat ordering.
 import assert from "node:assert/strict";
 import { test } from "node:test";

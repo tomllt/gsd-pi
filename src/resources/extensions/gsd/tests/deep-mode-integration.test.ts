@@ -1,4 +1,4 @@
-// GSD-2 — Deep planning mode end-to-end dispatch chain integration test.
+// gsd-pi — Deep planning mode end-to-end dispatch chain integration test.
 //
 // Unit-level tests (deep-planning-mode-dispatch.test.ts) invoke each
 // rule's match() in isolation and miss ordering bugs. This test exercises

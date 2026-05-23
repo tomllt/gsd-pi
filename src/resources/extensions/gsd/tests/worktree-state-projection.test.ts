@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Worktree State Projection Module — typed-Interface contract tests for projectRootToWorktree (ADR-016).
 import test from "node:test";
 import assert from "node:assert/strict";

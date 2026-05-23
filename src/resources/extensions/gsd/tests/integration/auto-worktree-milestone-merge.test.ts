@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Auto-worktree milestone squash-merge integration tests.
 /**
  * auto-worktree-milestone-merge.test.ts — Integration tests for mergeMilestoneToMain.

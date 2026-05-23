@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Regression tests for milestone validation persistence and evidence gates.
 
 import { describe, it, afterEach } from "node:test";

@@ -1,5 +1,5 @@
 /**
- * GSD2 — regression tests for #5187 and git-root anchor guard:
+ * gsd-pi — regression tests for #5187 and git-root anchor guard:
  *
  * #5187: gsdRoot() must refuse to use the global GSD home (~/.gsd) as a
  * project .gsd directory when basePath resolves to $HOME. Paths under

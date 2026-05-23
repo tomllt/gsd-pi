@@ -1,4 +1,4 @@
-// gsd-2 + Crash recovery via DB (Phase C pt 2 — auto.lock migration)
+// gsd-pi + Crash recovery via DB (Phase C pt 2 — auto.lock migration)
 //
 // auto.lock file IO is gone. readCrashLock now synthesizes a LockData
 // from the workers + unit_dispatches + runtime_kv tables. These tests

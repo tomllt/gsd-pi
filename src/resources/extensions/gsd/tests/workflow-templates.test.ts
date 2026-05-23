@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Unit tests for workflow template registry loading, matching, and display.
 //
 // GSD Workflow Templates — Unit Tests

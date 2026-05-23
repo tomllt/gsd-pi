@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Verifies the execution prompt renders compact required guidance.
 
 import test from "node:test";

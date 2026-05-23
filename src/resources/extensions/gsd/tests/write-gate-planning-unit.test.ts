@@ -1,4 +1,4 @@
-// GSD-2 — write-gate planning-unit tools-policy tests (#4934 runtime half).
+// gsd-pi — write-gate planning-unit tools-policy tests (#4934 runtime half).
 //
 // Covers shouldBlockPlanningUnit — the runtime predicate that enforces the
 // declarative ToolsPolicy on UnitContextManifest. Forensics: a discuss-

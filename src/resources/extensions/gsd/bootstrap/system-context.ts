@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: System prompt and hidden context bootstrap for GSD sessions.
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";

@@ -1,4 +1,4 @@
-// GSD-2 + Subagent durable run-store tests.
+// gsd-pi + Subagent durable run-store tests.
 
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";

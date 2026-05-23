@@ -1,4 +1,4 @@
-// GSD-2 + src/resources/extensions/gsd/orphan-stash-audit.ts
+// gsd-pi + src/resources/extensions/gsd/orphan-stash-audit.ts
 // Startup sweep for orphaned gsd-preflight-stash entries left behind by
 // interrupted milestone merges (#5538-followup).
 

@@ -1,4 +1,4 @@
-// GSD-2 + Visual Brief prompt construction
+// gsd-pi + Visual Brief prompt construction
 
 import {
 	createVisualBriefArtifactPolicy,

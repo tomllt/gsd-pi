@@ -1,4 +1,4 @@
-<!-- Project/App: GSD-2 -->
+<!-- Project/App: gsd-pi -->
 <!-- File Purpose: ADR for unifying TUI rendering on copy-clean content surfaces. -->
 
 # ADR-019: Unify the TUI Style System Around Copy-Clean Content Surfaces

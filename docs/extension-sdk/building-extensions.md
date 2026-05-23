@@ -1,8 +1,8 @@
 # Building Extensions
 
-// GSD-2 Extension SDK — Practical guide to building extensions
+// gsd-pi Extension SDK — Practical guide to building extensions
 
-This guide covers each extension capability with working code examples. All patterns are verified against the GSD-2 codebase.
+This guide covers each extension capability with working code examples. All patterns are verified against the gsd-pi codebase.
 
 For manifest configuration, see [manifest-spec.md](manifest-spec.md). For testing, see [testing.md](testing.md).
 

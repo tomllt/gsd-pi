@@ -1,4 +1,4 @@
-// GSD-2 — Subagent model dispatch behavior tests.
+// gsd-pi — Subagent model dispatch behavior tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

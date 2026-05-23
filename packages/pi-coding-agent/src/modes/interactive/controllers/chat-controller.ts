@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Interactive TUI chat stream controller.
 import { Loader, Markdown, Spacer, Text } from "@gsd/pi-tui";
 

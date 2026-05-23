@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Visual contract tests for the GSD watch header renderer.
 
 import test from "node:test";
@@ -20,7 +20,7 @@ test("renderHeaderLines uses the command-center splash layout", () => {
     {
       model: "claude-sonnet-4-6",
       provider: "anthropic",
-      directory: "~/Github/gsd-2",
+      directory: "~/projects/gsd-pi",
       branch: "feat/tui-refresh",
       mcpServers: ["context7"],
     },

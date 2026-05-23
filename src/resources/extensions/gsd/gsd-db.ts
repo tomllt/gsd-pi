@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: GSD database facade, schema, migrations, and single-writer write API.
 // GSD Database Abstraction Layer
 // Provides a SQLite database with provider fallback chain:

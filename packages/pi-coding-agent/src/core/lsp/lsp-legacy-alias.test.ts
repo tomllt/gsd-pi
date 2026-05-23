@@ -1,4 +1,4 @@
-// GSD2 — Regression test for LSP legacy server key aliases
+// gsd-pi — Regression test for LSP legacy server key aliases
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**

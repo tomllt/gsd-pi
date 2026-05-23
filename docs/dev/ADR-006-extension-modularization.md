@@ -11,6 +11,6 @@ This ADR's full text lives on the GitHub issue tracker so the discussion thread,
 
 ## One-line summary
 
-Modularize GSD2 across 7 milestones (v1.3–v1.9): split the 177K-LOC core `gsd` extension, introduce an `npm`-package-based extension install/uninstall/update surface, lazy-load provider SDKs, and ship a `~450 MB` default install instead of `~842 MB`.
+Modularize gsd-pi across 7 milestones (v1.3–v1.9): split the 177K-LOC core `gsd` extension, introduce an `npm`-package-based extension install/uninstall/update surface, lazy-load provider SDKs, and ship a `~450 MB` default install instead of `~842 MB`.
 
 See [Issue #2995](https://github.com/open-gsd/gsd-pi/issues/2995) for the full Context / Decision / Milestone breakdown / Success Metrics / Risks / Consequences.

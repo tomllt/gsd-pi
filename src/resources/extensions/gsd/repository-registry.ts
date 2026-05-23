@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Repository registry seam for parent workspace multi-repo resolution.
 
 import { execFileSync } from "node:child_process";

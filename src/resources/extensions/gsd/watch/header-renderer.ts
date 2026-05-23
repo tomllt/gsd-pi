@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: Watch-mode terminal header and splash renderer for GSD project status.
 
 import { execFileSync } from "node:child_process";

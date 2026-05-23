@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: gsd-pi
 // File Purpose: ADR-017 unmerged-merge-state drift handler. Relocated from
 // auto-recovery.ts as part of issue #5701. Owns:
 //   - rebase/cherry-pick/revert leftover cleanup (#4980 HIGH-7)

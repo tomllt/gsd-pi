@@ -1,4 +1,4 @@
-// GSD-2 pi-coding-agent system prompt file-safety regression tests.
+// gsd-pi pi-coding-agent system prompt file-safety regression tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

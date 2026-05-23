@@ -1,4 +1,4 @@
-// GSD-2 — Guided smart entry complete-state behavior tests.
+// gsd-pi — Guided smart entry complete-state behavior tests.
 
 import test from "node:test";
 import assert from "node:assert/strict";

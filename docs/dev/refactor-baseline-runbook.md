@@ -1,6 +1,6 @@
-# GSD-2 Refactor Baseline Runbook
+# gsd-pi Refactor Baseline Runbook
 
-Project/App: GSD-2
+Project/App: gsd-pi
 File Purpose: Operator runbook for Phase 0 baseline measurement and comparison during the long-running refactor.
 
 ## Purpose

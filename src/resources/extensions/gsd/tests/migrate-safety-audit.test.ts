@@ -1,4 +1,4 @@
-// GSD-2 - /gsd migrate safety and audit regression tests.
+// gsd-pi - /gsd migrate safety and audit regression tests.
 // File Purpose: Verifies migration hardening contracts for backup, target selection, archive, and DB projections.
 
 import assert from "node:assert/strict";
