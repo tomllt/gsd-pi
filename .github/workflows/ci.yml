@@ -214,7 +214,7 @@ jobs:
         run: node scripts/check-coderabbit-themes.mjs
 
   build:
-    timeout-minutes: 25
+    timeout-minutes: 45
     needs: [detect-changes, docs-check, lint]
     if: needs.detect-changes.outputs.heavy-code-changed == 'true'
     runs-on: ubuntu-latest
