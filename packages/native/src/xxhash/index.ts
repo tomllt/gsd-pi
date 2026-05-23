@@ -80,7 +80,7 @@ export function xxHash32Fallback(input: string, seed: number): number {
  * Compute xxHash32 of a UTF-8 string.
  *
  * Uses the native Rust implementation when available; falls back to a
- * pure-JS implementation if the addon is missing (proxy throws on call).
+ * pure-JS implementation if the addon is missing or throws on call.
  *
  * @param input  The string to hash (encoded as UTF-8 internally).
  * @param seed   32-bit seed value.

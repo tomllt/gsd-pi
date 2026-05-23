@@ -18,5 +18,5 @@ done
 # Omit dist/web — Next.js standalone contains symlinks that break tar extract on
 # Windows runners. validate-pack runs in the build job before this pack step.
 
-tar czf "$OUT" "${paths[@]}"
+tar chzf "$OUT" "${paths[@]}"
 echo "ci-pack-build-artifacts: packed ${#paths[@]} path(s) into ${OUT} ($(du -h "$OUT" | cut -f1))"
