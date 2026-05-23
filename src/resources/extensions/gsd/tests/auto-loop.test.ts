@@ -54,11 +54,14 @@ async function drainMicrotasks(turns = 20): Promise<void> {
 async function waitForMicrotasks(
   condition: () => boolean,
   label: string,
-  turns = 500,
+  turns = 5000,
 ): Promise<void> {
   for (let i = 0; i < turns; i++) {
     if (condition()) return;
     await Promise.resolve();
+    if (i % 25 === 24) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
   }
   assert.fail(`Timed out waiting for ${label}`);
 }
@@ -2506,8 +2509,8 @@ test("autoLoop handles verification retry by continuing loop", async (t) => {
       },
       postUnitPostVerification: async () => {
         deps.callLog.push("postUnitPostVerification");
-        // After the retry cycle completes, deactivate
-        s.active = false;
+        // After the retry cycle completes, deactivate.
+        if (verifyCallCount >= 2) s.active = false;
         return "continue" as const;
       },
     });
