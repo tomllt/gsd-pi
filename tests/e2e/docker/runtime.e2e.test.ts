@@ -86,6 +86,16 @@ function dockerBuildLocal(tarballName: string, tag: string): void {
 	);
 }
 
+function dockerBuildBuilder(tag: string): void {
+	const root = repoRoot();
+	execFileSync("docker", ["build", "--target", "builder", "-t", tag, "."], {
+		cwd: root,
+		stdio: "pipe",
+		encoding: "utf8",
+		timeout: 900_000,
+	});
+}
+
 function dockerRun(tag: string, args: string[]): { stdout: string; code: number } {
 	const result = spawnSync("docker", ["run", "--rm", tag, ...args], {
 		stdio: "pipe",
@@ -107,11 +117,22 @@ function dockerRmImage(tag: string): void {
 }
 
 const TAG = `gsd-pi:e2e-${process.pid}`;
+const BUILDER_TAG = `gsd-ci-builder:e2e-${process.pid}`;
 
 describe("docker runtime e2e", () => {
 	const skipReason = dockerAvailable()
 		? null
 		: "docker not available (set up Docker Desktop or run in CI to exercise this suite)";
+
+	test(
+		"CI builder image target builds for publish workflow bootstrap",
+		{ skip: skipReason ?? false, timeout: 900_000 },
+		(t) => {
+			t.after(() => dockerRmImage(BUILDER_TAG));
+
+			assert.doesNotThrow(() => dockerBuildBuilder(BUILDER_TAG));
+		},
+	);
 
 	test(
 		"`gsd --version` inside runtime-local container exits 0 with semver",
