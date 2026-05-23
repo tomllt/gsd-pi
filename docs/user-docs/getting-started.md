@@ -27,10 +27,10 @@ git --version
 
 ## Install GSD Pi
 
-Install the CLI globally:
+Install the CLI globally from the scoped npm package:
 
 ```bash
-npm install -g gsd-pi
+npm install -g @opengsd/gsd-pi@latest
 ```
 
 Confirm the command is available:
@@ -46,6 +46,18 @@ npm prefix -g
 ```
 
 Add that directory's `bin` folder to your shell profile, then open a new terminal.
+
+## Upgrade GSD Pi
+
+After the first install, upgrade to the latest release from your shell:
+
+```bash
+gsd upgrade
+```
+
+`gsd update` is an alias for the same command. Inside a GSD session, use `/gsd update` instead.
+
+If `gsd` reports a version mismatch with synced resources, or you previously installed the unscoped `gsd-pi` package, see [Upgrade from older GSD-2 installs](./troubleshooting.md#upgrade-from-older-gsd-2-installs) in Troubleshooting.
 
 ## Configure GSD
 
