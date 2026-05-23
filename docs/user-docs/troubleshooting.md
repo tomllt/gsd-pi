@@ -18,6 +18,43 @@ It checks:
 
 ## Common Issues
 
+### Upgrade from older GSD-2 installs
+
+**Symptoms:** `gsd` exits with a version or managed-resource mismatch, or an old global `gsd-pi` install still shadows the new package.
+
+**Fix:** Clear stale local update/resource state, then install the scoped package:
+
+macOS / Linux:
+
+```bash
+rm -f ~/.gsd/.update-check ~/.gsd/agent/managed-resources.json
+npm install -g @opengsd/gsd-pi@latest
+```
+
+Windows PowerShell:
+
+```powershell
+Remove-Item "$env:USERPROFILE\.gsd\.update-check" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.gsd\agent\managed-resources.json" -Force -ErrorAction SilentlyContinue
+npm install -g @opengsd/gsd-pi@latest
+```
+
+Windows Command Prompt:
+
+```bat
+del "%USERPROFILE%\.gsd\.update-check" 2>nul
+del "%USERPROFILE%\.gsd\agent\managed-resources.json" 2>nul
+npm install -g @opengsd/gsd-pi@latest
+```
+
+Or run the installer from the new package on any OS:
+
+```bash
+npx @opengsd/gsd-pi@latest
+```
+
+After that, routine upgrades use `gsd upgrade`, `gsd update`, or `/gsd update` in a session.
+
 ### Auto mode loops on the same unit
 
 **Symptoms:** The same unit (e.g., `research-slice` or `plan-slice`) dispatches repeatedly, then auto mode pauses with an "Artifact still missing..." error after 3 artifact verification retries.
@@ -87,7 +124,7 @@ It checks:
 
 ### `command not found: gsd` after install
 
-**Symptoms:** `npm install -g gsd-pi` succeeds but `gsd` isn't found.
+**Symptoms:** `npm install -g @opengsd/gsd-pi@latest` succeeds but `gsd` isn't found.
 
 **Cause:** npm's global bin directory isn't in your shell's `$PATH`.
 
@@ -103,14 +140,14 @@ echo 'export PATH="$(npm prefix -g)/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-**Workaround:** Run `npx gsd-pi` or `$(npm prefix -g)/bin/gsd` directly.
+**Workaround:** Run `npx @opengsd/gsd-pi@latest` or `$(npm prefix -g)/bin/gsd` directly.
 
 **Common causes:**
 - **Homebrew Node** — `/opt/homebrew/bin` should be in PATH but sometimes isn't if Homebrew init is missing from your shell profile
 - **Version manager (nvm, fnm, mise)** — global bin is version-specific; ensure your version manager initializes in your shell config
 - **oh-my-zsh** — the `gitfast` plugin aliases `gsd` to `git svn dcommit`. Check with `alias gsd` and unalias if needed
 
-### `npm install -g gsd-pi` fails
+### `npm install -g @opengsd/gsd-pi@latest` fails
 
 **Common causes:**
 - Missing workspace packages — fixed in v2.10.4+

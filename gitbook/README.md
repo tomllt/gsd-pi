@@ -38,7 +38,7 @@ You can stay hands-on with **step mode** (reviewing each step) or let GSD run au
 
 ```bash
 # Install
-npm install -g gsd-pi
+npm install -g @opengsd/gsd-pi@latest
 
 # Launch
 gsd

@@ -3,7 +3,7 @@
 ## Install GSD
 
 ```bash
-npm install -g gsd-pi
+npm install -g @opengsd/gsd-pi@latest
 ```
 
 Requires **Node.js 22.0.0 or later** (24 LTS recommended) and **Git**.
