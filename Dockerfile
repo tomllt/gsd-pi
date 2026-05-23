@@ -48,7 +48,7 @@ CMD ["--help"]
 # instead of pulling from npm. Lets `tests/e2e/docker/` exercise the actual
 # runtime container produced by this branch's code.
 # Build with:  docker build --target runtime-local \
-#                --build-arg TARBALL=gsd-pi-<version>.tgz -t gsd-pi:local .
+#                --build-arg TARBALL=opengsd-gsd-pi-<version>.tgz -t gsd-pi:local .
 # The tarball must be in the build context (created by `npm pack`).
 # ──────────────────────────────────────────────
 FROM node:24-slim AS runtime-local
