@@ -27,6 +27,8 @@ import {
   setSliceSummaryMd,
   saveGateResult,
   getPendingGatesForTurn,
+  getMilestoneSlices,
+  updateMilestoneStatus,
 } from "../gsd-db.js";
 import { getGatesForTurn } from "../gate-registry.js";
 import { gsdProjectionRoot, clearPathCache, resolveMilestoneFile } from "../paths.js";
@@ -384,6 +386,15 @@ export async function handleCompleteSlice(
       insertSlice({ id: params.sliceId, milestoneId: params.milestoneId, title: params.sliceTitle || params.sliceId });
     }
     updateSliceStatus(params.milestoneId, params.sliceId, "complete", completedAt);
+
+    const updatedSlices = getMilestoneSlices(params.milestoneId);
+    if (
+      milestone?.status === "planned" &&
+      updatedSlices.length > 0 &&
+      updatedSlices.every((s) => isClosedStatus(s.status))
+    ) {
+      updateMilestoneStatus(params.milestoneId, "active");
+    }
   });
 
   if (duplicateComplete) {

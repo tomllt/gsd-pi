@@ -11,6 +11,7 @@ import {
   insertSlice,
   insertTask,
   getSlice,
+  getMilestone,
   updateSliceStatus,
   getSliceTasks,
   setSliceSummaryMd,
@@ -264,6 +265,32 @@ console.log('\n=== complete-slice: handler happy path ===');
     assertEq(sliceAfter!.status, 'complete', 'slice status should be complete in DB');
     assertTrue(sliceAfter!.completed_at !== null, 'completed_at should be set in DB');
   }
+
+  cleanupDir(basePath);
+  cleanup(dbPath);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// complete-slice: final slice promotes planned milestone before validation
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== complete-slice: final slice promotes planned milestone ===');
+{
+  const dbPath = tempDbPath();
+  openDatabase(dbPath);
+
+  const { basePath } = createTempProject();
+
+  insertMilestone({ id: 'M001', title: 'Test Milestone', status: 'planned' });
+  insertSlice({ id: 'S01', milestoneId: 'M001', title: 'Test Slice', risk: 'medium', sequence: 1 });
+  insertTask({ id: 'T01', sliceId: 'S01', milestoneId: 'M001', status: 'complete', title: 'Task 1' });
+
+  const result = await handleCompleteSlice(makeValidSliceParams(), basePath);
+
+  assertTrue(!('error' in result), 'final slice completion should succeed');
+  const milestone = getMilestone('M001');
+  assertTrue(milestone !== null, 'milestone should exist after completion');
+  assertEq(milestone!.status, 'active', 'final slice should transition a planned milestone to active');
 
   cleanupDir(basePath);
   cleanup(dbPath);
