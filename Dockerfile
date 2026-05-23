@@ -1,3 +1,24 @@
+# Open GSD - Docker images
+# File Purpose: Define runtime and CI builder container images.
+
+# ──────────────────────────────────────────────
+# CI Builder
+# Image: ghcr.io/open-gsd/gsd-ci-builder
+# Used by: publish workflows that need Rust and Linux cross-compilers
+# ──────────────────────────────────────────────
+FROM node:24-bookworm AS builder
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    && rustup target add aarch64-unknown-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN node --version && rustc --version && cargo --version
+
 # ──────────────────────────────────────────────
 # Runtime
 # Image: ghcr.io/open-gsd/gsd-pi
