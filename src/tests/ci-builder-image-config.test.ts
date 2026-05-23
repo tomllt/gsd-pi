@@ -1,4 +1,4 @@
-// Project/App: GSD-2
+// Project/App: Open GSD
 // File Purpose: Regression tests for CI builder image workflow configuration.
 
 import assert from "node:assert/strict";
@@ -11,7 +11,7 @@ import { parse } from "yaml";
 const BUILDER_IMAGE = "ghcr.io/open-gsd/gsd-ci-builder";
 
 test("publish workflows use the builder image produced by pipeline", () => {
-  const prereleasePublish = readWorkflow("prerelease-publish.yml");
+  const prereleasePublish = readWorkflow("npm-publish.yml");
   const pipeline = readWorkflow("pipeline.yml");
 
   assert.equal(prereleasePublish.jobs["prerelease-publish"].container.image, `${BUILDER_IMAGE}:latest`);

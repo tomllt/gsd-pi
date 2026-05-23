@@ -1,6 +1,6 @@
 {
   "name": "@opengsd/gsd-pi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GSD Pi local-first coding agent",
   "license": "MIT",
   "repository": {
@@ -96,6 +96,7 @@
     "pi:uninstall-global": "node scripts/uninstall-pi-global.js",
     "sync-pkg-version": "node scripts/sync-pkg-version.cjs",
     "sync-platform-versions": "node native/scripts/sync-platform-versions.cjs",
+    "verify:version-sync": "node scripts/verify-version-sync.cjs",
     "validate-pack": "node scripts/validate-pack.js",
     "typecheck:extensions": "tsc --noEmit --project tsconfig.extensions.json",
     "verify:pr": "npm run build:core && npm run typecheck:extensions && npm run test:unit",
@@ -105,7 +106,7 @@
     "release:update-changelog": "node scripts/update-changelog.mjs",
     "docker:build-runtime": "docker build --target runtime -t ghcr.io/open-gsd/gsd-pi .",
     "docker:build-builder": "docker build --target builder -t ghcr.io/open-gsd/gsd-ci-builder .",
-    "prepublishOnly": "npm run sync-pkg-version && npm run sync-platform-versions && node scripts/prepublish-check.mjs && npm run build && npm run typecheck:extensions && npm run validate-pack",
+    "prepublishOnly": "npm run sync-pkg-version && npm run sync-platform-versions && npm run verify:version-sync && node scripts/prepublish-check.mjs && npm run build && npm run typecheck:extensions && npm run validate-pack",
     "test:live-regression": "node --experimental-strip-types tests/live-regression/run.ts",
     "test:e2e": "node --experimental-strip-types --test --test-concurrency=1 \"tests/e2e/*.e2e.test.ts\"",
     "test:e2e:windows-smoke": "node --experimental-strip-types --test tests/e2e/sanity.e2e.test.ts tests/e2e/migration.e2e.test.ts tests/e2e/native-abi.e2e.test.ts",

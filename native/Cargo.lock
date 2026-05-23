@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "gsd-ast"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "ast-grep-core",
  "globset",
@@ -576,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "gsd-engine"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "arboard",
  "dashmap",
@@ -604,7 +604,7 @@ dependencies = [
 
 [[package]]
 name = "gsd-grep"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "grep-matcher",
  "grep-regex",

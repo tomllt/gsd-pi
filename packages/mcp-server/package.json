@@ -1,6 +1,6 @@
 {
   "name": "@gsd-build/mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server exposing GSD orchestration tools for compatible clients",
   "license": "MIT",
   "gsd": {
@@ -34,8 +34,8 @@
     "test": "npm run build:test && node --test dist/mcp-server.test.js dist/remote-questions.test.js"
   },
   "dependencies": {
-    "@gsd-build/contracts": "^1.0.0",
-    "@gsd-build/rpc-client": "^1.0.0",
+    "@gsd-build/contracts": "^1.0.1",
+    "@gsd-build/rpc-client": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.0.0"
   },

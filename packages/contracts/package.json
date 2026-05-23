@@ -1,6 +1,6 @@
 {
   "name": "@gsd-build/contracts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared public contracts for GSD workspace boundaries",
   "license": "MIT",
   "gsd": {
