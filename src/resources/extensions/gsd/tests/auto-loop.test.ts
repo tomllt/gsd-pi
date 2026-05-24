@@ -2681,6 +2681,62 @@ test("autoLoop pauses instead of stopping for warning-level dispatch stop", asyn
   );
 });
 
+test("autoLoop retries warning-level unhandled phase with fresh state before pausing", async () => {
+  _resetPendingResolve();
+
+  const ctx = makeMockCtx();
+  ctx.ui.setStatus = () => {};
+  const pi = makeMockPi();
+  const s = makeLoopSession();
+  const states = [
+    {
+      phase: "planning",
+      activeMilestone: { id: "M001", title: "Test", status: "active" },
+      activeSlice: null,
+      activeTask: null,
+      registry: [{ id: "M001", status: "active" }],
+      blockers: [],
+    },
+    {
+      phase: "executing",
+      activeMilestone: { id: "M001", title: "Test", status: "active" },
+      activeSlice: { id: "S01", title: "Slice 1" },
+      activeTask: { id: "T01" },
+      registry: [{ id: "M001", status: "active" }],
+      blockers: [],
+    },
+  ];
+  const seenPhases: string[] = [];
+  let deriveCalls = 0;
+
+  const deps = makeMockDeps({
+    deriveState: async () => states[Math.min(deriveCalls++, states.length - 1)] as any,
+    resolveDispatch: async (dctx) => {
+      seenPhases.push(dctx.state.phase);
+      if (dctx.state.phase === "planning") {
+        return {
+          action: "stop" as const,
+          reason: 'Unhandled phase "planning" — run /gsd doctor to diagnose.',
+          level: "warning" as const,
+          matchedRule: "<no-match>",
+        };
+      }
+      return {
+        action: "stop" as const,
+        reason: "fresh state reached terminal stop",
+        level: "info" as const,
+      };
+    },
+  });
+
+  await autoLoop(ctx, pi, s, deps);
+
+  assert.deepEqual(seenPhases, ["planning", "executing"]);
+  assert.equal(deriveCalls, 2, "unhandled warning should re-derive state once");
+  assert.equal(deps.callLog.includes("pauseAuto"), false);
+  assert.equal(deps.callLog.includes("stopAuto"), true);
+});
+
 // #2474: error-level dispatch stop should still hard-stop
 test("autoLoop hard-stops for error-level dispatch stop", async (t) => {
   _resetPendingResolve();
@@ -2710,6 +2766,41 @@ test("autoLoop hard-stops for error-level dispatch stop", async (t) => {
   assert.ok(
     !deps.callLog.includes("pauseAuto"),
     "error-level stop should NOT call pauseAuto",
+  );
+});
+
+test("autoLoop closes journal iteration on pre-dispatch health-gate break", async () => {
+  _resetPendingResolve();
+
+  const ctx = makeMockCtx();
+  ctx.ui.setStatus = () => {};
+  const pi = makeMockPi();
+  const s = makeLoopSession();
+  const journalEvents: Array<{ eventType: string; data?: any }> = [];
+  let pauseOptions: unknown;
+
+  const deps = makeMockDeps({
+    preDispatchHealthGate: async () => ({
+      proceed: false,
+      reason: "health gate failed",
+      fixesApplied: [],
+    }),
+    pauseAuto: async (_ctx, _pi, _errorContext, options) => {
+      pauseOptions = options;
+      deps.callLog.push("pauseAuto");
+    },
+    emitJournalEvent: (event: any) => {
+      journalEvents.push(event);
+    },
+  });
+
+  await autoLoop(ctx, pi, s, deps);
+
+  assert.equal(deps.callLog.includes("pauseAuto"), true);
+  assert.deepEqual(pauseOptions, { expectedCurrentUnit: null });
+  assert.ok(
+    journalEvents.some((event) => event.eventType === "iteration-end" && event.data?.reason === "pre-dispatch-break"),
+    "pre-dispatch break must close the started iteration",
   );
 });
 
