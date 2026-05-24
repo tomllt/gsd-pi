@@ -1,0 +1,100 @@
+name: Discord changelog
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+  release:
+    types:
+      - published
+  create:
+  delete:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  discord-changelog:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+    steps:
+      - name: Post changelog to Discord
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+
+          const eventName = process.env.GITHUB_EVENT_NAME;
+          const eventPath = process.env.GITHUB_EVENT_PATH;
+          const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+
+          if (!webhookUrl) {
+            throw new Error("Missing DISCORD_CHANGELOG_WEBHOOK secret.");
+          }
+
+          const event = JSON.parse(await readFile(eventPath, "utf8"));
+          const payload = buildPayload(eventName, event);
+
+          const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Discord webhook failed with ${response.status}: ${await response.text()}`);
+          }
+
+          function buildPayload(eventName, event) {
+            return {
+              username: "Repo Changelog",
+              content: buildContent(eventName, event),
+              embeds: [
+                {
+                  ...buildEmbed(eventName, event),
+                  footer: { text: `GitHub ${eventName} event` },
+                  timestamp: new Date().toISOString(),
+                },
+              ],
+            };
+          }
+
+          function buildContent(eventName, event) {
+            const repo = getRepoName(event);
+
+            if (eventName === "release") {
+              const tag = event.release?.tag_name || event.release?.name || "release";
+              const action = event.action === "published" ? "published" : event.action || "updated";
+              return `**${repo}** ${action} **${tag}**`;
+            }
+
+            return `**${repo}** update from ${getActor(event)}`;
+          }
+
+          function buildEmbed(eventName, event) {
+            if (eventName === "release") {
+              return buildReleaseEmbed(event);
+            }
+
+            if (eventName === "push") {
+              return buildPushEmbed(event);
+            }
+
+            if (eventName === "pull_request") {
+              return buildPullRequestEmbed(event);
+            }
+
+            if (eventName === "create" || eventName === "delete") {
+              return buildRefEmbed(eventName, event);
+            }
