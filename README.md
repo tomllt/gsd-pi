@@ -2,6 +2,13 @@
 
 # GSD Pi
 
+[![npm version](https://img.shields.io/npm/v/@opengsd/gsd-pi?label=npm&logo=npm)](https://www.npmjs.com/package/@opengsd/gsd-pi)
+[![npm downloads](https://img.shields.io/npm/dm/@opengsd/gsd-pi?label=downloads&logo=npm&color=red)](https://www.npmjs.com/package/@opengsd/gsd-pi)
+[![CI](https://img.shields.io/github/actions/workflow/status/open-gsd/gsd-pi/ci.yml?branch=main&label=tests&logo=github)](https://github.com/open-gsd/gsd-pi/actions/workflows/ci.yml)
+[![Discord](https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/nKXTsAcmbT)
+[![GitHub stars](https://img.shields.io/github/stars/open-gsd/gsd-pi?label=stars&logo=github)](https://github.com/open-gsd/gsd-pi/stargazers)
+[![License: MIT](https://img.shields.io/github/license/open-gsd/gsd-pi?label=license)](https://github.com/open-gsd/gsd-pi/blob/main/LICENSE)
+
 GSD Pi is a local-first coding agent for planning, implementing, verifying, and tracking project work from the command line.
 
 It combines a terminal agent, project workflow tools, worktree-aware Git automation, and optional UI integrations so a project can move from idea to reviewed implementation with less manual coordination.
