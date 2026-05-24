@@ -33,6 +33,10 @@ console.log(`[bump-version] package.json: ${oldVersion} → ${newVersion}`);
 syncVersionSurfaces(root, newVersion, { updateRoot: false });
 console.log(`[bump-version] release version surfaces synced to ${newVersion}`);
 
+// 2b. Pin root optionalDependencies to the same engine version as the release.
+execSync("node native/scripts/sync-platform-versions.cjs", { cwd: root, stdio: "inherit" });
+console.log(`[bump-version] optionalDependencies pinned to ${newVersion}`);
+
 // 3. Regenerate root package-lock.json to match the new version.
 //    --package-lock-only updates the lockfile in-place without touching node_modules.
 execSync("npm install --package-lock-only --ignore-scripts", { cwd: root, stdio: "inherit" });

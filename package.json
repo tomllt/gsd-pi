@@ -161,11 +161,11 @@
   },
   "optionalDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.2.83",
-    "@opengsd/engine-darwin-arm64": "1.0.1",
-    "@opengsd/engine-darwin-x64": "1.0.1",
-    "@opengsd/engine-linux-arm64-gnu": "1.0.1",
-    "@opengsd/engine-linux-x64-gnu": "1.0.1",
-    "@opengsd/engine-win32-x64-msvc": "1.0.1",
+    "@opengsd/engine-darwin-arm64": "1.0.2",
+    "@opengsd/engine-darwin-x64": "1.0.2",
+    "@opengsd/engine-linux-arm64-gnu": "1.0.2",
+    "@opengsd/engine-linux-x64-gnu": "1.0.2",
+    "@opengsd/engine-win32-x64-msvc": "1.0.2",
     "fsevents": "~2.3.3",
     "koffi": "^2.9.0"
   },

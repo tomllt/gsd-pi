@@ -199,6 +199,16 @@ function verifyVersionSync(root) {
   verifyPackage(root, "pkg", expectedVersion, issues);
   verifyLockfile(root, expectedVersion, issues);
 
+  const rootPkg = readJson(path.join(root, "package.json"));
+  for (const platformDir of PLATFORM_PACKAGE_DIRS) {
+    const platform = platformDir.replace("native/npm/", "");
+    const depName = `@opengsd/engine-${platform}`;
+    const pinned = rootPkg.optionalDependencies?.[depName];
+    if (pinned !== undefined && pinned !== expectedVersion) {
+      issues.push(`package.json optionalDependencies.${depName} is ${pinned}, expected ${expectedVersion}`);
+    }
+  }
+
   const nativeCargoVersion = getNativeCargoVersion(root);
   if (nativeCargoVersion !== undefined && nativeCargoVersion !== expectedVersion) {
     issues.push(`native/Cargo.toml workspace package version is ${nativeCargoVersion}, expected ${expectedVersion}`);

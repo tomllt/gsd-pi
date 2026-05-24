@@ -279,7 +279,9 @@ jobs:
 
       - name: Install dependencies
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
-        run: npm ci --omit=optional
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm ci --omit=optional
 
       - name: Build
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
