@@ -57,6 +57,8 @@ function createHarness(overrides?: {
 	cancelResult?: boolean;
 	willRetry?: boolean;
 	hasQueuedMessages?: boolean;
+	keepRecentTokens?: number;
+	thresholdPercent?: number;
 }) {
 	const dir = mkdtempSync(join(tmpdir(), "compaction-orchestrator-test-"));
 	const sessionManager = SessionManager.create(dir, dir);
@@ -81,7 +83,10 @@ function createHarness(overrides?: {
 		hasQueuedMessages: () => overrides?.hasQueuedMessages ?? false,
 	} as unknown as Agent;
 
-	const extensionRunner = {
+	const extensionRunner: {
+		hasHandlers: ReturnType<typeof mock.fn>;
+		emit: ReturnType<typeof mock.fn>;
+	} = {
 		hasHandlers: mock.fn(() => true),
 		emit: mock.fn(async () => ({ cancel: overrides?.cancelResult ?? true })),
 	};
@@ -93,7 +98,8 @@ function createHarness(overrides?: {
 			getCompactionSettings: () => ({
 				enabled: true,
 				reserveTokens: 16_384,
-				keepRecentTokens: 1,
+				keepRecentTokens: overrides?.keepRecentTokens ?? 1,
+				thresholdPercent: overrides?.thresholdPercent,
 			}),
 		} as any,
 		modelRegistry: {
@@ -112,6 +118,7 @@ function createHarness(overrides?: {
 	return {
 		dir,
 		agent,
+		sessionManager,
 		continueFn,
 		replaceMessages,
 		emittedEvents,
@@ -150,5 +157,71 @@ describe("CompactionOrchestrator", () => {
 		assert.equal(endEvent?.willRetry, false, "threshold cancel should stay non-retrying");
 		assert.equal(harness.continueFn.mock.callCount(), 0, "threshold cancel should not resume the agent without queued work");
 		assert.equal(harness.replaceMessages.mock.callCount(), 0, "non-retry cancel should not trim messages");
+	});
+
+	it("(#109) empty prepared input aborts before session_before_compact hooks", async (t) => {
+		const harness = createHarness({ keepRecentTokens: 1_000_000 });
+		t.after(harness.cleanup);
+		const before = harness.sessionManager.getEntries().filter((entry) => entry.type === "compaction").length;
+
+		await (harness.orchestrator as any)._runAutoCompaction("threshold", false);
+
+		assert.equal(harness.extensionRunner.emit.mock.callCount(), 0, "invalid compaction must not reach hooks");
+		assert.equal(
+			harness.sessionManager.getEntries().filter((entry) => entry.type === "compaction").length,
+			before,
+			"invalid compaction must not append a compaction entry",
+		);
+		const endEvent = harness.emittedEvents.find((event) => event.type === "auto_compaction_end");
+		assert.match(String(endEvent?.errorMessage), /history preserved as-is/);
+	});
+
+	it("(#109) degenerate extension summaries abort without appending compaction", async (t) => {
+		const harness = createHarness();
+		t.after(harness.cleanup);
+		const firstKeptEntryId = harness.sessionManager.getBranch()[0]?.id;
+		assert.ok(firstKeptEntryId, "test session should have an entry id");
+		harness.extensionRunner.emit.mock.mockImplementation(async () => ({
+			compaction: {
+				summary:
+					"The conversation block you've handed me is empty: there's nothing between the <conversation> tags to summarize.",
+				firstKeptEntryId,
+				tokensBefore: 123,
+			},
+		}));
+		const before = harness.sessionManager.getEntries().filter((entry) => entry.type === "compaction").length;
+
+		await (harness.orchestrator as any)._runAutoCompaction("threshold", false);
+
+		assert.equal(
+			harness.sessionManager.getEntries().filter((entry) => entry.type === "compaction").length,
+			before,
+			"degenerate extension compaction must not be committed",
+		);
+		const endEvent = harness.emittedEvents.find((event) => event.type === "auto_compaction_end");
+		assert.match(String(endEvent?.errorMessage), /history preserved as-is/);
+	});
+
+	it("(#109) cumulative totalTokens alone does not trigger threshold compaction", async (t) => {
+		const harness = createHarness({ thresholdPercent: 0.6 });
+		t.after(harness.cleanup);
+		const assistant = createAssistantMessage("stop", "small live prompt");
+		assistant.usage = {
+			input: 10,
+			output: 5,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 4_623_740,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		};
+
+		await harness.orchestrator.checkCompaction(assistant);
+
+		assert.equal(
+			harness.emittedEvents.some((event) => event.type === "auto_compaction_start"),
+			false,
+			"huge cumulative totalTokens must not drive threshold compaction",
+		);
+		assert.equal(harness.extensionRunner.emit.mock.callCount(), 0);
 	});
 });

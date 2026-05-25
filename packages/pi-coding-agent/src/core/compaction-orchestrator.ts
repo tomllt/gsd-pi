@@ -14,10 +14,13 @@ import type { AssistantMessage, Model } from "@gsd/pi-ai";
 import { isContextOverflow } from "@gsd/pi-ai";
 import {
 	type CompactionResult,
+	type CompactionPreparation,
+	CompactionInvalidInputError,
 	CompactionProducedNoSummaryError,
 	calculateContextTokens,
 	compact,
 	estimateContextTokens,
+	isDegenerateSummary,
 	prepareCompaction,
 	shouldCompact,
 } from "./compaction/index.js";
@@ -42,6 +45,20 @@ export interface CompactionOrchestratorDeps {
 	disconnectFromAgent: () => void;
 	reconnectToAgent: () => void;
 	abort: () => Promise<void>;
+}
+
+function assertValidCompactionInput(preparation: CompactionPreparation): void {
+	if (preparation.messagesToSummarize.length === 0 && preparation.turnPrefixMessages.length === 0) {
+		throw new CompactionInvalidInputError();
+	}
+}
+
+function assertValidCompactionResult(result: CompactionResult): void {
+	if (isDegenerateSummary(result.summary)) {
+		throw new CompactionProducedNoSummaryError(
+			"Compaction produced no usable summary; session history preserved as-is.",
+		);
+	}
 }
 
 export class CompactionOrchestrator {
@@ -112,6 +129,7 @@ export class CompactionOrchestrator {
 				}
 				throw new Error("Nothing to compact (session too small)");
 			}
+			assertValidCompactionInput(preparation);
 
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
@@ -159,6 +177,7 @@ export class CompactionOrchestrator {
 				tokensBefore = result.tokensBefore;
 				details = result.details;
 			}
+			assertValidCompactionResult({ summary, firstKeptEntryId, tokensBefore, details });
 
 			if (this._compactionAbortController.signal.aborted) {
 				throw new Error("Compaction cancelled");
@@ -314,6 +333,7 @@ export class CompactionOrchestrator {
 				this._deps.emit({ type: "auto_compaction_end", result: undefined, aborted: false, willRetry: false });
 				return;
 			}
+			assertValidCompactionInput(preparation);
 
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
@@ -368,6 +388,7 @@ export class CompactionOrchestrator {
 				tokensBefore = compactResult.tokensBefore;
 				details = compactResult.details;
 			}
+			assertValidCompactionResult({ summary, firstKeptEntryId, tokensBefore, details });
 
 			if (this._autoCompactionAbortController.signal.aborted) {
 				this._deps.emit({ type: "auto_compaction_end", result: undefined, aborted: true, willRetry: false });
@@ -399,7 +420,7 @@ export class CompactionOrchestrator {
 			// can surface a clearer message than a generic compaction failure.
 			// Either way we drop the would-be compaction entry rather than writing
 			// an empty string to the session history.
-			const errorMessage = error instanceof CompactionProducedNoSummaryError
+			const errorMessage = error instanceof CompactionProducedNoSummaryError || error instanceof CompactionInvalidInputError
 				? `Compaction produced no usable summary — session history preserved as-is. (${error.message})`
 				: getErrorMessage(error);
 			this._deps.emit({

@@ -88,4 +88,42 @@ describe('register-hooks session_before_compact (#3696)', () => {
       _setAutoActiveForTest(false);
     }
   });
+
+  test('registered hook cancels empty compaction input defensively (#109)', async () => {
+    const handlers = new Map<string, Function>();
+    registerHooks({
+      on(event: string, handler: Function) {
+        handlers.set(event, handler);
+      },
+    } as any, []);
+
+    const compact = handlers.get('session_before_compact');
+    assert.ok(compact, 'session_before_compact hook should be registered');
+    const notifications: string[] = [];
+    const base = mkdtempSync(join(tmpdir(), 'gsd-compact-empty-'));
+    try {
+      const result = await compact(
+        {
+          preparation: {
+            messagesToSummarize: [],
+            turnPrefixMessages: [],
+          },
+        },
+        {
+          cwd: base,
+          ui: {
+            notify(message: string) {
+              notifications.push(message);
+            },
+            setWidget() {},
+          },
+        },
+      );
+
+      assert.deepEqual(result, { cancel: true });
+      assert.match(notifications.join('\n'), /history preserved/);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
 });

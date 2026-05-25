@@ -575,6 +575,8 @@ export function isDegenerateSummary(summary: string | undefined): boolean {
 	if (summary === undefined) return false;
 	const lower = summary.toLowerCase();
 	if (lower.includes("empty conversation")) return true;
+	if (lower.includes("conversation block") && lower.includes("empty")) return true;
+	if (lower.includes("nothing between") && lower.includes("conversation")) return true;
 	if (lower.includes("no conversation to summarize")) return true;
 	if (lower.includes("no messages to summarize")) return true;
 	// Length guard: any summary shorter than 100 chars is almost certainly
@@ -717,6 +719,13 @@ export class CompactionProducedNoSummaryError extends Error {
 	constructor(message: string) {
 		super(message);
 		this.name = "CompactionProducedNoSummaryError";
+	}
+}
+
+export class CompactionInvalidInputError extends Error {
+	constructor(message = "Compaction input had no conversation history to summarize; session history preserved as-is.") {
+		super(message);
+		this.name = "CompactionInvalidInputError";
 	}
 }
 
@@ -895,6 +904,7 @@ export async function compact(
 	apiKey: string | undefined,
 	customInstructions?: string,
 	signal?: AbortSignal,
+	_completeFn?: CompleteFn,
 ): Promise<CompactionResult> {
 	const {
 		firstKeptEntryId,
@@ -906,6 +916,10 @@ export async function compact(
 		fileOps,
 		settings,
 	} = preparation;
+
+	if (messagesToSummarize.length === 0 && turnPrefixMessages.length === 0) {
+		throw new CompactionInvalidInputError();
+	}
 
 	// Generate summaries (can be parallel if both needed) and merge into one
 	let summary: string;
@@ -922,6 +936,7 @@ export async function compact(
 						signal,
 						customInstructions,
 						previousSummary,
+						_completeFn,
 					)
 				: Promise.resolve("No prior history."),
 			generateTurnPrefixSummary(turnPrefixMessages, model, settings.reserveTokens, apiKey, signal),
@@ -938,6 +953,13 @@ export async function compact(
 			signal,
 			customInstructions,
 			previousSummary,
+			_completeFn,
+		);
+	}
+
+	if (isDegenerateSummary(summary)) {
+		throw new CompactionProducedNoSummaryError(
+			"Compaction produced no usable summary; session history preserved as-is.",
 		);
 	}
 

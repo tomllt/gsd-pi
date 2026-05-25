@@ -10,12 +10,15 @@ import type { AgentMessage } from "@gsd/pi-agent-core";
 import type { Model, AssistantMessage } from "@gsd/pi-ai";
 
 import {
+	compact,
 	generateSummary,
 	estimateTokens,
 	chunkMessages,
 	isDegenerateSummary,
+	CompactionInvalidInputError,
 	CompactionProducedNoSummaryError,
 	calculateContextTokens,
+	type CompactionPreparation,
 } from "./compaction.js";
 import { estimateSerializedTokens } from "./utils.js";
 
@@ -376,10 +379,54 @@ describe("(#4665) degenerate summary guard", () => {
 		);
 		assert.equal(
 			isDegenerateSummary(
+				"The conversation block you've handed me is empty: there's nothing between the <conversation> tags to summarize.",
+			),
+			true,
+			"known issue #109 refusal is degenerate",
+		);
+		assert.equal(
+			isDegenerateSummary(
 				"## Goal\nRefactor the compaction pipeline.\n## Done\n- Updated utils.ts\n- Added tests for #4665 regression path",
 			),
 			false,
 			"a real multi-section summary over 100 chars is not degenerate",
+		);
+	});
+
+	it("(#109) compact refuses empty prepared input before summarization", async () => {
+		const preparation: CompactionPreparation = {
+			firstKeptEntryId: "entry-1",
+			messagesToSummarize: [],
+			turnPrefixMessages: [],
+			isSplitTurn: false,
+			tokensBefore: 42,
+			fileOps: { read: new Set(), written: new Set(), edited: new Set() },
+			settings: { enabled: true, reserveTokens: 16_384, keepRecentTokens: 20_000 },
+		};
+
+		await assert.rejects(
+			() => compact(preparation, makeModel(200_000), undefined),
+			(err: unknown) => err instanceof CompactionInvalidInputError,
+		);
+	});
+
+	it("(#109) compact refuses degenerate single-pass summaries", async () => {
+		const preparation: CompactionPreparation = {
+			firstKeptEntryId: "entry-2",
+			messagesToSummarize: [makeUserMessage(10)],
+			turnPrefixMessages: [],
+			isSplitTurn: false,
+			tokensBefore: 100,
+			fileOps: { read: new Set(), written: new Set(), edited: new Set() },
+			settings: { enabled: true, reserveTokens: 16_384, keepRecentTokens: 20_000 },
+		};
+		const refusal =
+			"The conversation block you've handed me is empty: there's nothing between the <conversation> tags to summarize.";
+		const complete = mock.fn(async () => makeFakeResponse(refusal));
+
+		await assert.rejects(
+			() => compact(preparation, makeModel(200_000), undefined, undefined, undefined, complete as any),
+			(err: unknown) => err instanceof CompactionProducedNoSummaryError,
 		);
 	});
 

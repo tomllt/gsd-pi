@@ -652,11 +652,20 @@ export function registerHooks(
     }
   });
 
-  pi.on("session_before_compact", async (_event, ctx) => {
+  pi.on("session_before_compact", async (event, ctx) => {
     const basePath = contextBasePath(ctx);
     // Context Mode is default-on. Write the resumable snapshot before any
     // active-auto cancel return so auto sessions still leave re-entry context.
     await writeContextModeCompactionSnapshot(basePath);
+
+    const prep = event?.preparation;
+    if (prep && prep.messagesToSummarize?.length === 0 && prep.turnPrefixMessages?.length === 0) {
+      ctx.ui.notify(
+        "Skipped compaction because there was no conversation history to summarize; history preserved.",
+        "warning",
+      );
+      return { cancel: true };
+    }
 
     // Only cancel compaction while auto-mode is actively running.
     // Paused auto-mode should allow compaction — the user may be doing
