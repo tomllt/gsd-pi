@@ -33,6 +33,7 @@ function withModelPreferences<T>(fn: () => T): T {
       "  completion: completion-model",
       "  validation: validation-model",
       "  subagent: subagent-model",
+      "  uat: uat-model",
       "---",
       "",
     ].join("\n"));
@@ -63,6 +64,32 @@ test("worktree-merge routes to completion and is recognized as a unit label", ()
     assert.ok(KNOWN_UNIT_LABELS.includes("worktree-merge"));
     assert.equal(resolveModelWithFallbacksForUnit("worktree-merge")?.primary, "completion-model");
   });
+});
+
+test("run-uat routes to uat model bucket when configured", () => {
+  withModelPreferences(() => {
+    assert.equal(resolveModelWithFallbacksForUnit("run-uat")?.primary, "uat-model");
+  });
+});
+
+test("run-uat falls back to completion when uat bucket is not configured", () => {
+  const oldHome = process.env.GSD_HOME;
+  const home = mkdtempSync(join(tmpdir(), "gsd-model-map-uat-fallback-"));
+  try {
+    process.env.GSD_HOME = home;
+    writeFileSync(join(home, "preferences.md"), [
+      "---",
+      "models:",
+      "  completion: completion-model",
+      "---",
+      "",
+    ].join("\n"));
+    assert.equal(resolveModelWithFallbacksForUnit("run-uat")?.primary, "completion-model");
+  } finally {
+    if (oldHome === undefined) delete process.env.GSD_HOME;
+    else process.env.GSD_HOME = oldHome;
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("every known unit label with a dispatch phase resolves when all model buckets are configured", () => {

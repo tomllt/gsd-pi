@@ -223,6 +223,7 @@ export interface GSDModelConfig {
   completion?: string;
   validation?: string;
   subagent?: string;
+  uat?: string;
 }
 
 /**
@@ -238,6 +239,7 @@ export interface GSDModelConfigV2 {
   completion?: string | GSDPhaseModelConfig;
   validation?: string | GSDPhaseModelConfig;
   subagent?: string | GSDPhaseModelConfig;
+  uat?: string | GSDPhaseModelConfig;
 }
 
 /** Normalized model selection with resolved fallbacks */
