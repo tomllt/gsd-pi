@@ -176,6 +176,61 @@ async function callSessionDirectoryHook(extensions: LoadExtensionsResult, cwd: s
 	return customSessionDir;
 }
 
+type ProviderRegistryShim = Pick<ModelRegistry, "registerProvider" | "unregisterProvider">;
+
+async function importOptionalResourceModule<T>(relativePaths: string[]): Promise<T | undefined> {
+	for (const relativePath of relativePaths) {
+		try {
+			return (await import(new URL(relativePath, import.meta.url).href)) as T;
+		} catch {
+			// Try the next packaged/source resource location.
+		}
+	}
+	return undefined;
+}
+
+/** Providers like Ollama register on session_start; probe them for --list-models. */
+async function probeDeferredProvidersForListModels(modelRegistry: ModelRegistry): Promise<void> {
+	try {
+		const ollama = await importOptionalResourceModule<{
+			probeAndRegister?: (pi: ProviderRegistryShim) => Promise<unknown>;
+		}>([
+			"../../../dist/resources/extensions/ollama/index.js",
+			"../../../src/resources/extensions/ollama/index.ts",
+		]);
+		if (!ollama?.probeAndRegister) return;
+
+		const pi: ProviderRegistryShim = {
+			registerProvider(name, config) {
+				modelRegistry.registerProvider(name, config);
+			},
+			unregisterProvider(name) {
+				modelRegistry.unregisterProvider(name);
+			},
+		};
+		await ollama.probeAndRegister(pi);
+	} catch {
+		// Non-fatal: local Ollama is optional.
+	}
+}
+
+async function applyDisabledModelProvidersFromPreferences(modelRegistry: ModelRegistry): Promise<void> {
+	try {
+		const preferences = await importOptionalResourceModule<{
+			resolveDisabledModelProvidersFromPreferences?: () => string[];
+		}>([
+			"../../../dist/resources/extensions/gsd/preferences.js",
+			"../../../src/resources/extensions/gsd/preferences.ts",
+		]);
+		const providers = preferences?.resolveDisabledModelProvidersFromPreferences?.();
+		if (Array.isArray(providers)) {
+			modelRegistry.setDisabledModelProviders(providers);
+		}
+	} catch {
+		// Non-fatal: list all ready providers when preferences cannot be loaded.
+	}
+}
+
 async function createSessionManager(
 	parsed: Args,
 	cwd: string,
@@ -491,6 +546,8 @@ export async function main(args: string[]) {
 
 	if (parsed.listModels !== undefined) {
 		const searchPattern = typeof parsed.listModels === "string" ? parsed.listModels : undefined;
+		await probeDeferredProvidersForListModels(modelRegistry);
+		await applyDisabledModelProvidersFromPreferences(modelRegistry);
 		await listModels(modelRegistry, { searchPattern, discover: parsed.discover });
 		process.exit(0);
 	}
