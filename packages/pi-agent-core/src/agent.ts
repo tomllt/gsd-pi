@@ -168,6 +168,8 @@ export class Agent {
 	private _maxRetryDelayMs?: number;
 	private _beforeToolCall?: AgentLoopConfig["beforeToolCall"];
 	private _afterToolCall?: AgentLoopConfig["afterToolCall"];
+	private _formatValidationError?: AgentLoopConfig["formatValidationError"];
+	private _onPreparationErrorsTurn?: AgentLoopConfig["onPreparationErrorsTurn"];
 	private _externalToolExecution?: (model: Model<any>) => boolean;
 	private _getProviderOptions?: AgentOptions["getProviderOptions"];
 
@@ -261,6 +263,20 @@ export class Agent {
 	 */
 	setAfterToolCall(fn: AgentLoopConfig["afterToolCall"]): void {
 		this._afterToolCall = fn;
+	}
+
+	/**
+	 * Install a formatter for tool argument validation errors (schema failures).
+	 */
+	setFormatValidationError(fn: AgentLoopConfig["formatValidationError"]): void {
+		this._formatValidationError = fn;
+	}
+
+	/**
+	 * Install a hook called after a turn with preparation errors (validation failures).
+	 */
+	setOnPreparationErrorsTurn(fn: AgentLoopConfig["onPreparationErrorsTurn"]): void {
+		this._onPreparationErrorsTurn = fn;
 	}
 
 	get state(): AgentState {
@@ -534,6 +550,8 @@ export class Agent {
 			getFollowUpMessages: async () => this.dequeueFollowUpMessages(),
 			beforeToolCall: this._beforeToolCall,
 			afterToolCall: this._afterToolCall,
+			formatValidationError: this._formatValidationError,
+			onPreparationErrorsTurn: this._onPreparationErrorsTurn,
 			externalToolExecution: this._externalToolExecution?.(model) ?? false,
 		};
 

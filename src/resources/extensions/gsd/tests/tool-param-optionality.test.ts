@@ -148,6 +148,15 @@ test("gsd_slice_complete — validates with only core params", () => {
 
 // ─── gsd_plan_milestone: enrichment arrays must be optional ──────────────────
 
+test("gsd_plan_milestone — promptGuidelines warn against slice-only args", () => {
+  const tool = getTool("gsd_plan_milestone");
+  assert.ok(tool, "gsd_plan_milestone must be registered");
+  const joined = tool.promptGuidelines.join(" ");
+  assert.match(joined, /milestoneId, title, vision, and slices/);
+  assert.match(joined, /never pass only milestoneId \+ sliceId/i);
+  assert.match(joined, /gsd_plan_slice/);
+});
+
 test("gsd_plan_milestone — enrichment arrays are optional", () => {
   const tool = getTool("gsd_plan_milestone");
   assert.ok(tool, "gsd_plan_milestone must be registered");

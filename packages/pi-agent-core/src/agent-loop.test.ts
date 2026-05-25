@@ -730,4 +730,166 @@ describe("agent-loop — schema overload retry cap (#2783)", () => {
 			);
 		}
 	});
+
+	it("formatValidationError appends hint to validation error tool result", async () => {
+		const tool = makeToolWithSchema();
+		const badCall = makeToolCallMessage({ path: "/tmp/test" });
+		const finalStop = makeAssistantMessage({
+			content: [{ type: "text", text: "Done." }],
+			stopReason: "stop",
+		});
+		const mockStream = createMockStreamFn([badCall, finalStop]);
+
+		const context: AgentContext = {
+			systemPrompt: "test",
+			messages: [{ role: "user", content: [{ type: "text", text: "go" }], timestamp: Date.now() }],
+			tools: [tool],
+		};
+		const config: AgentLoopConfig = {
+			model: TEST_MODEL,
+			convertToLlm: (msgs) => msgs.filter((m): m is any => m.role !== "custom"),
+			toolExecution: "sequential",
+			formatValidationError: (_tool, _tc, base) => `${base}\n\nHINT: include content field`,
+		};
+
+		const stream = agentLoop(
+			[{ role: "user", content: [{ type: "text", text: "go" }], timestamp: Date.now() }],
+			context,
+			config,
+			undefined,
+			mockStream as any,
+		);
+		const events = await collectEvents(stream);
+		const toolError = events.find(
+			(e) => e.type === "tool_execution_end" && e.isError === true,
+		);
+		assert.ok(toolError && toolError.type === "tool_execution_end");
+		const text = toolError.result.content.find((c) => c.type === "text");
+		assert.ok(text && text.type === "text" && text.text.includes("HINT: include content field"));
+	});
+
+	it("onPreparationErrorsTurn with resetValidationFailureCap prevents schema overload stop", async () => {
+		const tool = makeToolWithSchema();
+		const badCall = makeToolCallMessage({ path: "/tmp/test" });
+		const goodCall = makeToolCallMessage({ path: "/tmp/test", content: "hello" });
+		const finalStop = makeAssistantMessage({
+			content: [{ type: "text", text: "Done." }],
+			stopReason: "stop",
+		});
+
+		// Exceed cap without reset: 3 bad + would stop. With reset after each bad: survives.
+		const responses = [badCall, badCall, badCall, goodCall, finalStop];
+		const mockStream = createMockStreamFn(responses);
+		let recoveryCalls = 0;
+
+		const context: AgentContext = {
+			systemPrompt: "test",
+			messages: [{ role: "user", content: [{ type: "text", text: "go" }], timestamp: Date.now() }],
+			tools: [tool],
+		};
+		const config: AgentLoopConfig = {
+			model: TEST_MODEL,
+			convertToLlm: (msgs) => msgs.filter((m): m is any => m.role !== "custom"),
+			toolExecution: "sequential",
+			onPreparationErrorsTurn: async () => {
+				recoveryCalls++;
+				return {
+					resetValidationFailureCap: true,
+					steeringMessages: [
+						{
+							role: "user",
+							content: [{ type: "text", text: "Retry with valid args." }],
+							timestamp: Date.now(),
+						},
+					],
+				};
+			},
+		};
+
+		const stream = agentLoop(
+			[{ role: "user", content: [{ type: "text", text: "go" }], timestamp: Date.now() }],
+			context,
+			config,
+			undefined,
+			mockStream as any,
+		);
+		const events = await collectEvents(stream);
+
+		const agentEnd = events.find((e) => e.type === "agent_end");
+		assert.ok(agentEnd, "agent must complete without schema overload stop");
+		assert.ok(recoveryCalls >= 3, "recovery hook should run for each bad turn");
+		const stopMessages = (agentEnd as any).messages.filter(
+			(m: AgentMessage) =>
+				m.role === "assistant" &&
+				(m as AssistantMessage).errorMessage?.includes("Schema overload"),
+		);
+		assert.equal(stopMessages.length, 0, "must not emit schema overload stop");
+	});
+
+	it("onPreparationErrorsTurn failures exclude execution errors in mixed turns", async () => {
+		const schemaTool = makeToolWithSchema();
+		const execFailTool: AgentTool<any> = {
+			...makeToolWithSchema(),
+			name: "exec_fail_tool",
+			label: "Exec Fail",
+			execute: async () => {
+				throw new Error("EXECUTION_PHASE_FAILURE");
+			},
+		};
+
+		const prepFailCall = makeToolCallMessage({ path: "/tmp/test" });
+		(prepFailCall.content[0] as any).name = "write_file";
+		const execFailCall = makeToolCallMessage({ path: "/tmp/ok", content: "hello" });
+		(execFailCall.content[0] as any).id = "tc_exec_fail";
+		(execFailCall.content[0] as any).name = "exec_fail_tool";
+
+		const mixedTurn = makeAssistantMessage({
+			content: [
+				prepFailCall.content[0],
+				execFailCall.content[0],
+			],
+			stopReason: "toolUse",
+		});
+		const finalStop = makeAssistantMessage({
+			content: [{ type: "text", text: "Done." }],
+			stopReason: "stop",
+		});
+
+		const mockStream = createMockStreamFn([mixedTurn, finalStop]);
+		let capturedFailures: Array<{ toolName: string; errorText: string }> = [];
+
+		const context: AgentContext = {
+			systemPrompt: "test",
+			messages: [{ role: "user", content: [{ type: "text", text: "go" }], timestamp: Date.now() }],
+			tools: [schemaTool, execFailTool],
+		};
+		const config: AgentLoopConfig = {
+			model: TEST_MODEL,
+			convertToLlm: (msgs) => msgs.filter((m): m is any => m.role !== "custom"),
+			toolExecution: "sequential",
+			onPreparationErrorsTurn: async (ctx) => {
+				capturedFailures = ctx.failures.map((f) => ({
+					toolName: f.toolName,
+					errorText: f.errorText,
+				}));
+				return undefined;
+			},
+		};
+
+		const stream = agentLoop(
+			[{ role: "user", content: [{ type: "text", text: "go" }], timestamp: Date.now() }],
+			context,
+			config,
+			undefined,
+			mockStream as any,
+		);
+		await collectEvents(stream);
+
+		assert.equal(capturedFailures.length, 1, "only preparation-phase errors belong in failures");
+		assert.equal(capturedFailures[0]?.toolName, "write_file");
+		assert.ok(
+			!capturedFailures.some((f) => f.errorText.includes("EXECUTION_PHASE_FAILURE")),
+			"execution errors must not appear in preparation failures context",
+		);
+	});
 });

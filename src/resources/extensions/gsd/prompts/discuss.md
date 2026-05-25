@@ -235,6 +235,9 @@ When writing context.md, preserve the user's exact terminology, emphasis, and fr
 When writing CONTEXT.md, include discussion-layer sections: **Scope**, **Architectural Decisions** with rationale/evidence/alternatives, **Error Handling Strategy**, and **Acceptance Criteria** specific enough for planning.
 
 4. Write `{{contextPath}}` — use the **Context** output template below. Preserve key risks, unknowns, existing codebase constraints, integration points, and relevant requirements surfaced during discussion.
+
+**gsd_plan_milestone tool shape (NON-BYPASSABLE):** NEVER call `gsd_plan_milestone` with only `milestoneId` and `sliceId` — that is the `gsd_plan_slice` tool. Required fields: `milestoneId`, `title`, `vision`, `slices[]` (each slice needs `sliceId`, `title`, `risk`, `depends`, `demo`, `goal`). Build `slices[]` from the Roadmap Preview table you printed in chat.
+
 5. Call `gsd_plan_milestone` to create the roadmap. Decompose into demoable vertical slices with risk, depends, demo sentences, proof strategy, verification classes, definition of done, requirement coverage, and a boundary map. If crossing runtime boundaries, include a final integration slice proving end-to-end behavior in a real environment. Use the **Roadmap** template below for tool parameters.
 6. For each architectural or pattern decision made during discussion, call `gsd_decision_save` — the tool auto-assigns IDs and regenerates `.gsd/DECISIONS.md` automatically.
 7. {{commitInstruction}}
@@ -277,6 +280,9 @@ Once the user confirms the milestone split:
 #### Phase 2: Primary milestone
 
 5. Write a full `CONTEXT.md` for the primary milestone (the one discussed in depth).
+
+**gsd_plan_milestone tool shape (NON-BYPASSABLE):** NEVER call `gsd_plan_milestone` with only `milestoneId` and `sliceId` — that is the `gsd_plan_slice` tool. Required fields: `milestoneId`, `title`, `vision`, `slices[]` (each slice needs `sliceId`, `title`, `risk`, `depends`, `demo`, `goal`). Build `slices[]` from the Roadmap Preview table you printed in chat.
+
 6. Call `gsd_plan_milestone` for **only the primary milestone**; detail-planning later milestones now is waste because the codebase will change. Include requirement coverage and definition of done.
 
 #### MANDATORY: depends_on Frontmatter in CONTEXT.md

@@ -1074,6 +1074,29 @@ export interface CustomToolResultEvent extends ToolResultEventBase {
 	details: unknown;
 }
 
+/** Fired when tool argument validation fails before execution. Can enrich the error message. */
+export interface ToolFormatValidationErrorEvent {
+	type: "tool_format_validation_error";
+	toolName: string;
+	toolCallId: string;
+	arguments: Record<string, unknown>;
+	baseMessage: string;
+}
+
+/** A single preparation-phase failure passed to turn-level recovery handlers. */
+export interface ToolPreparationErrorFailure {
+	toolName: string;
+	arguments: Record<string, unknown>;
+	errorText: string;
+}
+
+/** Fired after a turn when one or more tools failed during preparation (schema validation). */
+export interface ToolPreparationErrorsTurnEvent {
+	type: "tool_preparation_errors_turn";
+	failures: ToolPreparationErrorFailure[];
+	preparationErrorCount: number;
+}
+
 /** Fired after a tool executes. Can modify result. */
 export type ToolResultEvent =
 	| BashToolResultEvent
@@ -1218,6 +1241,18 @@ export interface ToolResultEventResult {
 	content?: (TextContent | ImageContent)[];
 	details?: unknown;
 	isError?: boolean;
+}
+
+export interface ToolFormatValidationErrorEventResult {
+	/** Replaces the validation error message shown to the model. */
+	message?: string;
+}
+
+export interface ToolPreparationErrorsTurnEventResult {
+	/** Injected as a user message before the next LLM call. */
+	steeringContent?: string;
+	/** When true, resets the schema-overload consecutive failure counter. */
+	resetValidationFailureCap?: boolean;
 }
 
 export interface BeforeAgentStartEventResult {
@@ -1386,6 +1421,14 @@ export interface ExtensionAPI {
 	on(event: "bash_transform", handler: ExtensionHandler<BashTransformEvent, BashTransformEventResult>): void;
 	on(event: "tool_call", handler: ExtensionHandler<ToolCallEvent, ToolCallEventResult>): void;
 	on(event: "tool_result", handler: ExtensionHandler<ToolResultEvent, ToolResultEventResult>): void;
+	on(
+		event: "tool_format_validation_error",
+		handler: ExtensionHandler<ToolFormatValidationErrorEvent, ToolFormatValidationErrorEventResult>,
+	): void;
+	on(
+		event: "tool_preparation_errors_turn",
+		handler: ExtensionHandler<ToolPreparationErrorsTurnEvent, ToolPreparationErrorsTurnEventResult>,
+	): void;
 	on(event: "user_bash", handler: ExtensionHandler<UserBashEvent, UserBashEventResult>): void;
 	on(event: "input", handler: ExtensionHandler<InputEvent, InputEventResult>): void;
 	on(event: "before_model_select", handler: ExtensionHandler<BeforeModelSelectEvent, BeforeModelSelectResult>): void;

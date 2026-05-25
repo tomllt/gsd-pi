@@ -636,6 +636,56 @@ export class AgentSession {
 
 			return undefined;
 		});
+
+		this.agent.setFormatValidationError(async (tool, toolCall, baseMessage) => {
+			await this._agentEventQueue;
+			if (!this._extensionRunner?.hasHandlers("tool_format_validation_error")) {
+				return baseMessage;
+			}
+			try {
+				const enriched = await this._extensionRunner.emitToolFormatValidationError({
+					type: "tool_format_validation_error",
+					toolName: toolCall.name,
+					toolCallId: toolCall.id,
+					arguments: toolCall.arguments as Record<string, unknown>,
+					baseMessage,
+				});
+				return enriched ?? baseMessage;
+			} catch {
+				return baseMessage;
+			}
+		});
+
+		this.agent.setOnPreparationErrorsTurn(async (context) => {
+			await this._agentEventQueue;
+			if (!this._extensionRunner?.hasHandlers("tool_preparation_errors_turn")) {
+				return undefined;
+			}
+			try {
+				const recovery = await this._extensionRunner.emitToolPreparationErrorsTurn({
+					type: "tool_preparation_errors_turn",
+					failures: context.failures,
+					preparationErrorCount: context.preparationErrorCount,
+				});
+				if (!recovery) return undefined;
+				const steeringMessages =
+					recovery.steeringContent !== undefined
+						? [
+								{
+									role: "user" as const,
+									content: [{ type: "text" as const, text: recovery.steeringContent }],
+									timestamp: Date.now(),
+								},
+							]
+						: undefined;
+				return {
+					steeringMessages,
+					resetValidationFailureCap: recovery.resetValidationFailureCap,
+				};
+			} catch {
+				return undefined;
+			}
+		});
 	}
 
 	/** Extract text content from a message */

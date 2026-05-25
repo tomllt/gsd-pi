@@ -50,6 +50,9 @@ Then:
 2. {{skillActivation}}
 3. Create only as many demoable vertical slices as the work genuinely needs. Use 1-10 slices, sized to the work; tiny/single-file/static work should usually be one slice.
 4. Order by risk, high-risk first.
+
+**gsd_plan_milestone tool shape (NON-BYPASSABLE):** NEVER call `gsd_plan_milestone` with only `milestoneId` and `sliceId` — that is the `gsd_plan_slice` tool. Required fields: `milestoneId`, `title`, `vision`, `slices[]` (each slice needs `sliceId`, `title`, `risk`, `depends`, `demo`, `goal`). Build `slices[]` from the Roadmap output template / decomposition above.
+
 5. Call `gsd_plan_milestone` to persist milestone fields, slice rows, and **Horizontal Checklist** through the DB-backed path. Fill checklist concerns considered during planning: requirements, decisions, shutdown, revenue, auth, shared resources, reconnection. Omit for trivial milestones. Do **not** write `{{outputPath}}`, `ROADMAP.md`, or other planning artifacts manually; the tool owns rendering and persistence.
 6. If planning produced structural decisions (slice ordering, technology choices, scope exclusions), call `gsd_decision_save` for each; the tool assigns IDs and regenerates `.gsd/DECISIONS.md`.
 

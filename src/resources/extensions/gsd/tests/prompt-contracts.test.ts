@@ -283,6 +283,16 @@ test("plan-milestone prompt references DB-backed planning tool and explicitly fo
   const prompt = readPrompt("plan-milestone");
   assert.match(prompt, /gsd_plan_milestone/);
   assert.match(prompt, /Do \*\*not\*\* write `?\{\{outputPath\}\}`?, `?ROADMAP\.md`?, or other planning artifacts manually/i);
+  assert.match(prompt, /NEVER call `gsd_plan_milestone` with only `milestoneId` and `sliceId`/);
+  assert.match(prompt, /gsd_plan_slice/);
+});
+
+test("discuss prompts forbid gsd_plan_milestone slice-only tool args", () => {
+  for (const name of ["discuss", "discuss-headless"] as const) {
+    const prompt = readPrompt(name);
+    assert.match(prompt, /NEVER call `gsd_plan_milestone` with only `milestoneId` and `sliceId`/);
+    assert.match(prompt, /title`, `vision`, `slices\[\]/);
+  }
 });
 
 test("plan-slice prompt no longer frames direct PLAN writes as the source of truth", () => {

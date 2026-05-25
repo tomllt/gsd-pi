@@ -848,6 +848,49 @@ export class ExtensionRunner {
 		return result;
 	}
 
+	async emitToolFormatValidationError(
+		event: import("./types.js").ToolFormatValidationErrorEvent,
+	): Promise<string | undefined> {
+		if (!this.hasHandlers("tool_format_validation_error")) return undefined;
+
+		let message: string | undefined;
+		await this.invokeHandlers("tool_format_validation_error", () => event, (handlerResult) => {
+			const r = handlerResult as import("./types.js").ToolFormatValidationErrorEventResult | undefined;
+			if (r?.message !== undefined && message === undefined) {
+				message = r.message;
+				return { done: true };
+			}
+			return { done: false };
+		});
+		return message;
+	}
+
+	async emitToolPreparationErrorsTurn(
+		event: import("./types.js").ToolPreparationErrorsTurnEvent,
+	): Promise<import("./types.js").ToolPreparationErrorsTurnEventResult | undefined> {
+		if (!this.hasHandlers("tool_preparation_errors_turn")) return undefined;
+
+		let steeringContent: string | undefined;
+		let resetValidationFailureCap = false;
+
+		await this.invokeHandlers("tool_preparation_errors_turn", () => event, (handlerResult) => {
+			const r = handlerResult as import("./types.js").ToolPreparationErrorsTurnEventResult | undefined;
+			if (!r) return { done: false };
+			if (r.steeringContent !== undefined) {
+				steeringContent = steeringContent
+					? `${steeringContent}\n\n${r.steeringContent}`
+					: r.steeringContent;
+			}
+			if (r.resetValidationFailureCap) {
+				resetValidationFailureCap = true;
+			}
+			return { done: false };
+		});
+
+		if (steeringContent === undefined && !resetValidationFailureCap) return undefined;
+		return { steeringContent, resetValidationFailureCap };
+	}
+
 	async emitBashTransform(command: string, cwd: string): Promise<string> {
 		if (!this.hasHandlers("bash_transform")) return command;
 

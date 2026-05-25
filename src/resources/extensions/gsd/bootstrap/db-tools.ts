@@ -491,6 +491,7 @@ export function registerDbTools(pi: ExtensionAPI): void {
     promptSnippet: "Plan a milestone via DB write + roadmap render + cache invalidation",
     promptGuidelines: [
       "Use gsd_plan_milestone for milestone planning instead of writing ROADMAP.md directly.",
+      "Requires milestoneId, title, vision, and slices[] — never pass only milestoneId + sliceId (that is gsd_plan_slice).",
       "Keep parameters flat and provide the full milestone planning payload, including slices.",
       "Milestone and slice titles must not contain forward slash (/), en dash, or em dash characters.",
       "The tool validates input, writes milestone and slice planning data transactionally, renders ROADMAP.md from DB, and clears both state and parse caches after success.",

@@ -19,6 +19,8 @@ import type {
 	AgentTool,
 	AgentToolCall,
 	AgentToolResult,
+	PreparationErrorFailure,
+	PreparationErrorsTurnContext,
 	StreamFn,
 } from "./types.js";
 import { maybeLogTokenAudit } from "./token-audit.js";
@@ -333,7 +335,11 @@ async function runLoop(
 					toolResults.length > 0 &&
 					toolExecution.preparationErrorCount === toolResults.length;
 				if (allToolsFailedPreparation) {
-					consecutiveAllToolErrorTurns++;
+					if (toolExecution.resetValidationFailureCap) {
+						consecutiveAllToolErrorTurns = 0;
+					} else {
+						consecutiveAllToolErrorTurns++;
+					}
 				} else if (!hasPreparationErrors) {
 					// Reset only when there are zero preparation errors this turn.
 					// Mixed turns (some prep errors, some successes) don't reset,
@@ -504,6 +510,8 @@ interface ToolExecutionResult {
 	steeringMessages?: AgentMessage[];
 	/** Number of tool results that failed during preparation (validation/schema). */
 	preparationErrorCount: number;
+	/** When true, recovery hook requested resetting the schema-overload counter. */
+	resetValidationFailureCap?: boolean;
 }
 
 /**
@@ -534,6 +542,7 @@ async function executeToolCallsSequential(
 	const results: ToolResultMessage[] = [];
 	let steeringMessages: AgentMessage[] | undefined;
 	let preparationErrorCount = 0;
+	const preparationErrorToolCallIds = new Set<string>();
 
 	for (let index = 0; index < toolCalls.length; index++) {
 		const toolCall = toolCalls[index];
@@ -548,6 +557,7 @@ async function executeToolCallsSequential(
 		if (preparation.kind === "immediate") {
 			if (preparation.isError) {
 				preparationErrorCount++;
+				preparationErrorToolCallIds.add(toolCall.id);
 			}
 			results.push(emitToolCallOutcome(toolCall, preparation.result, preparation.isError, stream));
 		} else {
@@ -578,7 +588,15 @@ async function executeToolCallsSequential(
 		}
 	}
 
-	return { toolResults: results, steeringMessages, preparationErrorCount };
+	return finalizeToolExecutionResult(
+		assistantMessage,
+		results,
+		steeringMessages,
+		preparationErrorCount,
+		preparationErrorToolCallIds,
+		config,
+		signal,
+	);
 }
 
 async function executeToolCallsParallel(
@@ -593,6 +611,7 @@ async function executeToolCallsParallel(
 	const runnableCalls: PreparedToolCall[] = [];
 	let steeringMessages: AgentMessage[] | undefined;
 	let preparationErrorCount = 0;
+	const preparationErrorToolCallIds = new Set<string>();
 
 	for (let index = 0; index < toolCalls.length; index++) {
 		const toolCall = toolCalls[index];
@@ -607,6 +626,7 @@ async function executeToolCallsParallel(
 		if (preparation.kind === "immediate") {
 			if (preparation.isError) {
 				preparationErrorCount++;
+				preparationErrorToolCallIds.add(toolCall.id);
 			}
 			results.push(emitToolCallOutcome(toolCall, preparation.result, preparation.isError, stream));
 		} else {
@@ -624,7 +644,15 @@ async function executeToolCallsParallel(
 				for (const skipped of remainingCalls) {
 					results.push(skipToolCall(skipped, stream));
 				}
-				return { toolResults: results, steeringMessages, preparationErrorCount };
+				return finalizeToolExecutionResult(
+					assistantMessage,
+					results,
+					steeringMessages,
+					preparationErrorCount,
+					preparationErrorToolCallIds,
+					config,
+					signal,
+				);
 			}
 		}
 	}
@@ -656,7 +684,80 @@ async function executeToolCallsParallel(
 		}
 	}
 
-	return { toolResults: results, steeringMessages, preparationErrorCount };
+	return finalizeToolExecutionResult(
+		assistantMessage,
+		results,
+		steeringMessages,
+		preparationErrorCount,
+		preparationErrorToolCallIds,
+		config,
+		signal,
+	);
+}
+
+function buildPreparationErrorsContext(
+	assistantMessage: AssistantMessage,
+	toolResults: ToolResultMessage[],
+	preparationErrorToolCallIds: ReadonlySet<string>,
+	preparationErrorCount: number,
+): PreparationErrorsTurnContext {
+	const toolCallsById = new Map(
+		(assistantMessage.content.filter((c) => c.type === "toolCall") as AgentToolCall[]).map((tc) => [
+			tc.id,
+			tc,
+		]),
+	);
+	const failures: PreparationErrorFailure[] = [];
+	for (const result of toolResults) {
+		if (!result.isError) continue;
+		if (!preparationErrorToolCallIds.has(result.toolCallId)) continue;
+		const toolCall = toolCallsById.get(result.toolCallId);
+		if (!toolCall) continue;
+		const textBlock = result.content.find((c) => c.type === "text");
+		const errorText = textBlock && textBlock.type === "text" ? textBlock.text : "";
+		failures.push({
+			toolName: toolCall.name,
+			arguments: toolCall.arguments as Record<string, unknown>,
+			errorText,
+		});
+	}
+	return { assistantMessage, failures, preparationErrorCount };
+}
+
+async function finalizeToolExecutionResult(
+	assistantMessage: AssistantMessage,
+	toolResults: ToolResultMessage[],
+	steeringMessages: AgentMessage[] | undefined,
+	preparationErrorCount: number,
+	preparationErrorToolCallIds: ReadonlySet<string>,
+	config: AgentLoopConfig,
+	signal: AbortSignal | undefined,
+): Promise<ToolExecutionResult> {
+	let resetValidationFailureCap: boolean | undefined;
+	if (preparationErrorCount > 0 && config.onPreparationErrorsTurn) {
+		const recovery = await config.onPreparationErrorsTurn(
+			buildPreparationErrorsContext(
+				assistantMessage,
+				toolResults,
+				preparationErrorToolCallIds,
+				preparationErrorCount,
+			),
+			signal,
+		);
+		const recoverySteering = recovery?.steeringMessages;
+		if (recoverySteering && recoverySteering.length > 0) {
+			steeringMessages = recoverySteering;
+		}
+		if (recovery?.resetValidationFailureCap === true) {
+			resetValidationFailureCap = true;
+		}
+	}
+	return {
+		toolResults,
+		steeringMessages,
+		preparationErrorCount,
+		resetValidationFailureCap,
+	};
 }
 
 type PreparedToolCall = {
@@ -720,9 +821,13 @@ async function prepareToolCall(
 			args: validatedArgs,
 		};
 	} catch (error) {
+		let message = error instanceof Error ? error.message : String(error);
+		if (config.formatValidationError) {
+			message = await config.formatValidationError(tool, toolCall, message);
+		}
 		return {
 			kind: "immediate",
-			result: createErrorToolResult(error instanceof Error ? error.message : String(error)),
+			result: createErrorToolResult(message),
 			isError: true,
 		};
 	}

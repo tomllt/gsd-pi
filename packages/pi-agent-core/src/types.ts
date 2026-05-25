@@ -68,6 +68,31 @@ export interface BeforeToolCallContext {
 	context: AgentContext;
 }
 
+/** A single tool call that failed during preparation (validation / not found / blocked). */
+export interface PreparationErrorFailure {
+	toolName: string;
+	arguments: Record<string, unknown>;
+	errorText: string;
+}
+
+/** Context passed to `onPreparationErrorsTurn`. */
+export interface PreparationErrorsTurnContext {
+	/** The assistant message that requested the tool calls. */
+	assistantMessage: AssistantMessage;
+	/** Tool calls that failed during preparation this turn. */
+	failures: PreparationErrorFailure[];
+	/** Count of tool results that failed during preparation. */
+	preparationErrorCount: number;
+}
+
+/** Result returned from `onPreparationErrorsTurn`. */
+export interface PreparationErrorsTurnResult {
+	/** Messages injected before the next LLM call (same as getSteeringMessages). */
+	steeringMessages?: AgentMessage[];
+	/** When true, the schema-overload counter resets instead of incrementing this turn. */
+	resetValidationFailureCap?: boolean;
+}
+
 /** Context passed to `afterToolCall`. */
 export interface AfterToolCallContext {
 	/** The assistant message that requested the tool call. */
@@ -207,6 +232,25 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * The hook receives the agent abort signal and is responsible for honoring it.
 	 */
 	afterToolCall?: (context: AfterToolCallContext, signal?: AbortSignal) => Promise<AfterToolCallResult | undefined>;
+
+	/**
+	 * Optional formatter for tool argument validation errors (AJV / schema failures).
+	 * Called in prepareToolCall before the error tool result is emitted.
+	 */
+	formatValidationError?: (
+		tool: AgentTool<any>,
+		toolCall: AgentToolCall,
+		baseMessage: string,
+	) => string | Promise<string>;
+
+	/**
+	 * Called after a turn when one or more tool calls failed during preparation.
+	 * Use to inject corrective steering and reset the schema-overload counter.
+	 */
+	onPreparationErrorsTurn?: (
+		context: PreparationErrorsTurnContext,
+		signal?: AbortSignal,
+	) => Promise<PreparationErrorsTurnResult | void>;
 
 	/**
 	 * When true, tool calls in assistant messages are rendered in the TUI

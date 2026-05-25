@@ -32,6 +32,7 @@ import { extractSubagentAgentClasses } from "./subagent-input.js";
 import { approvalGateIdForUnit, isExplicitApprovalResponse, shouldPauseForUserApprovalQuestion } from "../user-input-boundary.js";
 import { resolveSkillManifest } from "../skill-manifest.js";
 import { getGuidedUnitContext } from "../guided-unit-context.js";
+import { registerPlanMilestoneSchemaRecovery } from "./plan-milestone-schema-recovery.js";
 
 let approvalQuestionAbortInFlight = false;
 
@@ -485,6 +486,8 @@ export function registerHooks(
   // ADR-005 Phase 3b: surface pi-ai ProviderSwitchReport via audit, notification, and counter.
   // Idempotent — only the first registerHooks call installs.
   void import("../provider-switch-observer.js").then((m) => m.installProviderSwitchObserver());
+
+  registerPlanMilestoneSchemaRecovery(pi);
 
   pi.on("session_start", async (_event, ctx) => {
     const basePath = contextBasePath(ctx);
