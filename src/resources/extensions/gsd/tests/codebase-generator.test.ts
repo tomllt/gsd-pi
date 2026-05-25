@@ -667,3 +667,32 @@ test("ensureCodebaseMapFresh: returns fresh when metadata matches repository sta
     cleanup(base);
   }
 });
+
+test("ensureCodebaseMapFresh: does not rewrite expired metadata when fingerprint is unchanged", () => {
+  const base = makeTmpRepo();
+  try {
+    addFile(base, "src/main.ts");
+    ensureCodebaseMapFresh(base, undefined, { ttlMs: 0, force: true });
+
+    const staleGeneratedAt = "2026-01-01T00:00:00Z";
+    const original = readCodebaseMap(base);
+    assert.ok(original);
+    const staleContent = original
+      .replace(/Generated: \S+/, `Generated: ${staleGeneratedAt}`)
+      .replace(/"generatedAt":"[^"]+"/, `"generatedAt":"${staleGeneratedAt}"`);
+    writeCodebaseMap(base, staleContent);
+
+    const refreshed = ensureCodebaseMapFresh(base, undefined, {
+      ttlMs: 0,
+      maxAgeMs: 1,
+      force: true,
+    });
+    const written = readCodebaseMap(base);
+
+    assert.equal(refreshed.status, "fresh");
+    assert.equal(refreshed.generatedAt, staleGeneratedAt);
+    assert.equal(written, staleContent);
+  } finally {
+    cleanup(base);
+  }
+});

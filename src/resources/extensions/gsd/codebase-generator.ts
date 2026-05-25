@@ -107,7 +107,6 @@ const DEFAULT_EXCLUDES = [
 const DEFAULT_MAX_FILES = 500;
 const DEFAULT_COLLAPSE_THRESHOLD = 20;
 const DEFAULT_REFRESH_TTL_MS = 30_000;
-const DEFAULT_MAX_AGE_MS = 15 * 60_000;
 const CODEBASE_METADATA_PREFIX = "<!-- gsd:codebase-meta ";
 
 const freshnessCache = new Map<string, { checkedAt: number; result: EnsureCodebaseMapResult }>();
@@ -470,7 +469,6 @@ export function ensureCodebaseMapFresh(
   const resolved = resolveGeneratorOptions(options);
   const cacheKey = `${basePath}::${resolved.optionSignature}`;
   const ttlMs = ensureOptions?.ttlMs ?? DEFAULT_REFRESH_TTL_MS;
-  const maxAgeMs = ensureOptions?.maxAgeMs ?? DEFAULT_MAX_AGE_MS;
   const force = ensureOptions?.force === true;
   const now = Date.now();
 
@@ -515,13 +513,11 @@ export function ensureCodebaseMapFresh(
 
   const metadata = parseCodebaseMapMetadata(existing);
   const existingDescriptions = parseCodebaseMap(existing);
-  const ageMs = metadata ? now - Date.parse(metadata.generatedAt) : Number.POSITIVE_INFINITY;
   const staleReason =
     !metadata ? "missing-metadata"
     : metadata.fingerprint !== fingerprint ? "files-changed"
     : metadata.fileCount !== listed.files.length ? "file-count-changed"
     : metadata.truncated !== listed.truncated ? "truncation-changed"
-    : maxAgeMs > 0 && Number.isFinite(ageMs) && ageMs > maxAgeMs ? "expired"
     : undefined;
 
   if (!staleReason) {
