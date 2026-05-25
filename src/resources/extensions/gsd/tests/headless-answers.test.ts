@@ -164,6 +164,35 @@ test('tryHandle matches by question ID — single select', (t) => {
   assert.strictEqual(injector.getStats().questionsAnswered, 1);
 });
 
+test('tryHandle matches dynamic approval-gate question aliases', (t) => {
+  const injector = new AnswerInjector({
+    questions: { depth_verification_M001: 'Yes, you got it (Recommended)' },
+  });
+
+  injector.observeEvent(makeToolExecutionStart([{
+    id: 'depth_verification_m001_confirm',
+    header: 'Depth',
+    question: 'Proceed with this headless milestone plan?',
+    options: [
+      { label: 'Yes, you got it (Recommended)' },
+      { label: 'Not yet' },
+    ],
+  }]));
+
+  const captured: string[] = [];
+  const captureStdin = (data: string) => { captured.push(data); };
+  const event = makeSelectEvent(
+    'req-gate',
+    'Depth: Proceed with this headless milestone plan?',
+    ['Yes, you got it (Recommended)', 'Not yet'],
+  );
+  const handled = injector.tryHandle(event, captureStdin);
+
+  assert.strictEqual(handled, true);
+  assert.strictEqual(JSON.parse(captured[0].trim()).value, 'Yes, you got it (Recommended)');
+  assert.deepStrictEqual(injector.getUnusedWarnings(), []);
+});
+
 test('tryHandle unknown question deferred — first_option timeout', (t) => {
   // Use Node's MockTimers instead of a real-time setTimeout race. The
   // production class schedules an internal setTimeout to default the

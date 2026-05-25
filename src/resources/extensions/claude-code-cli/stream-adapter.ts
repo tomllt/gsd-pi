@@ -130,6 +130,11 @@ interface ParsedElicitationQuestion extends Question {
 	noteFieldId?: string;
 }
 
+interface HeadlessAnswersFile {
+	questions?: Record<string, string | string[]>;
+	defaults?: { strategy?: "first_option" | "cancel" };
+}
+
 /** Descriptor for a single free-text input field parsed from an SDK elicitation form schema. */
 interface ParsedTextInputField {
 	id: string;
@@ -501,6 +506,99 @@ function readElicitationChoices(options: SdkElicitationRequestOption[] | undefin
 	return options
 		.map((option) => (typeof option?.const === "string" ? option.const : typeof option?.title === "string" ? option.title : ""))
 		.filter((option): option is string => option.length > 0);
+}
+
+let cachedHeadlessAnswersPath: string | undefined;
+let cachedHeadlessAnswers: HeadlessAnswersFile | null | undefined;
+
+function loadHeadlessAnswers(env: NodeJS.ProcessEnv = process.env): HeadlessAnswersFile | null {
+	const filePath = env.GSD_HEADLESS_ANSWERS_PATH?.trim();
+	if (!filePath) return null;
+	if (cachedHeadlessAnswersPath === filePath) return cachedHeadlessAnswers ?? null;
+
+	cachedHeadlessAnswersPath = filePath;
+	cachedHeadlessAnswers = null;
+	try {
+		const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as unknown;
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+		cachedHeadlessAnswers = parsed as HeadlessAnswersFile;
+		return cachedHeadlessAnswers;
+	} catch {
+		return null;
+	}
+}
+
+function normalizeHeadlessQuestionId(id: string): string {
+	return id.trim().toLowerCase().replace(/[-\s]+/g, "_").replace(/_confirm$/, "");
+}
+
+function findHeadlessAnswer(
+	answers: Record<string, string | string[]> | undefined,
+	questionId: string,
+): string | string[] | undefined {
+	if (!answers) return undefined;
+	const normalizedQuestionId = normalizeHeadlessQuestionId(questionId);
+
+	for (const [key, answer] of Object.entries(answers)) {
+		if (normalizeHeadlessQuestionId(key) === normalizedQuestionId) return answer;
+	}
+
+	for (const [key, answer] of Object.entries(answers)) {
+		const normalizedKey = normalizeHeadlessQuestionId(key);
+		if (normalizedQuestionId.startsWith(`${normalizedKey}_`) || normalizedKey.startsWith(`${normalizedQuestionId}_`)) {
+			return answer;
+		}
+	}
+
+	return undefined;
+}
+
+function answerValueForQuestion(
+	question: ParsedElicitationQuestion,
+	answers: HeadlessAnswersFile,
+): string | string[] | undefined {
+	const explicit = findHeadlessAnswer(answers.questions, question.id);
+	if (explicit !== undefined) return explicit;
+
+	const strategy = answers.defaults?.strategy ?? "first_option";
+	if (strategy === "cancel") return undefined;
+	return question.allowMultiple ? [question.options[0]?.label ?? ""] : question.options[0]?.label;
+}
+
+function answerElicitationFromHeadlessAnswers(
+	questions: ParsedElicitationQuestion[],
+	answers: HeadlessAnswersFile | null,
+): SdkElicitationResult | null {
+	if (!answers) return null;
+	if (answers.defaults?.strategy === "cancel" && !answers.questions) return { action: "cancel" };
+
+	const content: Record<string, string | string[]> = {};
+	for (const question of questions) {
+		const rawAnswer = answerValueForQuestion(question, answers);
+		if (rawAnswer === undefined) return { action: "cancel" };
+
+		const labels = new Set(question.options.map((option) => option.label));
+		if (question.allowMultiple) {
+			const selected = (Array.isArray(rawAnswer) ? rawAnswer : [rawAnswer]).filter((value) => labels.has(value));
+			if (selected.length > 0) {
+				content[question.id] = selected;
+				continue;
+			}
+			if ((answers.defaults?.strategy ?? "first_option") === "cancel") return { action: "cancel" };
+			content[question.id] = [question.options[0]?.label ?? ""];
+			continue;
+		}
+
+		const selected = Array.isArray(rawAnswer) ? rawAnswer[0] : rawAnswer;
+		if (typeof selected === "string" && labels.has(selected)) {
+			content[question.id] = selected;
+			continue;
+		}
+		if ((answers.defaults?.strategy ?? "first_option") === "cancel") return { action: "cancel" };
+		content[question.id] = question.options[0]?.label ?? "";
+	}
+
+	return { action: "accept", content };
 }
 
 /** Parse an SDK elicitation request into structured multiple-choice questions, or null if the schema is unsupported. */
@@ -1213,6 +1311,9 @@ export function createClaudeCodeElicitationHandler(
 
 		const questions = parseAskUserQuestionsElicitation(request);
 		if (questions) {
+			const headlessAnswer = answerElicitationFromHeadlessAnswers(questions, loadHeadlessAnswers());
+			if (headlessAnswer) return headlessAnswer;
+
 			const interviewResult = await showInterviewRound(questions, { signal }, { ui } as any).catch(() => undefined);
 			if (interviewResult && Object.keys(interviewResult.answers).length > 0) {
 				return {

@@ -33,6 +33,34 @@ export interface AnswerInjectorStats {
   secretsProvided: number
 }
 
+export function normalizeQuestionId(id: string): string {
+  return id.trim().toLowerCase().replace(/[-\s]+/g, '_').replace(/_confirm$/, '')
+}
+
+export function findConfiguredQuestionAnswer(
+  questions: Record<string, string | string[]> | undefined,
+  questionId: string,
+): { key: string; answer: string | string[] } | undefined {
+  if (!questions) return undefined
+  const normalizedQuestionId = normalizeQuestionId(questionId)
+
+  for (const [key, answer] of Object.entries(questions)) {
+    if (normalizeQuestionId(key) === normalizedQuestionId) return { key, answer }
+  }
+
+  for (const [key, answer] of Object.entries(questions)) {
+    const normalizedKey = normalizeQuestionId(key)
+    if (
+      normalizedQuestionId.startsWith(`${normalizedKey}_`) ||
+      normalizedKey.startsWith(`${normalizedQuestionId}_`)
+    ) {
+      return { key, answer }
+    }
+  }
+
+  return undefined
+}
+
 // ---------------------------------------------------------------------------
 // Answer File Loader
 // ---------------------------------------------------------------------------
@@ -241,10 +269,11 @@ export class AnswerInjector {
     const meta = this.questionMetaByTitle.get(title)
     if (!meta) return false
 
-    const answer = this.answerFile.questions?.[meta.id]
+    const matchedAnswer = findConfiguredQuestionAnswer(this.answerFile.questions, meta.id)
+    const answer = matchedAnswer?.answer
     const eventOptions = event.options as string[] | undefined
 
-    if (answer !== undefined) {
+    if (matchedAnswer && answer !== undefined) {
       if (meta.allowMultiple) {
         // Multi-select: answer must be an array
         const values = Array.isArray(answer) ? answer : [answer]
@@ -252,7 +281,7 @@ export class AnswerInjector {
         if (valid) {
           const response = { type: 'extension_ui_response', id: event.id, values }
           writeToStdin(serializeJsonLine(response))
-          this.usedQuestionIds.add(meta.id)
+          this.usedQuestionIds.add(matchedAnswer.key)
           this.stats.questionsAnswered++
           return true
         }
@@ -262,7 +291,7 @@ export class AnswerInjector {
         if (eventOptions?.includes(value)) {
           const response = { type: 'extension_ui_response', id: event.id, value }
           writeToStdin(serializeJsonLine(response))
-          this.usedQuestionIds.add(meta.id)
+          this.usedQuestionIds.add(matchedAnswer.key)
           this.stats.questionsAnswered++
           return true
         }

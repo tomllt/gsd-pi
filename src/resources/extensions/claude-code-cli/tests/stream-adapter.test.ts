@@ -1183,6 +1183,96 @@ describe("stream-adapter — MCP elicitation bridge", () => {
 		});
 	});
 
+	test("createClaudeCodeElicitationHandler applies headless answers before UI prompts", async () => {
+		const tmp = mkdtempSync(join(tmpdir(), "gsd-headless-answers-"));
+		const previous = process.env.GSD_HEADLESS_ANSWERS_PATH;
+		try {
+			const answersPath = join(tmp, "answers.json");
+			writeFileSync(answersPath, JSON.stringify({
+				questions: {
+					storage_scope: "Cloud-synced",
+					platform: ["Desktop", "Mobile"],
+				},
+				defaults: { strategy: "first_option" },
+			}));
+			process.env.GSD_HEADLESS_ANSWERS_PATH = answersPath;
+
+			let customCalls = 0;
+			const handler = createClaudeCodeElicitationHandler({
+				custom: async () => {
+					customCalls++;
+					return undefined;
+				},
+				select: async () => {
+					throw new Error("select should not be called when headless answers match");
+				},
+			} as any);
+			assert.ok(handler);
+
+			const result = await handler!(askUserQuestionsRequest, { signal: new AbortController().signal });
+			assert.equal(customCalls, 0);
+			assert.deepEqual(result, {
+				action: "accept",
+				content: {
+					storage_scope: "Cloud-synced",
+					platform: ["Desktop", "Mobile"],
+				},
+			});
+		} finally {
+			if (previous === undefined) delete process.env.GSD_HEADLESS_ANSWERS_PATH;
+			else process.env.GSD_HEADLESS_ANSWERS_PATH = previous;
+			rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	test("createClaudeCodeElicitationHandler defaults dynamic depth gate IDs to the first option", async () => {
+		const tmp = mkdtempSync(join(tmpdir(), "gsd-headless-gate-answers-"));
+		const previous = process.env.GSD_HEADLESS_ANSWERS_PATH;
+		try {
+			const answersPath = join(tmp, "answers.json");
+			writeFileSync(answersPath, JSON.stringify({
+				questions: {
+					depth_verification_M001: "Proceed with planning (Recommended)",
+				},
+				defaults: { strategy: "first_option" },
+			}));
+			process.env.GSD_HEADLESS_ANSWERS_PATH = answersPath;
+
+			const handler = createClaudeCodeElicitationHandler({ custom: async () => undefined } as any);
+			assert.ok(handler);
+			const result = await handler!({
+				serverName: "gsd-workflow",
+				message: "Please answer the following question(s).",
+				mode: "form" as const,
+				requestedSchema: {
+					type: "object" as const,
+					properties: {
+						depth_verification_m001_confirm: {
+							type: "string",
+							title: "Depth",
+							description: "Proceed with this headless milestone plan?",
+							oneOf: [
+								{ const: "Yes, you got it (Recommended)", title: "Yes, you got it (Recommended)" },
+								{ const: "Not yet", title: "Not yet" },
+							],
+						},
+					},
+				},
+			}, { signal: new AbortController().signal });
+
+			assert.deepEqual(result, {
+				action: "accept",
+				content: {
+					depth_verification_m001_confirm: "Yes, you got it (Recommended)",
+				},
+			});
+		} finally {
+			if (previous === undefined) delete process.env.GSD_HEADLESS_ANSWERS_PATH;
+			else process.env.GSD_HEADLESS_ANSWERS_PATH = previous;
+			rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
 	test("createClaudeCodeElicitationHandler falls back to dialog prompts when custom UI is unavailable", async () => {
 		const ui = {
 			custom: async () => undefined,
