@@ -7,8 +7,15 @@ import {
   readKnowledge,
   readProgress,
   readRoadmap,
+  buildGraph,
+  graphDiff,
+  graphQuery,
+  graphStatus,
   registerWorkflowTools,
+  resolveGsdRoot,
   runDoctorLite,
+  writeGraph,
+  writeSnapshot,
   WORKFLOW_TOOL_NAMES,
 } from "@opengsd/mcp-server";
 import type { SessionManager } from "./session-manager.js";
@@ -66,6 +73,12 @@ export class LocalToolExecutor {
         if (typeof args.sessionId === "string") await this.sessionManager.cancelSession(args.sessionId);
         else await this.sessionManager.cancelSessionByDir(await this.requiredProjectDir(args));
         return { content: [{ type: "text", text: JSON.stringify({ cancelled: true }, null, 2) }] };
+      case "gsd_resolve_blocker": {
+        const sessionId = String(args.sessionId ?? "");
+        const response = String(args.response ?? "");
+        await this.sessionManager.resolveBlocker(sessionId, response);
+        return { content: [{ type: "text", text: JSON.stringify({ resolved: true }, null, 2) }] };
+      }
       case "gsd_query":
       case "gsd_progress":
         return { content: [{ type: "text", text: JSON.stringify(await readProgress(await this.requiredProjectDir(args)), null, 2) }] };
@@ -79,6 +92,8 @@ export class LocalToolExecutor {
         return { content: [{ type: "text", text: JSON.stringify(await readCaptures(await this.requiredProjectDir(args)), null, 2) }] };
       case "gsd_knowledge":
         return { content: [{ type: "text", text: JSON.stringify(await readKnowledge(await this.requiredProjectDir(args)), null, 2) }] };
+      case "gsd_graph":
+        return { content: [{ type: "text", text: JSON.stringify(await this.executeGraph(args), null, 2) }] };
       default:
         throw new Error(`Unsupported forwarded GSD MCP tool: ${toolName}`);
     }
@@ -119,6 +134,39 @@ export class LocalToolExecutor {
 
   private executeWorkflowHandler(handler: ToolHandler, args: Record<string, unknown>): Promise<unknown> {
     return handler(args);
+  }
+
+  private async executeGraph(args: Record<string, unknown>): Promise<unknown> {
+    const projectDir = await this.requiredProjectDir(args);
+    const mode = args.mode;
+    switch (mode) {
+      case "build": {
+        const gsdRoot = resolveGsdRoot(projectDir);
+        if (args.snapshot === true) {
+          await writeSnapshot(gsdRoot).catch(() => { /* best-effort */ });
+        }
+        const graph = await buildGraph(projectDir);
+        await writeGraph(gsdRoot, graph);
+        return {
+          built: true,
+          nodeCount: graph.nodes.length,
+          edgeCount: graph.edges.length,
+          builtAt: graph.builtAt,
+        };
+      }
+      case "query":
+        return graphQuery(
+          projectDir,
+          typeof args.term === "string" ? args.term : "",
+          typeof args.budget === "number" ? args.budget : undefined,
+        );
+      case "status":
+        return graphStatus(projectDir);
+      case "diff":
+        return graphDiff(projectDir);
+      default:
+        throw new Error("gsd_graph mode must be one of: build, query, status, diff");
+    }
   }
 }
 

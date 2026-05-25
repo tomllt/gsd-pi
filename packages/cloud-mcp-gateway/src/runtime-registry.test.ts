@@ -67,3 +67,17 @@ test("runtime registry serializes calls per project", async () => {
   socket.emit("message", JSON.stringify({ type: "tool_result", requestId: secondCall.requestId, result: { n: 2 } }));
   assert.deepEqual(await second, { n: 2 });
 });
+
+test("runtime registry rejects in-flight calls when runtime disconnects", async () => {
+  const registry = new RuntimeRegistry();
+  const socket = new FakeSocket();
+  registry.attachRuntime({ userId: "u1", runtimeId: "rt1", socket: socket as never });
+
+  const call = registry.callTool({ userId: "u1", toolName: "gsd_status", args: { sessionId: "s1" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(socket.sent.length, 1);
+
+  const rejection = assert.rejects(call, /Local GSD Runtime disconnected: rt1 while waiting for gsd_status/);
+  socket.close();
+  await rejection;
+});

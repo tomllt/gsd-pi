@@ -18,6 +18,8 @@ interface RuntimeConnection {
 }
 
 interface PendingCall {
+  runtimeId: string;
+  toolName: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -42,7 +44,10 @@ export class RuntimeRegistry {
     socket: WebSocket;
   }): void {
     const existing = this.runtimes.get(params.runtimeId);
-    if (existing && existing.socket !== params.socket) existing.socket.close(4000, "replaced");
+    if (existing && existing.socket !== params.socket) {
+      this.failPendingForRuntime(params.runtimeId, `Local GSD Runtime disconnected: ${params.runtimeId}`);
+      existing.socket.close(4000, "replaced");
+    }
 
     const runtime: RuntimeConnection = {
       userId: params.userId,
@@ -60,6 +65,7 @@ export class RuntimeRegistry {
     params.socket.on("close", () => {
       if (this.runtimes.get(params.runtimeId)?.socket === params.socket) {
         this.runtimes.delete(params.runtimeId);
+        this.failPendingForRuntime(params.runtimeId, `Local GSD Runtime disconnected: ${params.runtimeId}`);
       }
     });
   }
@@ -89,9 +95,11 @@ export class RuntimeRegistry {
       ...call,
       args: target.args,
     }, target.projectAlias));
-    this.projectQueues.set(projectKey, run.finally(() => {
+    const cleanup = run.catch(() => undefined).finally(() => {
       if (this.projectQueues.get(projectKey) === run) this.projectQueues.delete(projectKey);
-    }));
+      if (this.projectQueues.get(projectKey) === cleanup) this.projectQueues.delete(projectKey);
+    });
+    this.projectQueues.set(projectKey, cleanup);
     return run;
   }
 
@@ -149,7 +157,7 @@ export class RuntimeRegistry {
         this.pending.delete(requestId);
         reject(new Error(`Timed out waiting for Local GSD Runtime response to ${call.toolName}`));
       }, 10 * 60 * 1000);
-      this.pending.set(requestId, { resolve, reject, timer });
+      this.pending.set(requestId, { runtimeId: runtime.runtimeId, toolName: call.toolName, resolve, reject, timer });
 
       const abort = () => {
         this.send(runtime, { type: "cancel", requestId });
@@ -208,5 +216,14 @@ export class RuntimeRegistry {
       throw new Error(`Local GSD Runtime is offline: ${runtime.runtimeId}`);
     }
     runtime.socket.send(JSON.stringify(message));
+  }
+
+  private failPendingForRuntime(runtimeId: string, message: string): void {
+    for (const [requestId, pending] of this.pending) {
+      if (pending.runtimeId !== runtimeId) continue;
+      this.pending.delete(requestId);
+      clearTimeout(pending.timer);
+      pending.reject(new Error(`${message} while waiting for ${pending.toolName}`));
+    }
   }
 }

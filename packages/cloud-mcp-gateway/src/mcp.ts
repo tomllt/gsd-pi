@@ -19,12 +19,7 @@ const SESSION_TOOL_NAMES = [
   "gsd_doctor",
   "gsd_captures",
   "gsd_knowledge",
-  "gsd_graph_build",
-  "gsd_graph_write",
-  "gsd_graph_snapshot",
-  "gsd_graph_status",
-  "gsd_graph_query",
-  "gsd_graph_diff",
+  "gsd_graph",
 ] as const;
 
 const CLOUD_PROJECTS_TOOL = "gsd_cloud_projects";

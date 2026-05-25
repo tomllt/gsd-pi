@@ -2,7 +2,7 @@ import WebSocket from "ws";
 import type { Logger } from "./logger.js";
 import type { DaemonConfig } from "./types.js";
 import type { LocalToolExecutor } from "./local-tool-executor.js";
-import { parseCloudGatewayUrl } from "./cloud-config.js";
+import { createGatewayLookup, parseCloudGatewayUrl, validateGatewayNetworkTarget } from "./cloud-config.js";
 
 interface GatewayMessage {
   type: string;
@@ -41,10 +41,20 @@ export class CloudRuntime {
       this.logger.warn("cloud runtime skipped — missing device token or runtime id");
       return;
     }
-    const url = new URL("/runtime/connect", parseCloudGatewayUrl(this.cloud.gateway_url));
+    const gatewayUrl = parseCloudGatewayUrl(this.cloud.gateway_url);
+    try {
+      validateGatewayNetworkTarget(gatewayUrl);
+    } catch (err) {
+      this.logger.warn("cloud runtime skipped unsafe gateway URL", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    const url = new URL("/runtime/connect", gatewayUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     const socket = new WebSocket(url, {
       headers: { Authorization: `Bearer ${this.cloud.device_token}` },
+      lookup: createGatewayLookup(gatewayUrl),
     });
     this.socket = socket;
 

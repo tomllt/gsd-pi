@@ -1,8 +1,10 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { lookup } from "node:dns";
+import type { LookupOneOptions } from "node:dns";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
+import type { LookupFunction } from "node:net";
 import { dirname } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { loadConfig } from "./config.js";
@@ -116,11 +118,27 @@ function isPrivateIpHost(hostname: string): boolean {
   return false;
 }
 
-function validateGatewayNetworkTarget(url: URL): void {
+export function validateGatewayNetworkTarget(url: URL): void {
   if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return;
   if (isPrivateIpHost(url.hostname)) {
     throw new Error("Cloud gateway URL must not target private or loopback IP addresses");
   }
+}
+
+export function createGatewayLookup(url: URL): LookupFunction {
+  const allowLoopback = url.protocol === "http:" && isLoopbackHost(url.hostname);
+  return (hostname, options, callback) => {
+    const lookupOptions: LookupOneOptions = typeof options === "number"
+      ? { family: options, all: false }
+      : { ...options, all: false };
+    lookup(hostname, lookupOptions, (err, address, family) => {
+      if (err) return callback(err, address, family);
+      if (!address || (!allowLoopback && isPrivateIpHost(address))) {
+        return callback(new Error("Cloud gateway URL resolved to a private or loopback address"), address, family);
+      }
+      callback(null, address, family);
+    });
+  };
 }
 
 function isPrivateIpv4(host: string): boolean {
@@ -156,7 +174,6 @@ function postJsonToValidatedGateway(url: URL, payload: Record<string, unknown>):
   validateGatewayNetworkTarget(url);
   const body = JSON.stringify(payload);
   const requestImpl = url.protocol === "https:" ? httpsRequest : httpRequest;
-  const allowLoopback = url.protocol === "http:" && isLoopbackHost(url.hostname);
 
   return new Promise((resolve, reject) => {
     const req = requestImpl({
@@ -169,19 +186,7 @@ function postJsonToValidatedGateway(url: URL, payload: Record<string, unknown>):
         "content-type": "application/json",
         "content-length": Buffer.byteLength(body),
       },
-      lookup: (hostname, options, callback) => {
-        const lookupOptions = typeof options === "number"
-          ? { family: options, all: false }
-          : { ...options, all: false };
-        lookup(hostname, lookupOptions, (err, address, family) => {
-          if (err) return callback(err, address, family);
-          const resolvedAddress = Array.isArray(address) ? address[0]?.address : address;
-          if (!resolvedAddress || (!allowLoopback && isPrivateIpHost(resolvedAddress))) {
-            return callback(new Error("Cloud gateway URL resolved to a private or loopback address"), resolvedAddress, family);
-          }
-          callback(null, resolvedAddress, family);
-        });
-      },
+      lookup: createGatewayLookup(url),
     }, (res) => {
       const statusCode = res.statusCode ?? 0;
       const chunks: Buffer[] = [];
