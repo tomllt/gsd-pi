@@ -38,6 +38,7 @@ export interface DiscoveredCommands {
 
 /** Package.json script keys to probe, in order. */
 const PACKAGE_SCRIPT_KEYS = ["typecheck", "lint", "test"] as const;
+const INTERPRETER_PREFIX_RE = /^(bash|sh|zsh|node|python3?|ts-node|tsx):\s*/;
 
 /**
  * Discover verification commands using the first-non-empty-wins strategy (D003):
@@ -63,9 +64,10 @@ export function discoverCommands(options: DiscoverCommandsOptions): DiscoveredCo
       .map(c => c.trim())
       .filter(Boolean);
     for (const candidate of candidates) {
-      const validation = validateVerificationCommand(candidate);
+      const normalized = candidate.replace(INTERPRETER_PREFIX_RE, "").trim();
+      const validation = validateVerificationCommand(normalized);
       if (validation.ok) {
-        commands.push(candidate);
+        commands.push(normalized);
       } else if (validation.reason === "does not look like a runnable command") {
         hasTaskPlanProse = true;
       } else {

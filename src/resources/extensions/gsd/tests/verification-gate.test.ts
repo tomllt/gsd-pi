@@ -60,6 +60,18 @@ describe("verification-gate: discovery", () => {
     assert.equal(result.source, "task-plan");
   });
 
+  test("discoverCommands strips interpreter prefixes from task plan verify commands", () => {
+    const result = discoverCommands({
+      taskPlanVerify: "bash: ls scripts/hooks/\npython3: python3 -m pytest tests/ -q",
+      cwd: tmp,
+    });
+    assert.deepStrictEqual(result.commands, [
+      "ls scripts/hooks/",
+      "python3 -m pytest tests/ -q",
+    ]);
+    assert.equal(result.source, "task-plan");
+  });
+
   test("discoverCommands from package.json scripts", () => {
     writeFileSync(
       join(tmp, "package.json"),
