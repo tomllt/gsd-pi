@@ -173,7 +173,7 @@ function createTaskWithoutVerify(): void {
   });
 }
 
-function createFailingVerifyTask(): void {
+function createFailingVerifyTask(status = "pending"): void {
   insertMilestone({ id: "M001" });
   insertSlice({
     id: "S01",
@@ -187,7 +187,7 @@ function createFailingVerifyTask(): void {
     sliceId: "S01",
     milestoneId: "M001",
     title: "Task with failing verification",
-    status: "pending",
+    status,
     planning: {
       description: "Task with deterministic failing verification",
       estimate: "1h",
@@ -472,6 +472,34 @@ describe("Post-execution blocking failure retry bypass", () => {
     assert.equal(pauseAutoMock.mock.callCount(), 0);
     assert.equal(s.pendingVerificationRetry?.unitId, "M001/S01/T01");
     assert.match(s.pendingVerificationRetry?.failureContext ?? "", /npm run test/);
+  });
+
+  test("completed execute-task verification failure continues without retry metadata", async () => {
+    createFailingVerifyTask("complete");
+    writePreferences({
+      enhanced_verification: true,
+      enhanced_verification_post: false,
+      verification_auto_fix: true,
+      verification_max_retries: 2,
+    });
+
+    const ctx = makeMockCtx();
+    const pi = makeMockPi();
+    const pauseAutoMock = mock.fn(async () => {});
+    const s = makeMockSession(tempDir, { type: "execute-task", id: "M001/S01/T01" });
+
+    const result = await runPostUnitVerification({ s, ctx, pi }, pauseAutoMock);
+
+    assert.equal(result, "continue");
+    assert.equal(pauseAutoMock.mock.callCount(), 0);
+    assert.equal(s.pendingVerificationRetry, null);
+    assert.equal(s.verificationRetryCount.size, 0);
+
+    const evidencePath = join(tempDir, ".gsd", "milestones", "M001", "slices", "S01", "tasks", "T01-VERIFY.json");
+    const evidence = JSON.parse(readFileSync(evidencePath, "utf-8"));
+    assert.equal(evidence.passed, false);
+    assert.ok(!("retryAttempt" in evidence), "completed task failure evidence must not request a retry");
+    assert.ok(!("maxRetries" in evidence), "completed task failure evidence must not carry retry budget");
   });
 });
 

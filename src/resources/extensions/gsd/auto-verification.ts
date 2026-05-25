@@ -567,6 +567,7 @@ export async function runPostUnitVerification(
     // Write verification evidence JSON
     const retryKey = verificationRetryKey(s.currentUnit.type, s.currentUnit.id);
     const attempt = s.verificationRetryCount.get(retryKey) ?? 0;
+    const taskAlreadyComplete = taskRow?.status === "complete" || taskRow?.status === "done";
     if (mid && sid && tid) {
       try {
         const sDir = resolveSlicePath(s.basePath, mid, sid);
@@ -578,6 +579,7 @@ export async function runPostUnitVerification(
             const nextAttempt = attempt + 1;
             const includeRetryMetadata =
               !result.passed &&
+              !taskAlreadyComplete &&
               verdict.retryable &&
               autoFixEnabled &&
               nextAttempt <= maxRetries;
@@ -818,6 +820,19 @@ export async function runPostUnitVerification(
         category: "unknown",
       });
       return "pause";
+    } else if (taskAlreadyComplete) {
+      s.verificationRetryCount.delete(retryKey);
+      s.verificationRetryFailureHashes.delete(retryKey);
+      s.pendingVerificationRetry = null;
+      logWarning(
+        "engine",
+        `Verification gate failed for completed task ${s.currentUnit.id}; treating failure as non-blocking to avoid re-dispatching an already-complete task.`,
+      );
+      ctx.ui.notify(
+        `Verification failed after ${tid ?? s.currentUnit.id} was already complete; continuing without retry.`,
+        "warning",
+      );
+      return "continue";
     } else if (autoFixEnabled && attempt + 1 <= maxRetries) {
       const { unitCostUsd, rollingAvgUsd } = getCurrentUnitCostStats(s.currentUnit.id);
       const perUnitCapUsd =
