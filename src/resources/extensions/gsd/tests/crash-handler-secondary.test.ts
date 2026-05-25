@@ -49,6 +49,28 @@ describe('register-extension crash handler secondary fixes (#3348)', () => {
     }
   });
 
+  test('writeCrashLog appends repeated crashes from one process to a single file', async () => {
+    const tmpHome = join(tmpdir(), `gsd-crash-test-${randomUUID()}`);
+    const origHome = process.env.GSD_HOME;
+    process.env.GSD_HOME = tmpHome;
+    try {
+      const { writeCrashLog } = await import('../bootstrap/crash-log.ts');
+      writeCrashLog(new Error('first crash'), 'uncaughtException');
+      writeCrashLog(new Error('second crash'), 'unhandledRejection');
+
+      const crashDir = join(tmpHome, 'crash');
+      const logs = readdirSync(crashDir).filter((f) => f.endsWith('.log'));
+      assert.equal(logs.length, 1, 'repeated writes in one process should share one crash log');
+
+      const content = readFileSync(join(crashDir, logs[0]), 'utf-8');
+      assert.ok(content.includes('first crash'), 'log should contain first error message');
+      assert.ok(content.includes('second crash'), 'log should contain second error message');
+    } finally {
+      process.env.GSD_HOME = origHome;
+      rmSync(tmpHome, { recursive: true, force: true });
+    }
+  });
+
   test('_gsdRejectionGuard is registered for unhandledRejection', () => {
     installEpipeGuard();
     const listener = process.listeners("unhandledRejection").find((candidate) =>
