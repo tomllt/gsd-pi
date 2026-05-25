@@ -4,6 +4,7 @@ import { isIP } from "node:net";
 import { dirname } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { loadConfig } from "./config.js";
+import { protectCloudDeviceToken } from "./cloud-token.js";
 import type { DaemonConfig } from "./types.js";
 
 export interface PairingExchangeResult {
@@ -70,7 +71,12 @@ export function saveCloudConfig(configPath: string, nextCloud: NonNullable<Daemo
   } catch {
     raw = {};
   }
-  raw.cloud = { ...nextCloud, gateway_url: parseCloudGatewayUrl(nextCloud.gateway_url).toString() };
+  const { device_token: deviceToken, ...cloud } = nextCloud;
+  raw.cloud = {
+    ...cloud,
+    gateway_url: parseCloudGatewayUrl(nextCloud.gateway_url).toString(),
+    ...(deviceToken ? { device_token_encrypted: protectCloudDeviceToken(deviceToken) } : {}),
+  };
   mkdirSync(dirname(configPath), { recursive: true });
   writeConfigFile(configPath, stringifyYaml(raw));
   return loadConfig(configPath);

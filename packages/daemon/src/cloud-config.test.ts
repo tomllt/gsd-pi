@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { loadConfig } from "./config.js";
 import { exchangePairingCode, parseCloudGatewayUrl, redactedCloudStatus, saveCloudConfig } from "./cloud-config.js";
 
 test("cloud config stores device token but redacts status output", () => {
   const dir = mkdtempSync(join(tmpdir(), "gsd-cloud-config-"));
   const configPath = join(dir, "daemon.yaml");
+
   const config = saveCloudConfig(configPath, {
     gateway_url: "https://gateway.example",
     device_token: "secret-device-token",
@@ -16,8 +18,11 @@ test("cloud config stores device token but redacts status output", () => {
     enabled: true,
   });
 
-  assert.match(readFileSync(configPath, "utf8"), /secret-device-token/);
+  const rawConfig = readFileSync(configPath, "utf8");
+  assert.doesNotMatch(rawConfig, /secret-device-token/);
+  assert.match(rawConfig, /device_token_encrypted:/);
   assert.equal(statSync(configPath).mode & 0o777, 0o600);
+  assert.equal(config.cloud?.device_token, "secret-device-token");
   assert.deepEqual(redactedCloudStatus(config), {
     configured: true,
     enabled: true,
@@ -26,6 +31,31 @@ test("cloud config stores device token but redacts status output", () => {
     runtime_name: "Laptop",
     ["device_" + "token"]: "[redacted]",
   });
+});
+
+test("cloud config still reads legacy plaintext device tokens", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gsd-cloud-config-legacy-"));
+  const configPath = join(dir, "daemon.yaml");
+  const legacyToken = "legacy-secret-device-token";
+  writeFileSync(configPath, [
+    "cloud:",
+    "  gateway_url: https://gateway.example/",
+    `  device_token: ${legacyToken}`,
+    "  runtime_id: rt1",
+    "",
+  ].join("\n"));
+  assert.equal(loadConfig(configPath).cloud?.device_token, legacyToken);
+
+  const config = saveCloudConfig(configPath, {
+    gateway_url: "https://gateway.example",
+    device_token: legacyToken,
+    runtime_id: "rt1",
+  });
+
+  const rawConfig = readFileSync(configPath, "utf8");
+  assert.equal(config.cloud?.device_token, legacyToken);
+  assert.doesNotMatch(rawConfig, new RegExp(legacyToken));
+  assert.match(rawConfig, /device_token_encrypted:/);
 });
 
 test("cloud gateway URL validation allows HTTPS and localhost HTTP", () => {
