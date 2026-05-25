@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -92,7 +92,12 @@ function lookupCommand(command: string, platform: NodeJS.Platform = process.plat
 }
 
 function findWorkflowCliFromAncestorPath(startPath: string): string | null {
-  let current = resolve(startPath);
+  let current: string;
+  try {
+    current = realpathSync(resolve(startPath));
+  } catch {
+    current = resolve(startPath);
+  }
 
   while (true) {
     const candidate = resolve(current, "packages", "mcp-server", "dist", "cli.js");
