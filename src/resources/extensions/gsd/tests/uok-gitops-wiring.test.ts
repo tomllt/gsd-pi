@@ -13,6 +13,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { resolveCloseoutGitAction } from "../auto-post-unit.ts";
 import { resolveUokFlags } from "../uok/flags.ts";
 
 test("turn action defaults to commit when uok.gitops is enabled with no override", () => {
@@ -55,4 +56,12 @@ test("gitops disabled when uok.gitops.enabled is explicitly false", () => {
   assert.equal(flags.gitops, false);
   // Turn_action is still surfaced so callers can read their policy cleanly.
   assert.equal(flags.gitopsTurnAction, "snapshot");
+});
+
+test("closeout git action is skipped when uok gitops is disabled", () => {
+  const flags = resolveUokFlags({
+    uok: { gitops: { enabled: false, turn_action: "commit" } },
+  } as any);
+
+  assert.equal(resolveCloseoutGitAction(flags), null);
 });

@@ -232,7 +232,7 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
  *
  * This function recursively:
  * - Removes all `patternProperties` fields
- * - Converts `const: "value"` to `enum: ["value"]` in anyOf/oneOf blocks
+ * - Converts `const: value` to `enum: [value]` in anyOf/oneOf blocks
  *
  * This is needed for providers like `google-antigravity` when proxying Claude models,
  * since Google Cloud Code Assist uses a restricted subset of JSON Schema.
@@ -250,14 +250,26 @@ export function sanitizeSchemaForGoogle(schema: unknown): unknown {
 	const sanitized: Record<string, unknown> = {};
 
 	for (const [key, value] of Object.entries(obj)) {
-		// Skip patternProperties entirely — not supported by Google's API
-		if (key === "patternProperties") {
+		// Skip keywords not supported by Google's function declaration subset.
+		if (key === "patternProperties" || key === "$schema" || key === "$id" || key === "unevaluatedProperties") {
+			continue;
+		}
+
+		if (key === "additionalProperties" && value === false) {
+			continue;
+		}
+
+		if (key === "required" && Array.isArray(value) && value.length === 0) {
 			continue;
 		}
 
 		// Convert const to enum — Google's API rejects the const keyword
-		if (key === "const" && typeof value === "string") {
+		if (key === "const") {
 			sanitized.enum = [value];
+			const inferredType = inferJsonSchemaType(value);
+			if (inferredType) {
+				sanitized.type = inferredType;
+			}
 			continue;
 		}
 
@@ -270,6 +282,130 @@ export function sanitizeSchemaForGoogle(schema: unknown): unknown {
 	}
 
 	return sanitized;
+}
+
+function inferJsonSchemaType(value: unknown): string | undefined {
+	if (typeof value === "string") return "string";
+	if (typeof value === "number") return Number.isInteger(value) ? "integer" : "number";
+	if (typeof value === "boolean") return "boolean";
+	return undefined;
+}
+
+function mergePropertySchemas(a: unknown, b: unknown): unknown {
+	if (!a) return b;
+	if (!b) return a;
+	if (
+		typeof a !== "object"
+		|| typeof b !== "object"
+		|| Array.isArray(a)
+		|| Array.isArray(b)
+	) {
+		return b;
+	}
+
+	const left = a as Record<string, unknown>;
+	const right = b as Record<string, unknown>;
+	const leftConst = left.const;
+	const rightConst = right.const;
+	if (leftConst !== undefined && rightConst !== undefined) {
+		const enumValues = Array.from(new Set([leftConst, rightConst]));
+		const { const: _leftConst, ...leftWithoutConst } = left;
+		const { const: _rightConst, ...rightWithoutConst } = right;
+		return {
+			...leftWithoutConst,
+			...rightWithoutConst,
+			enum: enumValues,
+			type: enumValues.every((value) => typeof value === "string") ? "string" : right.type ?? left.type,
+		};
+	}
+
+	if (Array.isArray(left.enum) || Array.isArray(right.enum)) {
+		const enumValues = Array.from(new Set([...(Array.isArray(left.enum) ? left.enum : []), ...(Array.isArray(right.enum) ? right.enum : [])]));
+		return {
+			...left,
+			...right,
+			enum: enumValues,
+		};
+	}
+
+	return { ...left, ...right };
+}
+
+/**
+ * Cloud Code Assist translates Claude-model function declarations into
+ * Anthropic custom tool schemas. Keep that route on a conservative object-root
+ * schema, matching the Anthropic provider's conversion for top-level unions.
+ */
+export function normalizeClaudeToolSchemaForGoogle(schema: unknown): unknown {
+	if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+		return {
+			type: "object",
+			properties: {},
+			required: [],
+		};
+	}
+
+	const jsonSchema = schema as Record<string, unknown>;
+	const variants = Array.isArray(jsonSchema.anyOf)
+		? jsonSchema.anyOf
+		: Array.isArray(jsonSchema.oneOf)
+			? jsonSchema.oneOf
+			: [];
+	const objectVariants = variants.filter(
+		(candidate): candidate is Record<string, unknown> =>
+			!!candidate
+			&& typeof candidate === "object"
+			&& !Array.isArray(candidate)
+			&& candidate.type === "object"
+			&& typeof candidate.properties === "object"
+			&& candidate.properties !== null
+			&& !Array.isArray(candidate.properties),
+	);
+
+	if (objectVariants.length === 0) {
+		return {
+			...jsonSchema,
+			type: "object",
+			properties:
+				typeof jsonSchema.properties === "object" && jsonSchema.properties !== null && !Array.isArray(jsonSchema.properties)
+					? jsonSchema.properties
+					: {},
+			required: Array.isArray(jsonSchema.required)
+				? jsonSchema.required.filter((key): key is string => typeof key === "string")
+				: [],
+		};
+	}
+
+	const properties = objectVariants.reduce(
+		(acc: Record<string, unknown>, candidate) => ({
+			...acc,
+			...Object.fromEntries(
+				Object.entries(candidate.properties as Record<string, unknown>).map(([key, value]) => [
+					key,
+					mergePropertySchemas(acc[key], value),
+				]),
+			),
+		}),
+		{},
+	);
+	const required = Array.from(
+		new Set(
+			objectVariants.flatMap((candidate) =>
+				Array.isArray(candidate.required)
+					? candidate.required.filter((key): key is string => typeof key === "string")
+					: [],
+			),
+		),
+	);
+
+	const normalized: Record<string, unknown> = {
+		type: "object",
+		properties,
+	};
+	if (required.length > 0) {
+		normalized.required = required;
+	}
+	return normalized;
 }
 
 /**
@@ -294,7 +430,7 @@ export function convertTools(
 				name: tool.name,
 				description: tool.description,
 				...(useParameters
-					? { parameters: sanitizeSchemaForGoogle(tool.parameters) }
+					? { parameters: sanitizeSchemaForGoogle(normalizeClaudeToolSchemaForGoogle(tool.parameters)) }
 					: { parametersJsonSchema: sanitizeSchemaForGoogle(tool.parameters) }),
 			})),
 		},

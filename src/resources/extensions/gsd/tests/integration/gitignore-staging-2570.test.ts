@@ -148,3 +148,33 @@ test("smartStage does not stage .gsd/ files when .gsd is gitignored (#2570)", as
     `gitignored .gsd/ files must NOT be staged by smartStage.\nCommitted files: ${committed}`,
   );
 });
+
+test("smartStage does not update already tracked .gsd/ files when .gsd is gitignored", async (t) => {
+  const { GitServiceImpl } = await import("../../git-service.ts");
+
+  const dir = makeTempRepo();
+  t.after(() => { cleanup(dir); });
+
+  mkdirSync(join(dir, ".gsd", "milestones", "M001"), { recursive: true });
+  writeFileSync(join(dir, ".gsd", "milestones", "M001", "PLAN.md"), "tracked plan v1\n");
+  git(dir, "add", ".gsd/milestones/M001/PLAN.md");
+  git(dir, "commit", "-m", "track gsd plan");
+
+  writeFileSync(join(dir, ".gitignore"), ".gsd\n");
+  git(dir, "add", ".gitignore");
+  git(dir, "commit", "-m", "ignore gsd");
+
+  writeFileSync(join(dir, ".gsd", "milestones", "M001", "PLAN.md"), "tracked plan v2\n");
+  writeFileSync(join(dir, "src.ts"), "export const y = 2;\n");
+
+  const svc = new GitServiceImpl(dir);
+  const msg = svc.commit({ message: "test: respect ignored tracked gsd" });
+  assert.ok(msg !== null, "commit should include non-gsd source changes");
+
+  const committed = git(dir, "show", "--name-only", "HEAD");
+  assert.ok(committed.includes("src.ts"), "source files ARE committed");
+  assert.ok(
+    !committed.includes(".gsd/"),
+    `tracked gitignored .gsd/ files must NOT be staged by smartStage.\nCommitted files: ${committed}`,
+  );
+});

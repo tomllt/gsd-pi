@@ -34,7 +34,12 @@ export function resolve(specifier, context, nextResolve) {
   //    Also handles local imports — skip rewrite for dist/ paths that are real compiled artifacts.
 
   else if (specifier.endsWith('.js') && (specifier.startsWith('./') || specifier.startsWith('../'))) {
-    if (context.parentURL && context.parentURL.includes('/src/')) {
+    if (
+      context.parentURL &&
+      context.parentURL.startsWith(ROOT.href) &&
+      !context.parentURL.includes('/node_modules/') &&
+      context.parentURL.includes('/src/')
+    ) {
       if (specifier.includes('/dist/')) {
         specifier = specifier.replace('/dist/', '/src/').replace(/\.js$/, '.ts');
       } else {

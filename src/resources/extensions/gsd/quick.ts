@@ -17,6 +17,7 @@ import { gsdRoot } from "./paths.js";
 import { GitServiceImpl, runGit } from "./git-service.js";
 import { loadEffectiveGSDPreferences } from "./preferences.js";
 import { nativeHasStagedChanges } from "./native-git-bridge.js";
+import { resolveUokFlags } from "./uok/flags.js";
 
 interface QuickReturnState {
   basePath: string;
@@ -158,6 +159,11 @@ function hasStagedChanges(basePath: string): boolean {
   return nativeHasStagedChanges(basePath);
 }
 
+function isGitOpsEnabled(): boolean {
+  const prefs = loadEffectiveGSDPreferences()?.preferences;
+  return resolveUokFlags(prefs).gitops;
+}
+
 export function cleanupQuickBranch(basePath = process.cwd()): boolean {
   const state = readPendingReturn(basePath);
   if (!state) return false;
@@ -165,6 +171,10 @@ export function cleanupQuickBranch(basePath = process.cwd()): boolean {
   const repoPath = state.basePath;
   const gitPrefs = loadEffectiveGSDPreferences()?.preferences?.git ?? {};
   const git = new GitServiceImpl(repoPath, gitPrefs);
+  if (!isGitOpsEnabled()) {
+    clearPendingReturn(repoPath);
+    return false;
+  }
 
   if (git.getCurrentBranch() === state.quickBranch) {
     try {
@@ -233,7 +243,7 @@ export async function handleQuick(
   let originalBranch = git.getCurrentBranch();
 
   const { getIsolationMode } = await import("./preferences.js");
-  const usesBranch = getIsolationMode() !== "none";
+  const usesBranch = getIsolationMode() !== "none" && isGitOpsEnabled();
 
   let branchCreated = false;
   if (usesBranch) {
@@ -242,7 +252,9 @@ export async function handleQuick(
       if (current !== branchName) {
         // Auto-commit any dirty state before switching
         try {
-          git.autoCommit("quick-task", `Q${taskNum}`, []);
+          if (isGitOpsEnabled()) {
+            git.autoCommit("quick-task", `Q${taskNum}`, []);
+          }
         } catch { /* nothing to commit — fine */ }
 
         runGit(basePath, ["checkout", "-b", branchName]);

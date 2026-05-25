@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeSchemaForGoogle } from "./google-shared.js";
+import { convertTools, normalizeClaudeToolSchemaForGoogle, sanitizeSchemaForGoogle } from "./google-shared.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // sanitizeSchemaForGoogle
@@ -55,6 +55,7 @@ describe("sanitizeSchemaForGoogle", () => {
 		const schema = { const: "fixed-value" };
 		const result = sanitizeSchemaForGoogle(schema) as Record<string, unknown>;
 		assert.deepEqual(result.enum, ["fixed-value"]);
+		assert.equal(result.type, "string");
 		assert.ok(!("const" in result));
 	});
 
@@ -63,8 +64,8 @@ describe("sanitizeSchemaForGoogle", () => {
 			anyOf: [{ const: "a" }, { const: "b" }, { type: "string" }],
 		};
 		const result = sanitizeSchemaForGoogle(schema) as any;
-		assert.deepEqual(result.anyOf[0], { enum: ["a"] });
-		assert.deepEqual(result.anyOf[1], { enum: ["b"] });
+		assert.deepEqual(result.anyOf[0], { enum: ["a"], type: "string" });
+		assert.deepEqual(result.anyOf[1], { enum: ["b"], type: "string" });
 		assert.deepEqual(result.anyOf[2], { type: "string" });
 	});
 
@@ -73,8 +74,8 @@ describe("sanitizeSchemaForGoogle", () => {
 			oneOf: [{ const: "x" }, { const: "y" }],
 		};
 		const result = sanitizeSchemaForGoogle(schema) as any;
-		assert.deepEqual(result.oneOf[0], { enum: ["x"] });
-		assert.deepEqual(result.oneOf[1], { enum: ["y"] });
+		assert.deepEqual(result.oneOf[0], { enum: ["x"], type: "string" });
+		assert.deepEqual(result.oneOf[1], { enum: ["y"], type: "string" });
 	});
 
 	it("recursively sanitizes deeply nested schemas", () => {
@@ -94,7 +95,7 @@ describe("sanitizeSchemaForGoogle", () => {
 		};
 		const result = sanitizeSchemaForGoogle(schema) as any;
 		const level2 = result.properties.level1.properties.level2;
-		assert.deepEqual(level2.anyOf[0], { enum: ["deep"] });
+		assert.deepEqual(level2.anyOf[0], { enum: ["deep"], type: "string" });
 		assert.ok(!("patternProperties" in level2));
 	});
 
@@ -106,22 +107,21 @@ describe("sanitizeSchemaForGoogle", () => {
 			},
 		};
 		const result = sanitizeSchemaForGoogle(schema) as any;
-		assert.deepEqual(result.items.anyOf[0], { enum: ["foo"] });
+		assert.deepEqual(result.items.anyOf[0], { enum: ["foo"], type: "string" });
 	});
 
 	it("sanitizes arrays of schemas", () => {
 		const input = [{ const: "a" }, { const: "b" }];
 		const result = sanitizeSchemaForGoogle(input) as any[];
-		assert.deepEqual(result[0], { enum: ["a"] });
-		assert.deepEqual(result[1], { enum: ["b"] });
+		assert.deepEqual(result[0], { enum: ["a"], type: "string" });
+		assert.deepEqual(result[1], { enum: ["b"], type: "string" });
 	});
 
-	it("preserves non-string const values unchanged", () => {
-		// Only string const values are converted; number const is passed through
+	it("converts non-string const values to enum", () => {
 		const schema = { const: 42 };
 		const result = sanitizeSchemaForGoogle(schema) as Record<string, unknown>;
-		assert.equal(result.const, 42);
-		assert.ok(!("enum" in result));
+		assert.deepEqual(result.enum, [42]);
+		assert.ok(!("const" in result));
 	});
 
 	it("sanitizes additionalProperties", () => {
@@ -133,5 +133,119 @@ describe("sanitizeSchemaForGoogle", () => {
 		};
 		const result = sanitizeSchemaForGoogle(schema) as any;
 		assert.ok(!("patternProperties" in result.additionalProperties));
+	});
+});
+
+describe("normalizeClaudeToolSchemaForGoogle", () => {
+	it("merges top-level anyOf object variants into an object-root schema", () => {
+		const schema = {
+			anyOf: [
+				{
+					type: "object",
+					properties: {
+						milestone_id: { type: "string" },
+						artifact_type: { type: "string" },
+						content: { type: "string" },
+					},
+					required: ["milestone_id", "artifact_type", "content"],
+				},
+				{
+					type: "object",
+					properties: {
+						artifact_type: { type: "string" },
+						content: { type: "string" },
+					},
+					required: ["artifact_type", "content"],
+				},
+			],
+		};
+
+		assert.deepEqual(normalizeClaudeToolSchemaForGoogle(schema), {
+			type: "object",
+			properties: {
+				milestone_id: { type: "string" },
+				artifact_type: { type: "string" },
+				content: { type: "string" },
+			},
+			required: ["milestone_id", "artifact_type", "content"],
+		});
+	});
+
+	it("forces object-root parameters for Claude tools on Cloud Code Assist", () => {
+		const result = convertTools(
+			[
+				{
+					name: "save_summary",
+					description: "Save a summary",
+					parameters: {
+						anyOf: [
+							{
+								type: "object",
+								properties: { kind: { const: "milestone" }, content: { type: "string" } },
+								required: ["kind", "content"],
+							},
+							{
+								type: "object",
+								properties: { kind: { const: "project" }, content: { type: "string" } },
+								required: ["kind", "content"],
+							},
+						],
+					},
+				},
+			] as any,
+			true,
+		);
+
+		assert.deepEqual(result, [
+			{
+				functionDeclarations: [
+					{
+						name: "save_summary",
+						description: "Save a summary",
+						parameters: {
+							type: "object",
+							properties: {
+								kind: { enum: ["milestone", "project"], type: "string" },
+								content: { type: "string" },
+							},
+							required: ["kind", "content"],
+						},
+					},
+				],
+			},
+		]);
+	});
+
+	it("omits empty required and closed-object keywords from Claude parameters", () => {
+		const result = convertTools(
+			[
+				{
+					name: "noop",
+					description: "Noop",
+					parameters: {
+						type: "object",
+						properties: {},
+						required: [],
+						additionalProperties: false,
+					},
+				},
+			] as any,
+			true,
+		);
+
+		assert.deepEqual(result, [
+			{
+				functionDeclarations: [
+					{
+						name: "noop",
+						description: "Noop",
+						parameters: {
+							type: "object",
+							properties: {},
+						},
+					},
+				],
+			},
+		]);
 	});
 });

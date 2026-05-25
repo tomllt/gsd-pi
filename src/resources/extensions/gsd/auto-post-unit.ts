@@ -107,6 +107,12 @@ const MAX_VERIFICATION_RETRIES = 3;
 const MAX_NOTIFICATION_DETAILS = 3;
 const NOTIFICATION_BULLET = "•";
 
+export function resolveCloseoutGitAction(
+  uokFlags: ReturnType<typeof resolveUokFlags>,
+): TurnGitActionMode | null {
+  return uokFlags.gitops ? uokFlags.gitopsTurnAction : null;
+}
+
 function agentEndMessagesIncludeToolCall(messages: unknown[] | undefined, toolName: string): boolean {
   if (!Array.isArray(messages)) return false;
   for (const message of messages) {
@@ -848,6 +854,12 @@ export async function autoCommitUnit(
   ctx?: ExtensionContext,
 ): Promise<string | null> {
   try {
+    const prefs = loadEffectiveGSDPreferences()?.preferences;
+    const uokFlags = resolveUokFlags(prefs);
+    if (!uokFlags.gitops) {
+      return null;
+    }
+
     let taskContext: TaskCommitContext | undefined;
 
     if (unitType === "execute-task") {
@@ -887,12 +899,22 @@ async function runCloseoutGitAction(
   const { s, ctx, pi, pauseAuto } = pctx;
   const prefs = loadEffectiveGSDPreferences()?.preferences;
   const uokFlags = resolveUokFlags(prefs);
-  const turnAction: TurnGitActionMode = uokFlags.gitops ? uokFlags.gitopsTurnAction : "commit";
+  const turnAction = resolveCloseoutGitAction(uokFlags);
   const traceId = s.currentTraceId ?? `turn:${unit.startedAt}`;
   const turnId = s.currentTurnId ?? `${unit.type}/${unit.id}/${unit.startedAt}`;
 
   s.lastGitActionFailure = null;
   s.lastGitActionStatus = null;
+
+  if (!turnAction) {
+    debugLog("postUnit", {
+      phase: "git-action-skipped",
+      reason: "gitops-disabled",
+      unitType: unit.type,
+      unitId: unit.id,
+    });
+    return "continue";
+  }
 
   try {
     let taskContext: TaskCommitContext | undefined;

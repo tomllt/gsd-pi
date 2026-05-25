@@ -110,9 +110,10 @@ const BASELINE_PATTERNS = [
 /**
  * Check whether `.gsd` is covered by the project's `.gitignore`.
  *
- * Uses `git check-ignore` for accurate evaluation — this respects nested
- * .gitignore files, global gitignore, and negation patterns. Returns true
- * only when git would actually ignore `.gsd/`.
+ * Uses `git check-ignore --no-index` for accurate evaluation — this respects
+ * nested .gitignore files, global gitignore, and negation patterns, even when
+ * `.gsd` files were already tracked before the ignore rule was added. Returns
+ * true only when git would actually ignore `.gsd/`.
  *
  * Returns false (not ignored) if:
  *   - No `.gitignore` exists
@@ -126,7 +127,7 @@ export function isGsdGitignored(basePath: string): boolean {
   for (const path of [".gsd", ".gsd/"]) {
     try {
       // git check-ignore exits 0 when the path IS ignored, 1 when it is NOT.
-      execFileSync("git", ["check-ignore", "-q", path], {
+      execFileSync("git", ["check-ignore", "--no-index", "-q", path], {
         cwd: basePath,
         stdio: "pipe",
         env: GIT_NO_PROMPT_ENV,

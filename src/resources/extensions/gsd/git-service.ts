@@ -18,6 +18,7 @@ import { GIT_NO_PROMPT_ENV } from "./git-constants.js";
 import { loadEffectiveGSDPreferences } from "./preferences.js";
 import { logWarning } from "./workflow-logger.js";
 import { createRepositoryRegistryFromPreferences } from "./repository-registry.js";
+import { isGsdGitignored } from "./gitignore.js";
 
 
 import {
@@ -778,7 +779,11 @@ export class GitServiceImpl {
     //
     // If .gsd/ IS in .gitignore (the default for external state projects),
     // git add -A already skips it and the exclusions are harmless no-ops.
-    const allExclusions = [...RUNTIME_EXCLUSION_PATHS, ...extraExclusions];
+    const allExclusions = [
+      ...RUNTIME_EXCLUSION_PATHS,
+      ...(isGsdGitignored(this.basePath) ? [".gsd/**"] : []),
+      ...extraExclusions,
+    ];
 
     // ── Parallel worker milestone scope (#1991) ──
     // When GSD_MILESTONE_LOCK is set, this process is a parallel worker that
@@ -812,7 +817,11 @@ export class GitServiceImpl {
     const keyFiles = taskContext.keyFiles ?? [];
     if (keyFiles.length === 0) return false;
 
-    const allExclusions = [...RUNTIME_EXCLUSION_PATHS, ...extraExclusions];
+    const allExclusions = [
+      ...RUNTIME_EXCLUSION_PATHS,
+      ...(isGsdGitignored(this.basePath) ? [".gsd/**"] : []),
+      ...extraExclusions,
+    ];
     const normalized = keyFiles
       .map(file => normalizeRepoRelativePath(this.basePath, file))
       .filter((file): file is string => file !== null)
