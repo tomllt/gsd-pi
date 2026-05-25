@@ -8,8 +8,9 @@
  * Installation is delegated entirely to the skills.sh CLI:
  *   npx skills add <repo> --skill <name> --skill <name> -y
  *
- * Skills are installed into ~/.agents/skills/ (the industry-standard
- * ecosystem directory shared across all agents).
+ * User-selected catalog skills are installed into ~/.agents/skills/ (the
+ * industry-standard ecosystem directory shared across all agents). GSD's own
+ * bundled skills are managed separately in ~/.gsd/agent/skills/.
  */
 
 import { execFile } from "node:child_process";
@@ -19,6 +20,7 @@ import { homedir } from "node:os";
 import type { ExtensionCommandContext } from "@gsd/pi-coding-agent";
 import { showNextAction } from "../shared/tui.js";
 import type { ProjectSignals, XcodePlatform } from "./detection.js";
+import { gsdHome } from "./gsd-home.js";
 
 // ─── Catalog Types ────────────────────────────────────────────────────────────
 
@@ -935,10 +937,11 @@ export async function installPacksBatched(
 
 /**
  * Check if any skills from a pack are already installed.
- * Searches both the skills.sh ecosystem directory and Claude Code's official directory.
+ * Searches GSD bundled, skills.sh ecosystem, and Claude Code's official directory.
  */
 export function isPackInstalled(pack: SkillPack): boolean {
   const skillsDirs = [
+    join(gsdHome(), "agent", "skills"),
     join(homedir(), ".agents", "skills"),
     join(homedir(), ".claude", "skills"),
   ];

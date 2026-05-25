@@ -11,8 +11,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { gsdHome } from "./gsd-home.js";
 
-/** Skills directories — skills.sh ecosystem + Claude Code official */
+/** Skills directories — GSD bundled, skills.sh ecosystem, and Claude Code official */
+const GSD_SKILLS_DIR = join(gsdHome(), "agent", "skills");
 const SKILLS_DIR = join(homedir(), ".agents", "skills");
 const CLAUDE_SKILLS_DIR = join(homedir(), ".claude", "skills");
 
@@ -112,6 +114,7 @@ function listSkillDirsFrom(dir: string): string[] {
 
 function listSkillDirs(): string[] {
   const names = new Set<string>();
+  for (const name of listSkillDirsFrom(GSD_SKILLS_DIR)) names.add(name);
   for (const name of listSkillDirsFrom(SKILLS_DIR)) names.add(name);
   for (const name of listSkillDirsFrom(CLAUDE_SKILLS_DIR)) names.add(name);
   return [...names];
@@ -141,7 +144,7 @@ function parseSkillFrontmatter(path: string): { name?: string; description?: str
 }
 
 function resolveSkillMdPath(skillName: string): string | null {
-  for (const dir of [SKILLS_DIR, CLAUDE_SKILLS_DIR]) {
+  for (const dir of [GSD_SKILLS_DIR, SKILLS_DIR, CLAUDE_SKILLS_DIR]) {
     const candidate = join(dir, skillName, "SKILL.md");
     if (existsSync(candidate)) return candidate;
   }

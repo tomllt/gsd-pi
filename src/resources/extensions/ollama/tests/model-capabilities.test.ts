@@ -149,9 +149,8 @@ describe("getModelCapabilities — long-variant overrides aren't shadowed (#4991
 		assert.equal(caps.contextWindow, 262144);
 	});
 
-	it("minimax-m2.5:cloud and minimax-m2.7:cloud report 1M", () => {
+	it("minimax-m2.5:cloud reports 1M", () => {
 		assert.equal(getModelCapabilities("minimax-m2.5:cloud").contextWindow, 1048576);
-		assert.equal(getModelCapabilities("minimax-m2.7:cloud").contextWindow, 1048576);
 	});
 
 	it("minimax-m2 base resolves to 1M", () => {
@@ -254,5 +253,51 @@ describe("formatModelSize", () => {
 
 	it("formats KB", () => {
 		assert.equal(formatModelSize(500_000), "500 KB");
+	});
+});
+
+// ─── deepseek-v4 prefix-shadowing regression ────────────────────────────────
+//
+// deepseek-v4-pro:cloud and deepseek-v4-flash:cloud must be listed before the
+// bare `deepseek-v4` entry in KNOWN_MODELS, otherwise the linear startsWith
+// scan resolves any deepseek-v4-* query to the family base. Same invariant
+// as the qwen3-coder / glm / kimi families already pin elsewhere.
+
+describe("getModelCapabilities — deepseek-v4 long-variants aren't shadowed", () => {
+	it("deepseek-v4-pro:cloud and deepseek-v4-flash:cloud resolve to 1M (long-variants beat deepseek-v4 base)", () => {
+		assert.equal(getModelCapabilities("deepseek-v4-pro:cloud").contextWindow, 1048576);
+		assert.equal(getModelCapabilities("deepseek-v4-flash:cloud").contextWindow, 1048576);
+	});
+
+	it("deepseek-v4 base also resolves to 1M (parity with long-variants)", () => {
+		const caps = getModelCapabilities("deepseek-v4:671b");
+		assert.equal(caps.contextWindow, 1048576);
+	});
+
+	it("ollamaOptions.num_ctx mirrors contextWindow for all deepseek-v4 / gemma4 entries", () => {
+		// Inference time: num_ctx is what gets sent to Ollama on each chat.
+		// If contextWindow is right but num_ctx is stale, the model still
+		// gets truncated. Pin both sides.
+		for (const name of [
+			"deepseek-v4-pro:cloud",
+			"deepseek-v4-flash:cloud",
+			"deepseek-v4:671b",
+			"gemma4:31b",
+		]) {
+			const caps = getModelCapabilities(name);
+			assert.equal(caps.ollamaOptions?.num_ctx, caps.contextWindow,
+				`${name}: num_ctx ${caps.ollamaOptions?.num_ctx} != contextWindow ${caps.contextWindow}`);
+		}
+	});
+});
+
+describe("getModelCapabilities — minimax-m2.7 reflects /api/show truth", () => {
+	it("minimax-m2.7 contextWindow is 196608, not the official-spec 1048576", () => {
+		// minimax-m2.7:cloud reports 196608 via /api/show even though the
+		// MiniMax M2 announcement quoted 1M context. Trust the deployed
+		// backend, not marketing — a 1M num_ctx would silently truncate
+		// or OOM under cloud-routing.
+		assert.equal(getModelCapabilities("minimax-m2.7:cloud").contextWindow, 196608);
+		assert.equal(getModelCapabilities("minimax-m2.7:cloud").ollamaOptions?.num_ctx, 196608);
 	});
 });

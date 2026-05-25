@@ -48,8 +48,10 @@ On-demand capability packages following the [Agent Skills standard](https://agen
 ```
 
 **Placement:**
+- `~/.gsd/agent/skills/` (GSD bundled, highest priority)
 - `~/.agents/skills/` (global — shared across all agents)
 - `.agents/skills/` (project, searched up to git root)
+- `~/.claude/skills/` and `.claude/skills/` (Claude Code compatibility, lower priority)
 
 **Skill structure:**
 ```

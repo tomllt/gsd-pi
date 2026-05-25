@@ -77,6 +77,7 @@ import {
   getRequiredWorkflowToolsForAutoUnit,
   supportsStructuredQuestions,
 } from "../workflow-mcp.js";
+import type { DispatchAction } from "../auto-dispatch.js";
 import { resolveManifest } from "../unit-context-manifest.js";
 import { createWorktreeSafetyModule, type WorktreeSafetyResult } from "../worktree-safety.js";
 import { isSuspiciousGhostCompletion } from "../auto-unit-closeout.js";
@@ -1395,6 +1396,13 @@ export async function runPreDispatch(
 
 // ─── runDispatch ──────────────────────────────────────────────────────────────
 
+function isUnhandledPhaseWarning(dispatchResult: DispatchAction): dispatchResult is Extract<DispatchAction, { action: "stop" }> {
+  return dispatchResult.action === "stop" &&
+    dispatchResult.level === "warning" &&
+    dispatchResult.matchedRule === "<no-match>" &&
+    /^Unhandled phase "/.test(dispatchResult.reason);
+}
+
 /**
  * Phase 3: Dispatch resolution — resolve next unit, stuck detection, pre-dispatch hooks.
  * Returns break/continue to control the loop, or next with IterationData on success.
@@ -1423,7 +1431,7 @@ export async function runDispatch(
       }) ? "true" : "false";
 
   debugLog("autoLoop", { phase: "dispatch-resolve", iteration: ic.iteration });
-  const dispatchResult = await deps.resolveDispatch({
+  let dispatchResult = await deps.resolveDispatch({
     basePath: s.basePath,
     mid,
     midTitle,
@@ -1435,6 +1443,30 @@ export async function runDispatch(
     sessionProvider: ctx.model?.provider,
     modelRegistry: ctx.modelRegistry as MinimalModelRegistry | undefined,
   });
+  if (isUnhandledPhaseWarning(dispatchResult)) {
+    deps.invalidateAllCaches();
+    const freshState = await deps.deriveState(s.canonicalProjectRoot);
+    const freshMid = freshState.activeMilestone?.id ?? mid;
+    const freshMidTitle = freshState.activeMilestone?.title ?? freshMid ?? midTitle;
+    debugLog("autoLoop", {
+      phase: "dispatch-unhandled-phase-retry",
+      iteration: ic.iteration,
+      stalePhase: state.phase,
+      freshPhase: freshState.phase,
+    });
+    dispatchResult = await deps.resolveDispatch({
+      basePath: s.basePath,
+      mid: freshMid,
+      midTitle: freshMidTitle,
+      state: freshState,
+      prefs,
+      session: s,
+      structuredQuestionsAvailable,
+      sessionContextWindow: ctx.model?.contextWindow,
+      sessionProvider: ctx.model?.provider,
+      modelRegistry: ctx.modelRegistry as MinimalModelRegistry | undefined,
+    });
+  }
 
   if (dispatchResult.action === "stop") {
     deps.emitJournalEvent({ ts: new Date().toISOString(), flowId: ic.flowId, seq: ic.nextSeq(), eventType: "dispatch-stop", rule: dispatchResult.matchedRule, data: { reason: dispatchResult.reason } });

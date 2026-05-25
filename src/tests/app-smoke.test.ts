@@ -333,7 +333,8 @@ test("initResources syncs extensions, agents, and skills to target dir", async (
   // Agents synced
   assert.ok(existsSync(join(fakeAgentDir, "agents", "scout.md")), "scout agent synced");
 
-  // Skills are NOT synced here — they use ~/.agents/skills/ via skills.sh
+  // Bundled skills are synced to the GSD-owned agent dir, not ~/.agents/skills/.
+  assert.ok(existsSync(join(fakeAgentDir, "skills", "lint", "SKILL.md")), "bundled lint skill synced");
 
   // Version manifest synced
   const managedVersion = readManagedResourceVersion(fakeAgentDir);

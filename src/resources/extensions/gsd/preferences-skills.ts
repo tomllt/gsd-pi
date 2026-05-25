@@ -24,24 +24,19 @@ export type { GSDSkillRule, SkillDiscoveryMode, SkillResolution, SkillResolution
 
 /**
  * Known skill directories, in priority order.
- * Searches both the skills.sh ecosystem directory (~/.agents/skills/) and
- * Claude Code's official directory (~/.claude/skills/). Project-level
- * directories for both conventions are included as well.
- * Legacy ~/.gsd/agent/skills/ is included as a fallback for pre-migration installs.
+ * GSD bundled skills live in ~/.gsd/agent/skills/ and win name collisions.
+ * User-global and project-local ecosystem directories remain available as
+ * read-only discovery sources, followed by Claude Code compatibility paths.
  */
 export function getSkillSearchDirs(cwd: string): Array<{ dir: string; method: SkillResolution["method"] }> {
   const dirs: Array<{ dir: string; method: SkillResolution["method"] }> = [
+    { dir: join(gsdHome(), "agent", "skills"), method: "user-skill" },
     { dir: join(homedir(), ".agents", "skills"), method: "user-skill" },
     { dir: join(cwd, ".agents", "skills"), method: "project-skill" },
     // Claude Code official skill directories
     { dir: join(homedir(), ".claude", "skills"), method: "user-skill" },
     { dir: join(cwd, ".claude", "skills"), method: "project-skill" },
   ];
-  // Legacy fallback — read skills from old GSD directory only if migration hasn't completed
-  const legacyDir = join(gsdHome(), "agent", "skills");
-  if (existsSync(legacyDir) && !existsSync(join(legacyDir, ".migrated-to-agents"))) {
-    dirs.push({ dir: legacyDir, method: "user-skill" });
-  }
   return dirs;
 }
 

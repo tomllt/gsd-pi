@@ -6,16 +6,19 @@ Skills 遵循开放的 [Agent Skills 标准](https://agentskills.io/)，并且**
 
 ## 技能目录
 
-GSD 会按优先级顺序从两个位置读取技能：
+GSD 会按优先级顺序从这些位置读取技能：
 
 | 位置 | 范围 | 说明 |
 |------|------|------|
-| `~/.agents/skills/` | 全局 | 对所有项目和所有兼容 agent 共享 |
+| `~/.gsd/agent/skills/` | 内置 | GSD 管理的内置技能，会在安装或更新时同步 |
+| `~/.agents/skills/` | 全局 | 用户全局技能，对兼容 agent 共享 |
 | `.agents/skills/`（项目根目录） | 项目级 | 项目专用技能，可提交到版本控制 |
+| `~/.claude/skills/` | 兼容 | Claude Code 兼容来源，优先级较低 |
+| `.claude/skills/`（项目根目录） | 兼容 | 项目本地 Claude Code 兼容来源 |
 
-如果出现同名技能，全局技能优先于项目技能。
+如果出现同名技能，排在前面的目录优先。GSD 内置技能优先于用户全局和项目技能；Claude Code 兼容目录在标准 Agent Skills 目录之后搜索。
 
-> **从 `~/.gsd/agent/skills/` 迁移：** 升级后首次启动时，GSD 会自动把旧版 `~/.gsd/agent/skills/` 中的技能复制到 `~/.agents/skills/`。旧目录会保留，以兼容旧流程。
+> **内置技能与用户技能：** GSD 内置技能由 `~/.gsd/agent/skills/` 管理。你自己的共享技能应安装到 `~/.agents/skills/`，项目专用技能应提交到 `.agents/skills/`。
 
 ## 安装技能
 
@@ -122,11 +125,11 @@ skill_rules:
 
 技能可以通过以下几种方式引用：
 
-1. **裸名称**：例如 `frontend-design`，会扫描 `~/.agents/skills/` 和项目内的 `.agents/skills/`
+1. **裸名称**：例如 `frontend-design`，会按上面的优先级顺序扫描技能目录
 2. **绝对路径**：例如 `/Users/you/.agents/skills/my-skill/SKILL.md`
 3. **目录路径**：例如 `~/custom-skills/my-skill`，会在其中查找 `SKILL.md`
 
-全局技能（`~/.agents/skills/`）优先于项目技能（`.agents/skills/`）。
+内置技能（`~/.gsd/agent/skills/`）优先于用户全局技能（`~/.agents/skills/`）、项目技能（`.agents/skills/`）以及 Claude 兼容目录。
 
 ## 自定义技能
 

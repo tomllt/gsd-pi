@@ -1790,6 +1790,7 @@ export async function pauseAuto(
     return;
   }
   s.active = false;
+  s.paused = true;
   clearUnitTimeout();
   stopAutoCommandPolling();
 
@@ -1891,17 +1892,12 @@ export async function pauseAuto(
 
   deregisterSigtermHandler();
 
-  // Unblock pending unitPromise so autoLoop exits cleanly (#1799)
-  resolveAgentEnd({ messages: [] });
-  _resetPendingResolve();
-
   try {
     await s.orchestration?.stop("pause");
   } catch (err) {
     debugLog("pause-orchestration-stop", { error: err instanceof Error ? err.message : String(err) });
   }
 
-  s.paused = true;
   deactivateGSD();
   restoreProjectRootEnv();
   restoreMilestoneLockEnv();

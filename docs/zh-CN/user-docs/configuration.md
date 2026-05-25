@@ -656,7 +656,7 @@ prefer_skills:
 avoid_skills: []
 ```
 
-Skills 既可以写裸名称（去 `~/.agents/skills/` 和 `.agents/skills/` 查找），也可以写绝对路径。
+Skills 既可以写裸名称（按优先级从 `~/.gsd/agent/skills/`、`~/.agents/skills/`、`.agents/skills/`，再到 Claude 兼容技能目录查找），也可以写绝对路径。
 
 ### `skill_rules`
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, parse } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -190,6 +190,87 @@ test("initResources manifest tracks all bundled extension subdirectories includi
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test("initResources syncs bundled skills to the GSD agent dir by default", async (t) => {
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-resource-loader-skills-local-"));
+  const fakeAgentDir = join(tmp, ".gsd", "agent");
+  const restoreHomeEnv = overrideHomeEnv(tmp);
+
+  t.after(() => {
+    restoreHomeEnv();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  const { initResources } = await import("../resource-loader.ts");
+  initResources(fakeAgentDir);
+
+  assert.equal(
+    existsSync(join(fakeAgentDir, "skills", "lint", "SKILL.md")),
+    true,
+    "bundled skills should sync under ~/.gsd/agent/skills by default",
+  );
+  assert.equal(
+    existsSync(join(tmp, ".agents", "skills", "lint", "SKILL.md")),
+    false,
+    "initResources should not write bundled skills to ~/.agents/skills by default",
+  );
+});
+
+test("initResources removes exact bundled skill orphans from the ecosystem dir", async (t) => {
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-resource-loader-skills-clean-"));
+  const fakeAgentDir = join(tmp, ".gsd", "agent");
+  const ecosystemLintDir = join(tmp, ".agents", "skills", "lint");
+  const restoreHomeEnv = overrideHomeEnv(tmp);
+
+  t.after(() => {
+    restoreHomeEnv();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  cpSync(join(process.cwd(), "src", "resources", "skills", "lint"), ecosystemLintDir, { recursive: true });
+
+  const { initResources } = await import("../resource-loader.ts");
+  initResources(fakeAgentDir);
+
+  assert.equal(
+    existsSync(join(fakeAgentDir, "skills", "lint", "SKILL.md")),
+    true,
+    "bundled skill should exist in the GSD-owned skills dir after cleanup",
+  );
+  assert.equal(
+    existsSync(ecosystemLintDir),
+    false,
+    "exact bundled skill copies should be removed from ~/.agents/skills",
+  );
+});
+
+test("initResources leaves ambiguous ecosystem skill name collisions in place", async (t) => {
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-resource-loader-skills-ambiguous-"));
+  const fakeAgentDir = join(tmp, ".gsd", "agent");
+  const ecosystemLintDir = join(tmp, ".agents", "skills", "lint");
+  const ecosystemLintFile = join(ecosystemLintDir, "SKILL.md");
+  const restoreHomeEnv = overrideHomeEnv(tmp);
+
+  t.after(() => {
+    restoreHomeEnv();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  mkdirSync(ecosystemLintDir, { recursive: true });
+  writeFileSync(
+    ecosystemLintFile,
+    "---\nname: lint\ndescription: User-owned lint skill.\n---\n\n# Custom lint\n",
+  );
+
+  const { initResources } = await import("../resource-loader.ts");
+  initResources(fakeAgentDir);
+
+  assert.equal(
+    readFileSync(ecosystemLintFile, "utf-8"),
+    "---\nname: lint\ndescription: User-owned lint skill.\n---\n\n# Custom lint\n",
+    "ambiguous user-owned skills in ~/.agents/skills should not be removed or overwritten",
+  );
 });
 
 test("initResources prunes stale top-level extension siblings next to bundled compiled extensions", async (t) => {

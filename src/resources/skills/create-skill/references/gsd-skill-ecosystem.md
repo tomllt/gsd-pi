@@ -3,7 +3,12 @@ GSD-specific skill ecosystem details: directory conventions, discovery mechanics
 </overview>
 
 <skill_directories>
-GSD supports two skill directories, checked in order:
+GSD supports these skill directories, checked in order:
+
+**Bundled (GSD-managed):** `~/.gsd/agent/skills/`
+- Synced by GSD during install/update
+- Highest priority when names collide
+- Not the target for user-authored skills
 
 **User-scope (global):** `~/.agents/skills/`
 - Available in every GSD session regardless of working directory
@@ -14,17 +19,21 @@ GSD supports two skill directories, checked in order:
 - Committable to version control so team members share the same skill set
 - Ideal for project-specific workflows, deploy scripts, or conventions
 
-Skills in both directories follow the same SKILL.md format and router pattern conventions.
+**Claude Code compatibility:** `~/.claude/skills/` and `.claude/skills/`
+- Read after the standard Agent Skills directories
+- Useful for compatibility with existing Claude Code skill installs
+
+Skills in all directories follow the same SKILL.md format and router pattern conventions.
 </skill_directories>
 
 <skill_discovery>
 GSD auto-discovers skills at session start and during auto-mode:
 
-**Session start:** All skills in both directories are enumerated and their names + descriptions are injected into the system prompt as `<available_skills>`.
+**Session start:** All discovered skills are enumerated and their names + descriptions are injected into the system prompt as `<available_skills>`.
 
 **Auto-mode discovery:** `skill-discovery.ts` takes a snapshot of the skills directory at auto-mode start. On each unit boundary it diffs against the snapshot. Any new skills found are injected via a `<newly_discovered_skills>` XML block so the LLM sees them without requiring `/reload`.
 
-**Manual reload:** Running `/reload` re-scans both directories and updates the available skills list mid-session.
+**Manual reload:** Running `/reload` re-scans the skill directories and updates the available skills list mid-session.
 </skill_discovery>
 
 <skill_validation>

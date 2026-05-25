@@ -5,7 +5,15 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "pat
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import { toPosixPath } from "../utils/path-display.js";
 import type { ResourceDiagnostic } from "./diagnostics.js";
-import { CONFIG_DIR_NAME } from "../config.js";
+
+/**
+ * GSD-owned bundled skills directory. GSD writes its bundled skill set here
+ * instead of the shared Agent Skills ecosystem directory.
+ */
+export const GSD_BUNDLED_SKILLS_DIR = join(
+	process.env.GSD_CODING_AGENT_DIR || join(homedir(), ".gsd", "agent"),
+	"skills",
+);
 
 /**
  * The standard ecosystem skills directory used by skills.sh and the
@@ -20,10 +28,9 @@ export const ECOSYSTEM_SKILLS_DIR = join(homedir(), ".agents", "skills");
 export const ECOSYSTEM_PROJECT_SKILLS_DIR = ".agents";
 
 /**
- * Legacy skills directory (~/.gsd/agent/skills/ or ~/.pi/agent/skills/).
- * Read as a fallback so existing installs don't lose skills before migration runs.
+ * Claude Code's user-level skills directory. Read-only compatibility source.
  */
-const LEGACY_SKILLS_DIR = join(homedir(), CONFIG_DIR_NAME, "agent", "skills");
+export const CLAUDE_SKILLS_DIR = join(homedir(), ".claude", "skills");
 
 /** Max name length per spec */
 const MAX_NAME_LENGTH = 64;
@@ -349,7 +356,7 @@ function escapeXml(str: string): string {
 export interface LoadSkillsOptions {
 	/** Working directory for project-local skills. Default: process.cwd() */
 	cwd?: string;
-	/** @deprecated Skills now use ~/.agents/skills/ exclusively. This option is ignored. */
+	/** @deprecated GSD bundled skills resolve from ~/.gsd/agent/skills/. This option is ignored. */
 	agentDir?: string;
 	/** Explicit skill paths (files or directories) */
 	skillPaths?: string[];
@@ -419,18 +426,14 @@ export function loadSkills(options: LoadSkillsOptions = {}): LoadSkillsResult {
 	}
 
 	if (includeDefaults) {
-		// Primary: ~/.agents/skills/ — the industry-standard skills.sh location
+		// GSD-owned bundled skills win collisions inside GSD.
+		addSkills(loadSkillsFromDirInternal(GSD_BUNDLED_SKILLS_DIR, "bundled", true));
+		// User-global: ~/.agents/skills/ — the industry-standard skills.sh location
 		addSkills(loadSkillsFromDirInternal(ECOSYSTEM_SKILLS_DIR, "user", true));
-		// Primary project: .agents/skills/ — standard project-level location
+		// Project: .agents/skills/ — standard project-level location
 		addSkills(loadSkillsFromDirInternal(resolve(cwd, ECOSYSTEM_PROJECT_SKILLS_DIR, "skills"), "project", true));
-
-		// Legacy fallback: read skills from ~/.gsd/agent/skills/ so existing
-		// installs keep working until the one-time migration in resource-loader
-		// copies them to ~/.agents/skills/. Skip if migration has completed.
-		const legacyMigrated = existsSync(join(LEGACY_SKILLS_DIR, ".migrated-to-agents"));
-		if (LEGACY_SKILLS_DIR !== ECOSYSTEM_SKILLS_DIR && existsSync(LEGACY_SKILLS_DIR) && !legacyMigrated) {
-			addSkills(loadSkillsFromDirInternal(LEGACY_SKILLS_DIR, "user", true));
-		}
+		// Claude Code compatibility, read-only and lower priority.
+		addSkills(loadSkillsFromDirInternal(CLAUDE_SKILLS_DIR, "user", true));
 	}
 
 	const userSkillsDir = ECOSYSTEM_SKILLS_DIR;

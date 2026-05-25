@@ -912,7 +912,7 @@ prefer_skills:
 avoid_skills: []
 ```
 
-Skills can be bare names (looked up in `~/.agents/skills/` and `.agents/skills/`) or absolute paths.
+Skills can be bare names (looked up in priority order from `~/.gsd/agent/skills/`, `~/.agents/skills/`, `.agents/skills/`, then Claude compatibility skill directories) or absolute paths.
 
 ### `skill_rules`
 

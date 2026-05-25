@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { capturePauseAutoUnitIdentity, pauseAuto, isAutoActive } from "../auto.ts";
+import { _resetPendingResolve, _setCurrentResolve } from "../auto/resolve.ts";
 import { autoSession } from "../auto-runtime-state.ts";
 import { _isPauseOriginCancelledResult } from "../auto/phases.ts";
 
@@ -50,6 +51,32 @@ test("pauseAuto sets s.active = false synchronously before first await (blocks c
     autoSession.reset();
     process.chdir(previousCwd);
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("pauseAuto marks paused and cancels the in-flight unit before first await", async () => {
+  autoSession.reset();
+  autoSession.active = true;
+  autoSession.currentUnit = {
+    type: "execute-task",
+    id: "M001/S01/T01",
+    startedAt: 500,
+  };
+  let cancelledResult: unknown;
+  _setCurrentResolve((result) => {
+    cancelledResult = result;
+  });
+
+  try {
+    const pausePromise = pauseAuto();
+
+    assert.equal(autoSession.paused, true);
+    assert.deepEqual(cancelledResult, { status: "cancelled" });
+
+    await pausePromise.catch(() => {});
+  } finally {
+    _resetPendingResolve();
+    autoSession.reset();
   }
 });
 

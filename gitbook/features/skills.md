@@ -8,10 +8,13 @@ Skills follow the open [Agent Skills standard](https://agentskills.io/) and work
 
 | Location | Scope | Description |
 |----------|-------|------------|
-| `~/.agents/skills/` | Global | Shared across all projects |
+| `~/.gsd/agent/skills/` | Bundled | GSD-managed bundled skills synced during install/update |
+| `~/.agents/skills/` | Global | User-global skills shared across compatible agents |
 | `.agents/skills/` (project root) | Project | Project-specific, committable to git |
+| `~/.claude/skills/` | Compat | Claude Code compatibility source, lower priority |
+| `.claude/skills/` (project root) | Compat | Project-local Claude Code compatibility source |
 
-Global skills take precedence when names collide.
+Earlier entries take precedence when names collide. Bundled GSD skills win over user-global and project skills; Claude Code compatibility directories are searched after the standard Agent Skills locations.
 
 ## Installing Skills
 

@@ -908,6 +908,11 @@ export async function autoLoop(
           phaseReporter.report("pre-dispatch", preDispatchResult.action);
           if (preDispatchResult.action === "break") {
             finishTurn("stopped", "manual-attention", "pre-dispatch-break");
+            finishIncompleteIteration({
+              status: "stopped",
+              reason: "pre-dispatch-break",
+              failureClass: "manual-attention",
+            });
             break;
           }
           if (preDispatchResult.action === "continue") {

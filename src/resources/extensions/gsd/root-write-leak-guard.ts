@@ -6,6 +6,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+const MAX_SYNC_FINGERPRINT_BYTES = 1_500_000_000;
+
 export interface RootDirtyEntry {
   path: string;
   status: string;
@@ -31,6 +33,7 @@ function fileFingerprint(rootPath: string, relPath: string): string {
   if (!existsSync(absPath)) return "missing";
   const stat = statSync(absPath);
   if (!stat.isFile()) return `${stat.isDirectory() ? "dir" : "other"}:${stat.size}:${stat.mtimeMs}`;
+  if (stat.size > MAX_SYNC_FINGERPRINT_BYTES) return `large:${stat.size}:${stat.mtimeMs}`;
   return createHash("sha256").update(readFileSync(absPath)).digest("hex");
 }
 

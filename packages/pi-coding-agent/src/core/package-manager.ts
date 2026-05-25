@@ -1701,18 +1701,14 @@ export class DefaultPackageManager implements PackageManager {
 			);
 		}
 		{
-			// Ecosystem skills (~/.agents/skills/) take priority over legacy config-dir skills.
-			// Skip legacy dir entirely when migration has completed (marker file present).
-			const legacySkillsMigrated =
-				resolve(userDirs.skills) !== resolve(userAgentsSkillsDir) &&
-				existsSync(join(userDirs.skills, ".migrated-to-agents"));
-			const legacyUserSkillEntries =
-				!legacySkillsMigrated && userSubdirs.has("skills")
-					? collectAutoSkillEntries(userDirs.skills)
-					: [];
+			// GSD-owned bundled skills live in the config-dir skills folder and
+			// should remain visible regardless of obsolete migration markers.
+			const bundledUserSkillEntries = userSubdirs.has("skills")
+				? collectAutoSkillEntries(userDirs.skills)
+				: [];
 			const skillEntries = [
+				...bundledUserSkillEntries,
 				...collectAutoSkillEntries(userAgentsSkillsDir),
-				...legacyUserSkillEntries,
 			];
 			if (skillEntries.length > 0) {
 				addResources("skills", skillEntries, userMetadata, userOverrides.skills, globalBaseDir);

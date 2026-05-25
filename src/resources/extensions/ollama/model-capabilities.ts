@@ -24,11 +24,18 @@ export interface ModelCapability {
  * Keys are matched as prefixes against the model name (before the colon/tag).
  * More specific entries should appear first.
  */
-// Note: ollamaOptions.num_ctx is set for known model families where the context
-// window is authoritative. For unknown/estimated models, num_ctx is NOT sent
-// to avoid OOM risk — Ollama uses its own safe default instead.
+// Note: ollamaOptions.num_ctx is set when the context window has an authoritative
+// source — either a KNOWN_MODELS table entry, or /api/show returning context_length
+// at runtime (ollama-discovery.ts syncs num_ctx with the /api/show value when present).
+// When neither source provides a context window, num_ctx is NOT sent and ollama
+// uses its own safe default to avoid OOM on constrained hosts.
 const KNOWN_MODELS: Array<[pattern: string, caps: ModelCapability]> = [
 	// ─── Reasoning models ───────────────────────────────────────────────
+	// Long-variants listed before the bare `deepseek-v4` base to avoid prefix shadowing.
+	// Same invariant as qwen3-coder / glm / kimi / minimax families.
+	["deepseek-v4-pro",   { contextWindow: 1048576, reasoning: true, ollamaOptions: { num_ctx: 1048576 } }],
+	["deepseek-v4-flash", { contextWindow: 1048576, reasoning: true, ollamaOptions: { num_ctx: 1048576 } }],
+	["deepseek-v4",       { contextWindow: 1048576, reasoning: true, ollamaOptions: { num_ctx: 1048576 } }],
 	["deepseek-r1", { contextWindow: 131072, reasoning: true, ollamaOptions: { num_ctx: 131072 } }],
 	["qwq", { contextWindow: 131072, reasoning: true, ollamaOptions: { num_ctx: 131072 } }],
 
@@ -90,11 +97,15 @@ const KNOWN_MODELS: Array<[pattern: string, caps: ModelCapability]> = [
 
 	// ─── MiniMax M2 (Ollama Cloud) ─────────────────────────────────────
 	// ref: minimax-m2 1M ctx — https://www.minimax.io/news/minimax-m2
-	["minimax-m2.7", { contextWindow: 1048576, maxTokens: 16384, ollamaOptions: { num_ctx: 1048576 } }],
+	// minimax-m2.7:cloud reports 196608 via /api/show despite the M2 announcement
+	// quoting 1M context. Cloud deployment truncates / OOMs at the announced
+	// number; trust the deployed backend.
+	["minimax-m2.7", { contextWindow: 196608, maxTokens: 16384, reasoning: true, ollamaOptions: { num_ctx: 196608 } }],
 	["minimax-m2.5", { contextWindow: 1048576, maxTokens: 16384, ollamaOptions: { num_ctx: 1048576 } }],
 	["minimax-m2", { contextWindow: 1048576, maxTokens: 16384, ollamaOptions: { num_ctx: 1048576 } }],
 
 	// ─── Gemma family ───────────────────────────────────────────────────
+	["gemma4", { contextWindow: 262144, reasoning: true, ollamaOptions: { num_ctx: 262144 } }],
 	["gemma3", { contextWindow: 131072, maxTokens: 16384, ollamaOptions: { num_ctx: 131072 } }],
 	["gemma2", { contextWindow: 8192, maxTokens: 8192, ollamaOptions: { num_ctx: 8192 } }],
 

@@ -88,8 +88,11 @@ Then proceed directly to the workflow.
 ## Skill Structure Quick Reference
 
 **Skill directories:**
+- Bundled/read-only: `~/.gsd/agent/skills/{skill-name}/`
 - Global: `~/.agents/skills/{skill-name}/`
 - Project-local: `.agents/skills/{skill-name}/`
+
+User-authored skills should target the global or project-local directories; GSD manages the bundled directory during install/update.
 
 **Simple skill (single file):**
 ```yaml

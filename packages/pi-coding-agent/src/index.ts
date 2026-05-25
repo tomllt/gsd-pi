@@ -253,9 +253,11 @@ export {
 } from "./core/resolve-config-value.js";
 // Skills
 export {
+	CLAUDE_SKILLS_DIR,
 	ECOSYSTEM_SKILLS_DIR,
 	ECOSYSTEM_PROJECT_SKILLS_DIR,
 	formatSkillsForPrompt,
+	GSD_BUNDLED_SKILLS_DIR,
 	getLoadedSkills,
 	type LoadSkillsFromDirOptions,
 	type LoadSkillsResult,

@@ -18,6 +18,8 @@
 1. **Global** (`~/.agents/skills/`) — Available in all GSD sessions
 2. **Project-local** (`.agents/skills/`) — Available only in this project
 
+Do not create user-authored skills under `~/.gsd/agent/skills/`; GSD owns that bundled skills directory.
+
 ## Step 2: Adaptive Requirements Gathering
 
 **If user provided context** (e.g., "build a skill for X"):

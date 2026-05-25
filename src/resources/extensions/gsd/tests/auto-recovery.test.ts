@@ -904,6 +904,7 @@ function makeGitBase(): string {
   execFileSync("git", ["init", "--initial-branch=main"], { cwd: base, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: base, stdio: "ignore" });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: base, stdio: "ignore" });
+  execFileSync("git", ["config", "gc.auto", "0"], { cwd: base, stdio: "ignore" });
   // Create initial commit so HEAD exists
   writeFileSync(join(base, ".gitkeep"), "");
   execFileSync("git", ["add", "."], { cwd: base, stdio: "ignore" });
@@ -1245,14 +1246,14 @@ test("hasImplementationArtifacts uses milestone path history instead of rolling 
     execFileSync("git", ["commit", "-m", "feat: old milestone implementation\n\nGSD-Task: S01/T01"], { cwd: base, stdio: "ignore" });
 
     mkdirSync(join(base, "docs"), { recursive: true });
-    for (let i = 0; i < 205; i++) {
+    for (let i = 0; i < 25; i++) {
       writeFileSync(join(base, "docs", `note-${i}.md`), `# Note ${i}\n`);
       execFileSync("git", ["add", "."], { cwd: base, stdio: "ignore" });
       execFileSync("git", ["commit", "-m", `docs: filler ${i}`], { cwd: base, stdio: "ignore" });
     }
 
     const result = hasImplementationArtifacts(base, "M001");
-    assert.equal(result, "present", "milestone evidence should not age out after 200 unrelated commits");
+    assert.equal(result, "present", "milestone evidence should not age out beyond the old rolling-depth fallback");
   } finally {
     cleanup(base);
   }

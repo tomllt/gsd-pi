@@ -1355,6 +1355,7 @@ export class AgentSession {
 				extensionPath: `command:${commandName}`,
 				event: "command",
 				error: getErrorMessage(err),
+				stack: err instanceof Error ? err.stack : undefined,
 			});
 			return true;
 		}

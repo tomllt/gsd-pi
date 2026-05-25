@@ -6,16 +6,19 @@ Skills follow the open [Agent Skills standard](https://agentskills.io/) and are 
 
 ## Skill Directories
 
-GSD reads skills from two locations, in priority order:
+GSD reads skills from these locations, in priority order:
 
 | Location                          | Scope   | Description                                              |
 |-----------------------------------|---------|----------------------------------------------------------|
-| `~/.agents/skills/`              | Global  | Shared across all projects and all compatible agents     |
+| `~/.gsd/agent/skills/`           | Bundled | GSD-managed bundled skills synced during install/update  |
+| `~/.agents/skills/`              | Global  | User-global skills shared across compatible agents       |
 | `.agents/skills/` (project root) | Project | Project-specific skills, committable to version control  |
+| `~/.claude/skills/`              | Compat  | Claude Code compatibility source, lower priority         |
+| `.claude/skills/` (project root) | Compat  | Project-local Claude Code compatibility source           |
 
-Global skills take precedence over project skills when names collide.
+Earlier entries take precedence when names collide. Bundled GSD skills win over user-global and project skills; Claude Code compatibility directories are searched after the standard Agent Skills locations.
 
-> **Migration from `~/.gsd/agent/skills/`:** On first launch after upgrading, GSD automatically copies skills from the legacy `~/.gsd/agent/skills/` directory to `~/.agents/skills/`. The old directory is preserved for backward compatibility.
+> **Bundled vs user skills:** GSD bundled skills are managed in `~/.gsd/agent/skills/`. Install your own shared skills into `~/.agents/skills/`, or commit project-specific skills under `.agents/skills/`.
 
 ## Installing Skills
 
@@ -116,11 +119,11 @@ skill_rules:
 ### Resolution Order
 
 Skills can be referenced by:
-1. **Bare name** — e.g., `frontend-design` → scans `~/.agents/skills/` and project `.agents/skills/`
+1. **Bare name** — e.g., `frontend-design` → scans the skill directories above in priority order
 2. **Absolute path** — e.g., `/Users/you/.agents/skills/my-skill/SKILL.md`
 3. **Directory path** — e.g., `~/custom-skills/my-skill` → looks for `SKILL.md` inside
 
-Global skills (`~/.agents/skills/`) take precedence over project skills (`.agents/skills/`).
+Bundled skills (`~/.gsd/agent/skills/`) take precedence over user-global skills (`~/.agents/skills/`), project skills (`.agents/skills/`), and Claude compatibility directories.
 
 ## Custom Skills
 
