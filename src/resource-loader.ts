@@ -354,7 +354,7 @@ function copyDirRecursive(src: string, dest: string): void {
  * Layout differences by install method:
  * - Source/monorepo: packageRoot/node_modules has everything → simple symlink
  * - npm/bun global: deps hoisted to dirname(packageRoot), including @gsd/* → simple symlink
- * - pnpm global: external deps hoisted, but @gsd/* stays in packageRoot/node_modules
+ * - pnpm global: external deps hoisted, but GSD workspace scopes stay in packageRoot/node_modules
  *   → merged directory with symlinks from both roots (#3529, #3564)
  */
 function ensureNodeModulesSymlink(agentDir: string): void {
@@ -369,7 +369,7 @@ function ensureNodeModulesSymlink(agentDir: string): void {
     return
   }
 
-  // Global install: check if workspace scopes (@gsd/*) are hoisted.
+  // Global install: check if GSD workspace scopes are hoisted.
   // npm/bun hoist everything; pnpm keeps workspace packages internal.
   if (!hasMissingWorkspaceScopes(hoistedNodeModules, internalNodeModules)) {
     // Everything is hoisted — simple symlink to parent node_modules
@@ -381,18 +381,22 @@ function ensureNodeModulesSymlink(agentDir: string): void {
   reconcileMergedNodeModules(agentNodeModules, hoistedNodeModules, internalNodeModules)
 }
 
-/** Check if any @gsd* scopes exist in internal but not in hoisted node_modules */
+/** Check if any GSD workspace scopes exist in internal but not in hoisted node_modules */
 export function hasMissingWorkspaceScopes(hoisted: string, internal: string): boolean {
   if (!existsSync(internal)) return false
   try {
     for (const entry of readdirSync(internal, { withFileTypes: true })) {
-      if (entry.isDirectory() && entry.name.startsWith('@gsd') &&
+      if (entry.isDirectory() && isGsdWorkspaceScope(entry.name) &&
           !existsSync(join(hoisted, entry.name))) {
         return true
       }
     }
   } catch { /* non-fatal */ }
   return false
+}
+
+function isGsdWorkspaceScope(scope: string): boolean {
+  return scope === '@gsd' || scope === '@gsd-build' || scope === '@opengsd'
 }
 
 /** Ensure a symlink at `link` points to `target`, fixing stale/wrong entries */

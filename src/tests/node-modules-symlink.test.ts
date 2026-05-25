@@ -200,8 +200,8 @@ test("hasMissingWorkspaceScopes detects pnpm layout", (t) => {
     "pnpm-style: @opengsd missing from hoisted should be detected",
   );
 
-  // Non-@gsd scope missing from hoisted does NOT trigger detection —
-  // only @gsd* scopes are the contract signal.
+  // Non-GSD scope missing from hoisted does NOT trigger detection —
+  // only GSD workspace scopes are the contract signal.
   const tmp2 = mkdtempSync(join(tmpdir(), "gsd-pnpm-detect-non-gsd-"));
   t.after(() => rmSync(tmp2, { recursive: true, force: true }));
   const hoisted2 = join(tmp2, "hoisted");
@@ -211,7 +211,7 @@ test("hasMissingWorkspaceScopes detects pnpm layout", (t) => {
   assert.equal(
     hasMissingWorkspaceScopes(hoisted2, internal2),
     false,
-    "non-@gsd scope should not trigger missing-workspace detection",
+    "non-GSD scope should not trigger missing-workspace detection",
   );
 
   // Missing internal directory returns false (no layout to reason about)
