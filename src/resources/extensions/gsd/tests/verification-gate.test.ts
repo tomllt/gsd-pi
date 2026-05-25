@@ -679,6 +679,17 @@ test("validateVerificationCommand allows semicolons inside quoted python -c code
   assert.equal(result.ok, true);
 });
 
+test("validateVerificationCommand allows grep patterns with quoted pipes", () => {
+  assert.equal(validateVerificationCommand('grep -q "| " output.md').ok, true);
+  assert.equal(validateVerificationCommand("grep -c '^## SectionA\\|^### Sub1\\|^### Sub2' notes.md").ok, true);
+});
+
+test("validateVerificationCommand allows exit-code echo diagnostic suffix", () => {
+  assert.equal(validateVerificationCommand('python3 tools/check-status.py; echo "exit:$?"').ok, true);
+  assert.equal(validateVerificationCommand("python3 tools/check-status.py; echo 'exit:$?'").ok, true);
+  assert.equal(validateVerificationCommand("python3 tools/check-status.py; echo exit:$?").ok, true);
+});
+
 test("validateVerificationCommand rejects shell operators after single-quote backslash desync patterns", () => {
   const result = validateVerificationCommand("echo 'x\\'; ls");
   assert.equal(result.ok, false);
@@ -689,6 +700,14 @@ test("validateVerificationCommand rejects shell operators after single-quote bac
 
 test("validateVerificationCommand rejects logical OR fallback syntax", () => {
   const result = validateVerificationCommand("npm test || true");
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /shell control syntax/);
+  }
+});
+
+test("validateVerificationCommand rejects arbitrary semicolon command chaining", () => {
+  const result = validateVerificationCommand("python3 tools/check-status.py; rm -rf output");
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.match(result.reason, /shell control syntax/);

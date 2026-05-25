@@ -246,6 +246,11 @@ export function formatFailureContext(result: VerificationResult): string {
 
 /** Characters that indicate shell control syntax when unquoted in a command string. */
 const UNQUOTED_SHELL_CONTROL_CHARS = new Set([";", "|", "<", ">"]);
+const EXIT_CODE_ECHO_SUFFIX = /^;\s*echo\s+(?:"exit:\$\?"|'exit:\$\?'|exit:\$\?)\s*$/;
+
+function isAllowedExitCodeEchoSuffix(suffix: string): boolean {
+  return EXIT_CODE_ECHO_SUFFIX.test(suffix);
+}
 
 /** Returns true when command text contains unquoted shell control syntax. */
 function hasUnsafeShellSyntax(cmd: string): boolean {
@@ -256,7 +261,8 @@ function hasUnsafeShellSyntax(cmd: string): boolean {
   let inDouble = false;
   let escaped = false;
 
-  for (const ch of cmd) {
+  for (let i = 0; i < cmd.length; i += 1) {
+    const ch = cmd[i];
     if (escaped) {
       escaped = false;
       continue;
@@ -274,6 +280,9 @@ function hasUnsafeShellSyntax(cmd: string): boolean {
       continue;
     }
     if (!inSingle && !inDouble && UNQUOTED_SHELL_CONTROL_CHARS.has(ch)) {
+      if (ch === ";" && isAllowedExitCodeEchoSuffix(cmd.slice(i))) {
+        return hasUnsafeShellSyntax(cmd.slice(0, i).trim());
+      }
       return true;
     }
   }

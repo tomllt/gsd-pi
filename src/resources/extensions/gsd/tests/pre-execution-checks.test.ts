@@ -917,6 +917,25 @@ describe("checkVerificationCommands", () => {
     assert.equal(results[0]?.blocking, true);
     assert.match(results[0]?.message ?? "", /shell control syntax/);
   });
+
+  test("accepts quoted grep metacharacters and exit-code echo suffixes", () => {
+    const results = checkVerificationCommands([
+      createTask({
+        id: "T01",
+        verify: 'grep -q "| " output.md',
+      }),
+      createTask({
+        id: "T02",
+        verify: "grep -c '^## SectionA\\|^### Sub1\\|^### Sub2' notes.md",
+      }),
+      createTask({
+        id: "T03",
+        verify: 'python3 tools/check-status.py; echo "exit:$?"',
+      }),
+    ]);
+
+    assert.deepEqual(results, []);
+  });
 });
 
 // ─── runPreExecutionChecks Integration Tests ─────────────────────────────────
