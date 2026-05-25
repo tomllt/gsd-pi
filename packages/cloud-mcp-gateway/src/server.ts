@@ -16,7 +16,10 @@ export interface GatewayServerOptions {
 
 export function createGatewayServer(options: GatewayServerOptions = {}) {
   const userId = options.userId ?? "local-user";
-  const userToken = options.userToken ?? process.env.GSD_CLOUD_USER_TOKEN ?? "dev-user-token";
+  const userToken = options.userToken ?? process.env.GSD_CLOUD_USER_TOKEN;
+  if (!userToken) {
+    throw new Error("GSD_CLOUD_USER_TOKEN is required");
+  }
   const authStorePath = options.authStorePath ?? process.env.GSD_CLOUD_AUTH_STORE_PATH;
   const auth = authStorePath
     ? new FileAuthStore(authStorePath, { token: userToken, userId })

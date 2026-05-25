@@ -3,6 +3,17 @@ import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import { createGatewayServer } from "./server.js";
 
+test("gateway requires an explicit user bearer token", () => {
+  const prior = process.env.GSD_CLOUD_USER_TOKEN;
+  delete process.env.GSD_CLOUD_USER_TOKEN;
+  try {
+    assert.throws(() => createGatewayServer(), /GSD_CLOUD_USER_TOKEN is required/);
+  } finally {
+    if (prior === undefined) delete process.env.GSD_CLOUD_USER_TOKEN;
+    else process.env.GSD_CLOUD_USER_TOKEN = prior;
+  }
+});
+
 test("gateway does not expose unexpected error details in HTTP responses", async () => {
   const { server, auth } = createGatewayServer({ userToken: "user-token" });
   auth.authenticateUser = () => {

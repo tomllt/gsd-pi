@@ -9,6 +9,7 @@ The gateway is a live routing layer. It does not host workspaces, clone source c
 Build and start the gateway with persistent auth storage:
 
 ```bash
+export GSD_CLOUD_USER_TOKEN="$(openssl rand -hex 32)"
 npm run build -w @opengsd/cloud-mcp-gateway
 node packages/cloud-mcp-gateway/dist/cli.js \
   --port 8787 \
@@ -19,7 +20,7 @@ Create a pairing code:
 
 ```bash
 curl -s -X POST http://localhost:8787/pairing-codes \
-  -H 'Authorization: Bearer dev-user-token' \
+  -H "Authorization: Bearer $GSD_CLOUD_USER_TOKEN" \
   -H 'Content-Type: application/json'
 ```
 
@@ -45,7 +46,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 const client = new Client({ name: "gateway-smoke", version: "0.0.1" });
 const transport = new StreamableHTTPClientTransport(
   new URL("http://localhost:8787/mcp"),
-  { requestInit: { headers: { Authorization: "Bearer dev-user-token" } } },
+  { requestInit: { headers: { Authorization: `Bearer ${process.env.GSD_CLOUD_USER_TOKEN}` } } },
 );
 
 await client.connect(transport);
@@ -68,4 +69,4 @@ GSD_CLOUD_AUTH_STORE_PATH=/secure/path/gsd-cloud-auth.json node packages/cloud-m
 
 The auth store persists user tokens, device tokens, and pairing codes as SHA-256 hashes. Raw bearer tokens and device tokens are not written to disk.
 
-`GSD_CLOUD_USER_TOKEN` seeds the initial user bearer token. If omitted, the development default is `dev-user-token`.
+`GSD_CLOUD_USER_TOKEN` seeds the initial user bearer token and is required at startup.
