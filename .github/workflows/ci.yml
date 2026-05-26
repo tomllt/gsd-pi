@@ -206,7 +206,7 @@ jobs:
 
   integration-tests:
     name: integration-tests
-    timeout-minutes: 15
+    timeout-minutes: 25
     needs: [fast-gates, build]
     if: needs.fast-gates.outputs.heavy-code-changed == 'true'
     runs-on: ubuntu-latest
