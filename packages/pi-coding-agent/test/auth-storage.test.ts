@@ -31,7 +31,15 @@ describe("AuthStorage", () => {
 	}
 
 	function toShPath(value: string): string {
-		return value.replace(/\\/g, "/").replace(/"/g, '\\"');
+		let escaped = "";
+		for (const char of value) {
+			const normalized = char === "\\" ? "/" : char;
+			if (normalized === '"' || normalized === "$" || normalized === "`" || normalized === "\\") {
+				escaped += "\\";
+			}
+			escaped += normalized;
+		}
+		return escaped;
 	}
 
 	describe("API key resolution", () => {

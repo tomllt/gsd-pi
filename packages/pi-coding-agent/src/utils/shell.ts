@@ -126,7 +126,46 @@ export function getShellEnv(): NodeJS.ProcessEnv {
 /** GSD compat: normalize Windows NUL redirects for bash compatibility. */
 export function sanitizeCommand(command: string): string {
 	if (process.platform !== "win32") return command;
-	return command.replace(/(\d*>>?) *\bNUL\b(?=\s|;|\||&|\)|$)/gi, "$1 /dev/null");
+
+	const isDigit = (char: string | undefined): boolean => Boolean(char && char >= "0" && char <= "9");
+	const isBoundary = (char: string | undefined): boolean =>
+		char === undefined || char === " " || char === "\t" || char === ";" || char === "|" || char === "&" || char === ")";
+
+	let output = "";
+	for (let index = 0; index < command.length; ) {
+		let cursor = index;
+		while (isDigit(command[cursor])) {
+			cursor++;
+		}
+		if (command[cursor] !== ">") {
+			output += command[index]!;
+			index++;
+			continue;
+		}
+
+		cursor++;
+		if (command[cursor] === ">") {
+			cursor++;
+		}
+
+		const redirectToken = command.slice(index, cursor);
+		let valueStart = cursor;
+		while (command[valueStart] === " ") {
+			valueStart++;
+		}
+
+		const value = command.slice(valueStart, valueStart + 3);
+		if (value.toLowerCase() === "nul" && isBoundary(command[valueStart + 3])) {
+			output += `${redirectToken} /dev/null`;
+			index = valueStart + 3;
+			continue;
+		}
+
+		output += command[index]!;
+		index++;
+	}
+
+	return output;
 }
 
 /**

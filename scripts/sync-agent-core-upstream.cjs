@@ -43,9 +43,6 @@ function normalize(content) {
     'from "../../modes/interactive/theme/theme.js"',
     'from "@gsd/pi-coding-agent/theme/theme.js"',
   )
-  // Upstream compaction/bash/export-html paths → pi-coding-agent or local
-  c = c.replace(/from "\.\/compaction\//g, 'from "./compaction/')
-  c = c.replace(/from "\.\/export-html\//g, 'from "./export-html/')
   return c
 }
 

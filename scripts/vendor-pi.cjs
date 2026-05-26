@@ -17,7 +17,7 @@
 
 const { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, readdirSync } = require('fs')
 const { join, resolve, dirname } = require('path')
-const { execSync } = require('child_process')
+const { execFileSync } = require('child_process')
 
 const REPO_ROOT = resolve(__dirname, '..')
 const UPSTREAM_CONFIG_PATH = join(__dirname, 'pi-upstream.json')
@@ -36,24 +36,24 @@ function parseArgs(argv) {
   return opts
 }
 
-function run(cmd, cwd) {
-  execSync(cmd, { cwd, stdio: 'inherit' })
+function run(command, args, cwd) {
+  execFileSync(command, args, { cwd, stdio: 'inherit' })
 }
 
-function runCapture(cmd, cwd) {
-  return execSync(cmd, { cwd, encoding: 'utf8' }).trim()
+function runCapture(command, args, cwd) {
+  return execFileSync(command, args, { cwd, encoding: 'utf8' }).trim()
 }
 
 function ensureUpstreamCheckout(repoUrl, ref) {
   if (!existsSync(CACHE_DIR)) {
     mkdirSync(dirname(CACHE_DIR), { recursive: true })
-    run(`git clone --depth 1 --branch ${ref} ${repoUrl} ${CACHE_DIR}`, REPO_ROOT)
+    run('git', ['clone', '--depth', '1', '--branch', ref, '--', repoUrl, CACHE_DIR], REPO_ROOT)
     return
   }
 
-  run('git fetch --depth 1 origin', CACHE_DIR)
-  run(`git checkout ${ref}`, CACHE_DIR)
-  run('git pull --depth 1 origin', CACHE_DIR)
+  run('git', ['fetch', '--depth', '1', 'origin'], CACHE_DIR)
+  run('git', ['checkout', ref], CACHE_DIR)
+  run('git', ['pull', '--depth', '1', 'origin'], CACHE_DIR)
 }
 
 function preserveGsdPackageJson(targetDir, upstreamPkgJson) {

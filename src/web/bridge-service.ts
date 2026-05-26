@@ -1,8 +1,8 @@
 import { execFile, spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { StringDecoder } from "node:string_decoder";
 import type { Readable } from "node:stream";
-import { join, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveTypeStrippingFlag, resolveSubprocessModule, buildSubprocessPrefixArgs } from "./ts-subprocess-flags.ts";
 import { safePackageRootFromImportUrl } from "./safe-import-meta-resolve.ts";
@@ -139,9 +139,8 @@ type FlatSessionBrowserNode = {
 };
 
 type ParsedSessionSearchQuery = {
-  mode: "tokens" | "regex";
+  mode: "tokens";
   tokens: Array<{ kind: "fuzzy" | "phrase"; value: string }>;
-  regex: RegExp | null;
   error?: string;
 };
 
@@ -233,21 +232,16 @@ function hasSessionName(session: SessionInfo): boolean {
 function parseSessionSearchQuery(query: string): ParsedSessionSearchQuery {
   const trimmed = query.trim();
   if (!trimmed) {
-    return { mode: "tokens", tokens: [], regex: null };
+    return { mode: "tokens", tokens: [] };
   }
 
   if (trimmed.startsWith("re:")) {
     const pattern = trimmed.slice(3).trim();
     if (!pattern) {
-      return { mode: "regex", tokens: [], regex: null, error: "Empty regex" };
+      return { mode: "tokens", tokens: [], error: "Empty search" };
     }
 
-    try {
-      return { mode: "regex", tokens: [], regex: new RegExp(pattern, "i") };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { mode: "regex", tokens: [], regex: null, error: message };
-    }
+    return { mode: "tokens", tokens: [{ kind: "phrase", value: pattern }] };
   }
 
   const tokens: Array<{ kind: "fuzzy" | "phrase"; value: string }> = [];
@@ -297,29 +291,15 @@ function parseSessionSearchQuery(query: string): ParsedSessionSearchQuery {
         .map((value) => value.trim())
         .filter((value) => value.length > 0)
         .map((value) => ({ kind: "fuzzy" as const, value })),
-      regex: null,
     };
   }
 
   flush(inQuote ? "phrase" : "fuzzy");
-  return { mode: "tokens", tokens, regex: null };
+  return { mode: "tokens", tokens };
 }
 
 function matchSessionSearch(session: SessionInfo, parsed: ParsedSessionSearchQuery): { matches: boolean; score: number } {
   const text = getSessionSearchText(session);
-
-  if (parsed.mode === "regex") {
-    if (!parsed.regex) {
-      return { matches: false, score: 0 };
-    }
-
-    const index = text.search(parsed.regex);
-    if (index < 0) {
-      return { matches: false, score: 0 };
-    }
-
-    return { matches: true, score: index * 0.1 };
-  }
 
   if (parsed.tokens.length === 0) {
     return { matches: true, score: 0 };
@@ -475,6 +455,31 @@ export interface ProjectDetection {
   signals: ProjectDetectionSignals;
 }
 
+function getSafeReadableDirectory(pathValue: string): string | null {
+  const trimmed = pathValue.trim();
+  if (!trimmed || trimmed.includes("\0")) {
+    return null;
+  }
+
+  try {
+    const resolved = resolve(trimmed);
+    const canonical = realpathSync(resolved);
+    const stats = statSync(canonical);
+    return stats.isDirectory() ? canonical : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveWithinDirectory(root: string, ...segments: string[]): string {
+  const candidate = resolve(root, ...segments);
+  const rel = relative(root, candidate);
+  if (rel === ".." || rel.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(rel)) {
+    throw new Error(`Path escapes root: ${candidate}`);
+  }
+  return candidate;
+}
+
 /**
  * Detect whether a directory looks like a monorepo root.
  *
@@ -491,17 +496,21 @@ export interface ProjectDetection {
  * in many code paths). No deep directory scanning.
  */
 export function detectMonorepo(dirPath: string, checkExists?: (path: string) => boolean): boolean {
+  const safeDirPath = getSafeReadableDirectory(dirPath);
+  if (!safeDirPath) {
+    return false;
+  }
   const exists = checkExists ?? (getBridgeDeps().existsSync ?? existsSync);
 
   // Fast checks — file existence only
-  if (exists(join(dirPath, "pnpm-workspace.yaml"))) return true;
-  if (exists(join(dirPath, "lerna.json"))) return true;
-  if (exists(join(dirPath, "rush.json"))) return true;
-  if (exists(join(dirPath, "nx.json"))) return true;
-  if (exists(join(dirPath, "turbo.json"))) return true;
+  if (exists(resolveWithinDirectory(safeDirPath, "pnpm-workspace.yaml"))) return true;
+  if (exists(resolveWithinDirectory(safeDirPath, "lerna.json"))) return true;
+  if (exists(resolveWithinDirectory(safeDirPath, "rush.json"))) return true;
+  if (exists(resolveWithinDirectory(safeDirPath, "nx.json"))) return true;
+  if (exists(resolveWithinDirectory(safeDirPath, "turbo.json"))) return true;
 
   // Check package.json for workspaces field (npm/yarn workspaces)
-  const packageJsonPath = join(dirPath, "package.json");
+  const packageJsonPath = resolveWithinDirectory(safeDirPath, "package.json");
   if (exists(packageJsonPath)) {
     try {
       const raw = readFileSync(packageJsonPath, "utf-8");
@@ -516,21 +525,39 @@ export function detectMonorepo(dirPath: string, checkExists?: (path: string) => 
 }
 
 export function detectProjectKind(projectCwd: string): ProjectDetection {
+  const safeProjectCwd = getSafeReadableDirectory(projectCwd);
+  if (!safeProjectCwd) {
+    return {
+      kind: "blank",
+      signals: {
+        hasGsdFolder: false,
+        hasPlanningFolder: false,
+        hasGitRepo: false,
+        hasPackageJson: false,
+        hasCargo: false,
+        hasGoMod: false,
+        hasPyproject: false,
+        isMonorepo: false,
+        fileCount: 0,
+      },
+    };
+  }
+
   const checkExists = getBridgeDeps().existsSync ?? existsSync;
 
-  const hasGsdFolder = checkExists(join(projectCwd, ".gsd"));
-  const hasPlanningFolder = checkExists(join(projectCwd, ".planning"));
-  const hasGitRepo = checkExists(join(projectCwd, ".git"));
-  const hasPackageJson = checkExists(join(projectCwd, "package.json"));
-  const hasCargo = checkExists(join(projectCwd, "Cargo.toml"));
-  const hasGoMod = checkExists(join(projectCwd, "go.mod"));
-  const hasPyproject = checkExists(join(projectCwd, "pyproject.toml"));
-  const isMonorepo = detectMonorepo(projectCwd, checkExists);
+  const hasGsdFolder = checkExists(resolveWithinDirectory(safeProjectCwd, ".gsd"));
+  const hasPlanningFolder = checkExists(resolveWithinDirectory(safeProjectCwd, ".planning"));
+  const hasGitRepo = checkExists(resolveWithinDirectory(safeProjectCwd, ".git"));
+  const hasPackageJson = checkExists(resolveWithinDirectory(safeProjectCwd, "package.json"));
+  const hasCargo = checkExists(resolveWithinDirectory(safeProjectCwd, "Cargo.toml"));
+  const hasGoMod = checkExists(resolveWithinDirectory(safeProjectCwd, "go.mod"));
+  const hasPyproject = checkExists(resolveWithinDirectory(safeProjectCwd, "pyproject.toml"));
+  const isMonorepo = detectMonorepo(safeProjectCwd, checkExists);
 
   // Count top-level non-dot entries (cheap heuristic for "has code")
   let fileCount = 0;
   try {
-    const entries = readdirSync(projectCwd);
+    const entries = readdirSync(safeProjectCwd);
     fileCount = entries.filter(e => !e.startsWith(".")).length;
   } catch {
     // Can't read dir — treat as blank
@@ -552,7 +579,7 @@ export function detectProjectKind(projectCwd: string): ProjectDetection {
 
   if (hasGsdFolder) {
     // Check if milestones exist
-    const milestonesDir = join(projectCwd, ".gsd", "milestones");
+    const milestonesDir = resolveWithinDirectory(safeProjectCwd, ".gsd", "milestones");
     let hasMilestones = false;
     try {
       const dirs = readdirSync(milestonesDir, { withFileTypes: true });
