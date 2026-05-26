@@ -45,7 +45,15 @@ import {
 	resolveHeadersOrThrow,
 } from "./resolve-config-value.js";
 
-export type ProviderAuthMode = "apiKey" | "oauth" | "none" | "externalCli";
+import {
+	getDisabledModelProviders as getDisabledProviders,
+	getProviderAuthMode as resolveProviderAuthMode,
+	isProviderRequestReady as checkProviderRequestReady,
+	setDisabledModelProviders as applyDisabledModelProviders,
+	type ProviderAuthMode,
+} from "./provider-readiness.js";
+
+export type { ProviderAuthMode } from "./provider-readiness.js";
 
 // Schema for OpenRouter routing preferences
 const PercentileCutoffsSchema = Type.Object({
@@ -1130,34 +1138,28 @@ export class ModelRegistry {
 	}
 
 	getProviderAuthMode(provider: string): ProviderAuthMode {
-		if (provider === "gsd-fake") return "none";
-		const config = this.registeredProviders.get(provider);
-		if (!config) return "apiKey";
-		if (config.authMode) return config.authMode;
-		if (config.oauth) return "oauth";
-		if (config.apiKey) return "apiKey";
-		return "apiKey";
+		return resolveProviderAuthMode(this._readinessDeps(), provider);
 	}
 
 	setDisabledModelProviders(providers: string[]): void {
-		this.disabledModelProviders = new Set(
-			providers
-				.map((provider) => provider.trim().toLowerCase())
-				.filter((provider) => provider.length > 0),
-		);
+		applyDisabledModelProviders(this._readinessDeps(), providers);
 	}
 
 	getDisabledModelProviders(): string[] {
-		return Array.from(this.disabledModelProviders);
+		return getDisabledProviders(this._readinessDeps());
 	}
 
 	isProviderRequestReady(provider: string): boolean {
-		if (this.disabledModelProviders.has(provider.trim().toLowerCase())) return false;
-		const config = this.registeredProviders.get(provider);
-		if (config?.isReady) return config.isReady();
-		const authMode = this.getProviderAuthMode(provider);
-		if (authMode === "externalCli" || authMode === "none") return true;
-		return this.authStorage.hasAuth(provider) || this.providerRequestConfigs.has(provider);
+		return checkProviderRequestReady(this._readinessDeps(), provider);
+	}
+
+	private _readinessDeps() {
+		return {
+			authStorage: this.authStorage,
+			registeredProviders: this.registeredProviders,
+			providerRequestConfigs: this.providerRequestConfigs,
+			disabledModelProviders: this.disabledModelProviders,
+		};
 	}
 
 	isAllLocalChain(): boolean {

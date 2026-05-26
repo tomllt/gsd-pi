@@ -27,20 +27,56 @@ process.env.GIT_TEMPLATE_DIR = gitTemplateDir;
 // dist-test root — everything compiled lands here
 const DIST_TEST = new URL('../dist-test/', import.meta.url).href;
 
-// Absolute paths to compiled @gsd/* entry points
-const GSD_ALIASES = {
-  '@gsd/pi-coding-agent': new URL('../dist-test/packages/pi-coding-agent/src/index.js', import.meta.url).href,
-  '@gsd/pi-ai/oauth':     new URL('../dist-test/packages/pi-ai/src/utils/oauth/index.js', import.meta.url).href,
-  '@gsd/pi-ai':           new URL('../dist-test/packages/pi-ai/src/index.js', import.meta.url).href,
-  '@gsd/pi-agent-core':   new URL('../dist-test/packages/pi-agent-core/src/index.js', import.meta.url).href,
-  '@gsd/pi-tui':          new URL('../dist-test/packages/pi-tui/src/index.js', import.meta.url).href,
-  '@gsd/native':          new URL('../dist-test/packages/native/dist/index.js', import.meta.url).href,
+// ESM import hook: compiled .js mirrors for workspace packages (jiti uses alias map instead).
+const WORKSPACE_ENTRIES = {
+  'pi-coding-agent': new URL('../dist-test/packages/pi-coding-agent/src/index.js', import.meta.url).href,
+  'pi-ai/oauth':     new URL('../dist-test/packages/pi-ai/src/utils/oauth/index.js', import.meta.url).href,
+  'pi-ai':           new URL('../dist-test/packages/pi-ai/src/index.js', import.meta.url).href,
+  'pi-agent-core':   new URL('../dist-test/packages/pi-agent-core/src/index.js', import.meta.url).href,
+  'pi-tui':          new URL('../dist-test/packages/pi-tui/src/index.js', import.meta.url).href,
+  'native':          new URL('../dist-test/packages/native/dist/index.js', import.meta.url).href,
 };
 
+const WORKSPACE_SCOPES = ['@gsd', '@earendil-works', '@mariozechner'];
+
+const GSD_ALIASES = Object.fromEntries(
+  Object.entries(WORKSPACE_ENTRIES).flatMap(([pkg, target]) =>
+    WORKSPACE_SCOPES.map((scope) => [`${scope}/${pkg}`, target]),
+  ),
+);
+
+function isJitiCjsParent(context) {
+  const parent = context.parentURL ?? '';
+  // Only jiti's CJS require path — ESM imports from extension modules still use GSD_ALIASES.
+  return parent.includes('/node_modules/@mariozechner/jiti/');
+}
+
+function resolveWorkspaceSubpath(specifier) {
+  for (const scope of WORKSPACE_SCOPES) {
+    const piCodingPrefix = `${scope}/pi-coding-agent/`;
+    if (specifier.startsWith(piCodingPrefix)) {
+      const subpath = specifier.slice(piCodingPrefix.length).replace(/\.js$/, '.js');
+      return new URL(`../dist-test/packages/pi-coding-agent/src/${subpath}`, import.meta.url).href;
+    }
+    const nativePrefix = `${scope}/native/`;
+    if (specifier.startsWith(nativePrefix)) {
+      const subpath = specifier.slice(nativePrefix.length);
+      return new URL(`../dist-test/packages/native/src/${subpath}/index.js`, import.meta.url).href;
+    }
+  }
+  return null;
+}
+
 export function resolve(specifier, context, nextResolve) {
-  // 1. @gsd/* bare imports → compiled dist-test counterpart
-  if (specifier in GSD_ALIASES) {
-    return nextResolve(GSD_ALIASES[specifier], context);
+  // 1. Workspace bare + subpath imports → compiled dist-test counterparts (skip for jiti CJS)
+  if (!isJitiCjsParent(context)) {
+    if (specifier in GSD_ALIASES) {
+      return nextResolve(GSD_ALIASES[specifier], context);
+    }
+    const subpathTarget = resolveWorkspaceSubpath(specifier);
+    if (subpathTarget) {
+      return nextResolve(subpathTarget, context);
+    }
   }
 
   // 2. .ts imports inside dist-test → .js, preserving query/hash

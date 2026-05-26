@@ -120,7 +120,7 @@ ${c.cyan}   ██████╗ ███████╗██████╗
   ╚██████╔╝███████║██████╔╝
    ╚═════╝ ╚══════╝╚═════╝${c.reset}
 
-  ${c.bold}Get Shit Done${c.reset} ${c.dim}v${gsdVersion}${c.reset}
+  ${c.bold}Git Ship Done${c.reset} ${c.dim}v${gsdVersion}${c.reset}
 `)
 }
 

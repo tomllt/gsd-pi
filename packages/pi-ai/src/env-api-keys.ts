@@ -2,25 +2,29 @@
 let _existsSync: typeof import("node:fs").existsSync | null = null;
 let _homedir: typeof import("node:os").homedir | null = null;
 let _join: typeof import("node:path").join | null = null;
+let _nodeRequire: NodeRequire | null | undefined;
 
-type DynamicImport = (specifier: string) => Promise<unknown>;
-
-const dynamicImport: DynamicImport = (specifier) => import(specifier);
-const NODE_FS_SPECIFIER = "node:" + "fs";
-const NODE_OS_SPECIFIER = "node:" + "os";
-const NODE_PATH_SPECIFIER = "node:" + "path";
-
-// Eagerly load in Node.js/Bun environment only
-if (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {
-	dynamicImport(NODE_FS_SPECIFIER).then((m) => {
-		_existsSync = (m as typeof import("node:fs")).existsSync;
-	});
-	dynamicImport(NODE_OS_SPECIFIER).then((m) => {
-		_homedir = (m as typeof import("node:os")).homedir;
-	});
-	dynamicImport(NODE_PATH_SPECIFIER).then((m) => {
-		_join = (m as typeof import("node:path")).join;
-	});
+function ensureNodeBuiltins(): void {
+	if (_existsSync && _homedir && _join) return;
+	if (typeof process === "undefined" || !(process.versions?.node || process.versions?.bun)) {
+		return;
+	}
+	if (_nodeRequire === undefined) {
+		try {
+			const { createRequire } = require("node:module") as typeof import("node:module");
+			_nodeRequire = createRequire(import.meta.url);
+		} catch {
+			_nodeRequire = null;
+		}
+	}
+	if (!_nodeRequire) return;
+	try {
+		_existsSync = _nodeRequire("node:fs").existsSync;
+		_homedir = _nodeRequire("node:os").homedir;
+		_join = _nodeRequire("node:path").join;
+	} catch {
+		// Bundled/browser contexts may not resolve node: builtins.
+	}
 }
 
 import type { KnownProvider } from "./types.js";
@@ -62,9 +66,10 @@ let cachedVertexAdcCredentialsExists: boolean | null = null;
 
 function hasVertexAdcCredentials(): boolean {
 	if (cachedVertexAdcCredentialsExists === null) {
-		// If node modules haven't loaded yet (async import race at startup),
-		// return false WITHOUT caching so the next call retries once they're ready.
-		// Only cache false permanently in a browser environment where fs is never available.
+		ensureNodeBuiltins();
+		// If node modules aren't available, return false WITHOUT caching so the next
+		// call retries once they're ready. Only cache false permanently in a browser
+		// environment where fs is never available.
 		if (!_existsSync || !_homedir || !_join) {
 			const isNode = typeof process !== "undefined" && (process.versions?.node || process.versions?.bun);
 			if (!isNode) {

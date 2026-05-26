@@ -78,5 +78,27 @@ for (const pkg of getLinkablePackages()) {
   }
 }
 
+// Vendored pi-coding-agent still resolves @earendil-works/* at runtime.
+const earendilDir = join(REPO_ROOT, 'node_modules', '@earendil-works')
+if (!existsSync(earendilDir)) {
+  mkdirSync(earendilDir, { recursive: true })
+}
+for (const name of ['pi-agent-core', 'pi-ai', 'pi-tui', 'pi-coding-agent']) {
+  const target = join(earendilDir, name)
+  const source = join(scopeDirs['@gsd'], name)
+  if (!existsSync(source) || existsSync(target)) continue
+  try {
+    symlinkSync(source, target, 'junction')
+    linked++
+  } catch {
+    try {
+      cpSync(source, target, { recursive: true })
+      copied++
+    } catch {
+      // non-fatal
+    }
+  }
+}
+
 if (linked > 0) process.stderr.write(`  Linked ${linked} workspace package${linked !== 1 ? 's' : ''}\n`)
 if (copied > 0) process.stderr.write(`  Copied ${copied} workspace package${copied !== 1 ? 's' : ''} (symlinks unavailable)\n`)

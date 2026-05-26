@@ -1,4 +1,4 @@
-// gsd-pi — Provider Capabilities Registry (ADR-005 Phase 1)
+// GSD-2 — Provider Capabilities Registry (ADR-005 Phase 1)
 // Declarative registry of what each API provider supports, consolidating
 // scattered knowledge from *-shared.ts files into a queryable data structure.
 

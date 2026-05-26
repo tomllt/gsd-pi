@@ -11,6 +11,7 @@ import {
 	type ToolResultMessage,
 	validateToolArguments,
 } from "@gsd/pi-ai";
+import { resolveAgentTool } from "./resolve-agent-tool.js";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -23,10 +24,6 @@ import type {
 } from "./types.js";
 
 export type AgentEventSink = (event: AgentEvent) => Promise<void> | void;
-
-const MAX_CONSECUTIVE_ALL_ERROR_TOOL_TURNS = 3;
-const CONSECUTIVE_TOOL_FAILURE_STOP_MESSAGE =
-	"Stopped after 3 consecutive turns with all tool calls failing. Review the failing tool requests and adjust before continuing.";
 
 /**
  * Start an agent loop with a new prompt message.
@@ -167,7 +164,6 @@ async function runLoop(
 	let currentContext = initialContext;
 	let config = initialConfig;
 	let firstTurn = true;
-	let consecutiveAllErrorToolTurns = 0;
 	// Check for steering messages at start (user may have typed while waiting)
 	let pendingMessages: AgentMessage[] = (await config.getSteeringMessages?.()) || [];
 
@@ -221,24 +217,6 @@ async function runLoop(
 			}
 
 			await emit({ type: "turn_end", message, toolResults });
-
-			if (toolResults.length > 0 && toolResults.every((toolResult) => toolResult.isError)) {
-				consecutiveAllErrorToolTurns++;
-			} else {
-				consecutiveAllErrorToolTurns = 0;
-			}
-
-			if (consecutiveAllErrorToolTurns >= MAX_CONSECUTIVE_ALL_ERROR_TOOL_TURNS) {
-				const safeguardMessage = createStopMessage(message, CONSECUTIVE_TOOL_FAILURE_STOP_MESSAGE);
-				currentContext.messages.push(safeguardMessage);
-				newMessages.push(safeguardMessage);
-				await emit({ type: "turn_start" });
-				await emit({ type: "message_start", message: safeguardMessage });
-				await emit({ type: "message_end", message: safeguardMessage });
-				await emit({ type: "turn_end", message: safeguardMessage, toolResults: [] });
-				await emit({ type: "agent_end", messages: newMessages });
-				return;
-			}
 
 			const nextTurnContext = {
 				message,
@@ -589,7 +567,7 @@ async function prepareToolCall(
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,
 ): Promise<PreparedToolCall | ImmediateToolCallOutcome> {
-	const tool = currentContext.tools?.find((t) => t.name === toolCall.name);
+	const tool = resolveAgentTool(currentContext.tools, toolCall.name);
 	if (!tool) {
 		return {
 			kind: "immediate",
@@ -762,17 +740,4 @@ function createToolResultMessage(finalized: FinalizedToolCallOutcome): ToolResul
 async function emitToolResultMessage(toolResultMessage: ToolResultMessage, emit: AgentEventSink): Promise<void> {
 	await emit({ type: "message_start", message: toolResultMessage });
 	await emit({ type: "message_end", message: toolResultMessage });
-}
-
-function createStopMessage(message: AssistantMessage, text: string): AssistantMessage {
-	return {
-		role: "assistant",
-		content: [{ type: "text", text }],
-		api: message.api,
-		provider: message.provider,
-		model: message.model,
-		usage: message.usage,
-		stopReason: "stop",
-		timestamp: Date.now(),
-	};
 }

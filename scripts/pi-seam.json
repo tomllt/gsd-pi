@@ -1,0 +1,114 @@
+{
+  "forbiddenPaths": [
+    "src/modes",
+    "src/cli",
+    "src/main.ts",
+    "src/core/agent-session.ts",
+    "src/core/sdk.ts",
+    "src/core/compaction",
+    "src/core/compaction-orchestrator.ts",
+    "src/core/bash-executor.ts",
+    "src/export-html"
+  ],
+  "protectedPiCoreFiles": [
+    "keybindings.ts",
+    "fallback-resolver.ts",
+    "lifecycle-hooks.ts",
+    "blob-store.ts",
+    "artifact-manager.ts",
+    "system-prompt.ts",
+    "model-discovery.ts",
+    "models-json-writer.ts",
+    "package-commands.ts",
+    "db-snapshot.ts",
+    "capability-patches.ts",
+    "gsd-seam-types.ts",
+    "gsd-extension-types.ts",
+    "session-cwd.ts",
+    "extension-session-types.ts",
+    "extensions/types.ts",
+    "extensions/extension-upstream-types.ts"
+  ],
+  "postVendorDeletes": [
+    "core/agent-session.ts",
+    "core/agent-session-runtime.ts",
+    "core/agent-session-services.ts",
+    "core/sdk.ts",
+    "core/compaction-orchestrator.ts",
+    "core/compaction",
+    "core/export-html",
+    "core/contextual-tips.ts",
+    "core/image-overflow-recovery.ts",
+    "modes",
+    "cli",
+    "cli.ts",
+    "main.ts"
+  ],
+  "importRewrites": {
+    "agentCore": {
+      "./agent-session.js": "@gsd/agent-core",
+      "../agent-session.js": "@gsd/agent-core",
+      "./bash-executor.js": "@gsd/agent-core",
+      "../bash-executor.js": "@gsd/agent-core",
+      "./fallback-resolver.js": "@gsd/agent-core",
+      "../fallback-resolver.js": "@gsd/agent-core",
+      "./compaction/index.js": "@gsd/agent-core",
+      "../compaction/index.js": "@gsd/agent-core",
+      "./keybindings.js": "@gsd/agent-core",
+      "../keybindings.js": "@gsd/agent-core",
+      "./contextual-tips.js": "@gsd/agent-core",
+      "../contextual-tips.js": "@gsd/agent-core",
+      "./blob-store.js": "@gsd/agent-core",
+      "../blob-store.js": "@gsd/agent-core",
+      "./artifact-manager.js": "@gsd/agent-core",
+      "../artifact-manager.js": "@gsd/agent-core",
+      "./system-prompt.js": "@gsd/agent-core",
+      "../system-prompt.js": "@gsd/agent-core",
+      "./lifecycle-hooks.js": "@gsd/agent-core",
+      "../lifecycle-hooks.js": "@gsd/agent-core",
+      "./sdk.js": "@gsd/agent-core",
+      "../sdk.js": "@gsd/agent-core"
+    },
+    "agentModes": {
+      "../cli/args.js": "@gsd/agent-modes",
+      "../../cli/args.js": "@gsd/agent-modes",
+      "../modes/interactive/controllers/chat-controller.js": "@gsd/agent-modes",
+      "@gsd/pi-coding-agent/core/keybindings.js": "@gsd/agent-core"
+    }
+  },
+  "piInternalPathFixes": [
+    { "from": "../../pi-coding-agent/src/core/", "to": "./" },
+    { "from": "../../pi-coding-agent/src/utils/", "to": "../utils/" },
+    { "from": "../../pi-coding-agent/src/config.js", "to": "../config.js" },
+    { "from": "../../pi-coding-agent/src/theme/", "to": "../theme/" },
+    { "from": "../../pi-coding-agent/src/migrations.js", "to": "../migrations.js" }
+  ],
+  "localPiShimImports": {
+    "FallbackResolver": "./fallback-resolver.js",
+    "prepareLifecycleHooks": "./lifecycle-hooks.js",
+    "runLifecycleHooks": "./lifecycle-hooks.js",
+    "readManifestRuntimeDeps": "./lifecycle-hooks.js",
+    "collectRuntimeDependencies": "./lifecycle-hooks.js",
+    "verifyRuntimeDependencies": "./lifecycle-hooks.js",
+    "resolveLocalSourcePath": "./lifecycle-hooks.js",
+    "BlobStore": "./blob-store.js",
+    "externalizeImageData": "./blob-store.js",
+    "isBlobRef": "./blob-store.js",
+    "resolveImageData": "./blob-store.js",
+    "ArtifactManager": "./artifact-manager.js",
+    "KeybindingsManager": "./keybindings.js",
+    "AppAction": "./keybindings.js",
+    "KeyAction": "./keybindings.js",
+    "KeybindingsConfig": "./keybindings.js"
+  },
+  "toolComponentImportFix": {
+    "from": "../../modes/interactive/components/",
+    "to": "@gsd/agent-modes/modes/interactive/components/"
+  },
+  "themePathFixes": [
+    { "from": "@earendil-works/pi-tui", "to": "@gsd/pi-tui" },
+    { "from": "../../../config.js", "to": "../config.js" },
+    { "from": "../../../core/", "to": "../core/" },
+    { "from": "../../../utils/", "to": "../utils/" }
+  ]
+}

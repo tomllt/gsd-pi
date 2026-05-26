@@ -449,6 +449,68 @@ describe("agentLoop with AgentMessage", () => {
 		expect(executed).toEqual([[{ oldText: "before", newText: "after" }]]);
 	});
 
+	it("should resolve Claude Code tool names to Pi built-ins", async () => {
+		const executed: string[] = [];
+		const bashTool: AgentTool<any, unknown> = {
+			name: "bash",
+			label: "bash",
+			description: "Run shell commands",
+			parameters: Type.Object({ command: Type.String() }),
+			async execute(_toolCallId, params: { command: string }) {
+				executed.push(`bash:${params.command}`);
+				return { content: [{ type: "text", text: "ok" }] };
+			},
+		};
+		const findTool: AgentTool<any, unknown> = {
+			name: "find",
+			label: "find",
+			description: "Find files",
+			parameters: Type.Object({ pattern: Type.String() }),
+			async execute(_toolCallId, params: { pattern: string }) {
+				executed.push(`find:${params.pattern}`);
+				return { content: [{ type: "text", text: "ok" }] };
+			},
+		};
+
+		const context: AgentContext = {
+			systemPrompt: "",
+			messages: [],
+			tools: [bashTool, findTool],
+		};
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+		};
+
+		let callIndex = 0;
+		const streamFn = () => {
+			const stream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					const message = createAssistantMessage(
+						[
+							{ type: "toolCall", id: "tool-1", name: "Bash", arguments: { command: "pwd" } },
+							{ type: "toolCall", id: "tool-2", name: "Glob", arguments: { pattern: "*.ts" } },
+						],
+						"toolUse",
+					);
+					stream.push({ type: "done", reason: "toolUse", message });
+				} else {
+					stream.push({ type: "done", reason: "stop", message: createAssistantMessage([{ type: "text", text: "done" }]) });
+				}
+				callIndex++;
+			});
+			return stream;
+		};
+
+		const stream = agentLoop([createUserMessage("run tools")], context, config, undefined, streamFn);
+		for await (const _event of stream) {
+			// consume
+		}
+
+		expect(executed).toEqual(["bash:pwd", "find:*.ts"]);
+	});
+
 	it("should emit tool_execution_end in completion order but persist tool results in source order", async () => {
 		const toolSchema = Type.Object({ value: Type.String() });
 		let firstResolved = false;
@@ -1061,59 +1123,6 @@ describe("agentLoop with AgentMessage", () => {
 			"message_end",
 			"turn_end",
 			"agent_end",
-		]);
-	});
-
-	it("should synthesize a stop message after 3 consecutive all-error tool turns", async () => {
-		const context: AgentContext = {
-			systemPrompt: "",
-			messages: [],
-			tools: [],
-		};
-
-		let llmCalls = 0;
-		const stream = agentLoop([createUserMessage("loop forever")], context, {
-			model: createModel(),
-			convertToLlm: identityConverter,
-		}, undefined, () => {
-			llmCalls++;
-			const mockStream = new MockAssistantStream();
-			queueMicrotask(() => {
-				if (llmCalls <= 3) {
-					mockStream.push({
-						type: "done",
-						reason: "toolUse",
-						message: createAssistantMessage(
-							[{ type: "toolCall", id: `tool-${llmCalls}`, name: "NoSuchTool", arguments: {} }],
-							"toolUse",
-						),
-					});
-					return;
-				}
-
-				mockStream.push({
-					type: "done",
-					reason: "stop",
-					message: createAssistantMessage([{ type: "text", text: "should not be reached" }]),
-				});
-			});
-			return mockStream;
-		});
-
-		for await (const _event of stream) {
-			// consume
-		}
-
-		const messages = await stream.result();
-		expect(llmCalls).toBe(3);
-		expect(messages.at(-1)?.role).toBe("assistant");
-		if (messages.at(-1)?.role !== "assistant") throw new Error("Expected final assistant message");
-		expect(messages.at(-1)?.stopReason).toBe("stop");
-		expect(messages.at(-1)?.content).toEqual([
-			{
-				type: "text",
-				text: "Stopped after 3 consecutive turns with all tool calls failing. Review the failing tool requests and adjust before continuing.",
-			},
 		]);
 	});
 

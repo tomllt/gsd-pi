@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { Agent } from "@gsd/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import type { ToolDefinition } from "@gsd/pi-coding-agent/core/extensions/types.js";
-import { AgentSession } from "./agent-session.js";
+import { AgentSession } from "@gsd/agent-core";
 import { AuthStorage } from "@gsd/pi-coding-agent/core/auth-storage.js";
 import { ModelRegistry } from "@gsd/pi-coding-agent/core/model-registry.js";
 import { DefaultResourceLoader } from "@gsd/pi-coding-agent/core/resource-loader.js";

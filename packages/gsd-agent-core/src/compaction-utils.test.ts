@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { Message } from "@gsd/pi-ai";
 
-import { serializeConversation, truncateForSummary } from "./compaction/index.js";
+import { serializeConversation, truncateForSummary } from "@gsd/agent-core";
 
 test("serializeConversation uses narrative role markers instead of chat-style delimiters (#4054)", () => {
 	const messages: Message[] = [

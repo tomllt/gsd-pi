@@ -12,17 +12,23 @@ const CORE = join(ROOT, 'packages/pi-coding-agent/src/core')
 const UTILS = join(ROOT, 'packages/pi-coding-agent/src/utils')
 
 const PROTECTED = new Set([
+  'keybindings.ts',
   'fallback-resolver.ts',
   'lifecycle-hooks.ts',
   'blob-store.ts',
   'artifact-manager.ts',
+  'system-prompt.ts',
   'model-discovery.ts',
   'models-json-writer.ts',
   'package-commands.ts',
   'db-snapshot.ts',
   'capability-patches.ts',
   'gsd-seam-types.ts',
+  'gsd-extension-types.ts',
   'session-cwd.ts',
+  'extension-session-types.ts',
+  'extensions/types.ts',
+  'extensions/extension-upstream-types.ts',
 ])
 
 function backupProtected() {
@@ -67,24 +73,7 @@ if (existsSync(compactionDir)) rmSync(compactionDir, { recursive: true })
 if (existsSync(exportHtmlDir)) rmSync(exportHtmlDir, { recursive: true })
 
 execSync('node scripts/normalize-pi-imports.cjs', { cwd: ROOT, stdio: 'inherit' })
-execSync('node scripts/fix-pi-local-imports.cjs', { cwd: ROOT, stdio: 'inherit' })
-execSync('node scripts/fix-pi-tool-component-imports.cjs', { cwd: ROOT, stdio: 'inherit' })
+execSync('node scripts/apply-seam.cjs --imports-only', { cwd: ROOT, stdio: 'inherit' })
 execSync('node scripts/generate-pi-coding-agent-index.cjs', { cwd: ROOT, stdio: 'inherit' })
-
-// Theme lives at src/theme after seam
-const walkFixTheme = (dir) => {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name)
-    if (e.isDirectory()) walkFixTheme(p)
-    else if (e.name.endsWith('.ts')) {
-      let c = readFileSync(p, 'utf8')
-      const n = c
-        .replaceAll('../../modes/interactive/theme/theme.js', '../../theme/theme.js')
-        .replaceAll('../modes/interactive/theme/theme.js', '../theme/theme.js')
-      if (n !== c) writeFileSync(p, n)
-    }
-  }
-}
-walkFixTheme(CORE)
 
 process.stderr.write('vendor-pi-coding-agent-core: done\n')

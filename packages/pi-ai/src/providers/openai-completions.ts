@@ -507,13 +507,6 @@ function buildParams(
 	compat: ResolvedOpenAICompletionsCompat = getCompat(model),
 	cacheRetention: CacheRetention = resolveCacheRetention(options?.cacheRetention),
 ) {
-	const hasHostname = (expected: string): boolean => {
-		try {
-			return new URL(model.baseUrl).hostname === expected;
-		} catch {
-			return false;
-		}
-	};
 	const messages = convertMessages(model, context, compat);
 	const cacheControl = getCompatCacheControl(compat, cacheRetention);
 
@@ -522,7 +515,7 @@ function buildParams(
 		messages,
 		stream: true,
 		prompt_cache_key:
-			(hasHostname("api.openai.com") && cacheRetention !== "none") ||
+			(model.baseUrl.includes("api.openai.com") && cacheRetention !== "none") ||
 			(cacheRetention === "long" && compat.supportsLongCacheRetention)
 				? clampOpenAIPromptCacheKey(options?.sessionId)
 				: undefined,
@@ -628,22 +621,6 @@ function buildParams(
 	}
 
 	return params;
-}
-
-function hostnameEquals(baseUrl: string, expected: string): boolean {
-	try {
-		return new URL(baseUrl).hostname === expected;
-	} catch {
-		return false;
-	}
-}
-
-function hostnameEndsWith(baseUrl: string, suffix: string): boolean {
-	try {
-		return new URL(baseUrl).hostname.endsWith(suffix);
-	} catch {
-		return false;
-	}
 }
 
 function getCompatCacheControl(
@@ -1094,33 +1071,32 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 	const provider = model.provider;
 	const baseUrl = model.baseUrl;
 
-	const isZai = provider === "zai" || hostnameEquals(baseUrl, "api.z.ai");
+	const isZai = provider === "zai" || baseUrl.includes("api.z.ai");
 	const isTogether =
-		provider === "together" || hostnameEquals(baseUrl, "api.together.ai") || hostnameEquals(baseUrl, "api.together.xyz");
-	const isMoonshot =
-		provider === "moonshotai" || provider === "moonshotai-cn" || hostnameEndsWith(baseUrl, ".api.moonshot.cn");
-	const isCloudflareWorkersAI = provider === "cloudflare-workers-ai" || hostnameEquals(baseUrl, "api.cloudflare.com");
-	const isCloudflareAiGateway = provider === "cloudflare-ai-gateway" || hostnameEquals(baseUrl, "gateway.ai.cloudflare.com");
+		provider === "together" || baseUrl.includes("api.together.ai") || baseUrl.includes("api.together.xyz");
+	const isMoonshot = provider === "moonshotai" || provider === "moonshotai-cn" || baseUrl.includes("api.moonshot.");
+	const isCloudflareWorkersAI = provider === "cloudflare-workers-ai" || baseUrl.includes("api.cloudflare.com");
+	const isCloudflareAiGateway = provider === "cloudflare-ai-gateway" || baseUrl.includes("gateway.ai.cloudflare.com");
 
 	const isNonStandard =
 		provider === "cerebras" ||
-		hostnameEndsWith(baseUrl, ".cerebras.ai") ||
+		baseUrl.includes("cerebras.ai") ||
 		provider === "xai" ||
-		hostnameEquals(baseUrl, "api.x.ai") ||
+		baseUrl.includes("api.x.ai") ||
 		isTogether ||
-		hostnameEndsWith(baseUrl, ".chutes.ai") ||
-		hostnameEndsWith(baseUrl, ".deepseek.com") ||
+		baseUrl.includes("chutes.ai") ||
+		baseUrl.includes("deepseek.com") ||
 		isZai ||
 		isMoonshot ||
 		provider === "opencode" ||
-		hostnameEquals(baseUrl, "opencode.ai") ||
+		baseUrl.includes("opencode.ai") ||
 		isCloudflareWorkersAI ||
 		isCloudflareAiGateway;
 
-	const useMaxTokens = hostnameEndsWith(baseUrl, ".chutes.ai") || isMoonshot || isCloudflareAiGateway || isTogether;
+	const useMaxTokens = baseUrl.includes("chutes.ai") || isMoonshot || isCloudflareAiGateway || isTogether;
 
-	const isGrok = provider === "xai" || hostnameEquals(baseUrl, "api.x.ai");
-	const isDeepSeek = provider === "deepseek" || hostnameEndsWith(baseUrl, ".deepseek.com");
+	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
+	const isDeepSeek = provider === "deepseek" || baseUrl.includes("deepseek.com");
 	const cacheControlFormat = provider === "openrouter" && model.id.startsWith("anthropic/") ? "anthropic" : undefined;
 
 	return {

@@ -19,6 +19,7 @@ export {
 	collectEntriesForBranchSummary,
 	compact,
 	DEFAULT_COMPACTION_SETTINGS,
+	estimateContextTokens,
 	estimateTokens,
 	type FileOperations,
 	findCutPoint,
@@ -28,12 +29,39 @@ export {
 	generateSummary,
 	getLastAssistantUsage,
 	prepareBranchEntries,
+	prepareCompaction,
 	serializeConversation,
 	shouldCompact,
 } from "./compaction/index.js";
 export type { CompactionPreparation } from "./compaction/compaction.js";
 export { type BashResult, executeBashWithOperations } from "./bash-executor.js";
 export { buildSystemPrompt, type BuildSystemPromptOptions } from "./system-prompt.js";
+export {
+	type AppAction,
+	type AppKeybinding,
+	KeybindingsManager,
+} from "./keybindings.js";
+export { FallbackResolver, type FallbackResult } from "./fallback-resolver.js";
+export {
+	ArtifactManager,
+} from "./artifact-manager.js";
+export {
+	BlobStore,
+	externalizeImageData,
+	isBlobRef,
+	parseBlobRef,
+	resolveImageData,
+	type BlobPutResult,
+} from "./blob-store.js";
+export {
+	prepareLifecycleHooks,
+	runLifecycleHooks,
+	readManifestRuntimeDeps,
+	collectRuntimeDependencies,
+	verifyRuntimeDependencies,
+	resolveLocalSourcePath,
+	type PackageLifecycleHooksOptions,
+} from "./lifecycle-hooks.js";
 export { exportFromFile, exportSessionToHtml } from "./export-html/index.js";
 export {
 	type CreateAgentSessionOptions,
@@ -41,5 +69,4 @@ export {
 	createAgentSession,
 } from "./sdk.js";
 export { ContextualTips } from "./contextual-tips.js";
-export { type AppAction, KeybindingsManager } from "@gsd/pi-coding-agent/core/keybindings.js";
 export * from "./agent-session-runtime.js";

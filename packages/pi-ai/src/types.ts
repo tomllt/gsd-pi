@@ -12,7 +12,6 @@ export type KnownApi =
 	| "anthropic-messages"
 	| "bedrock-converse-stream"
 	| "google-generative-ai"
-	| "google-gemini-cli"
 	| "google-vertex";
 
 export type Api = KnownApi | (string & {});
@@ -25,8 +24,6 @@ export type KnownProvider =
 	| "amazon-bedrock"
 	| "anthropic"
 	| "google"
-	| "google-antigravity"
-	| "google-gemini-cli"
 	| "google-vertex"
 	| "openai"
 	| "azure-openai-responses"
@@ -297,7 +294,7 @@ export interface Usage {
 	};
 }
 
-export type StopReason = "stop" | "length" | "toolUse" | "pauseTurn" | "error" | "aborted";
+export type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
 
 export interface UserMessage {
 	role: "user";
@@ -401,9 +398,15 @@ export type AssistantMessageEvent =
 	| { type: "thinking_end"; contentIndex: number; content: string; partial: AssistantMessage }
 	| { type: "toolcall_start"; contentIndex: number; partial: AssistantMessage }
 	| { type: "toolcall_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
-	| { type: "toolcall_end"; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage; malformedArguments?: boolean }
+	| {
+			type: "toolcall_end";
+			contentIndex: number;
+			toolCall: ToolCall;
+			partial: AssistantMessage;
+			malformedArguments?: boolean;
+	  }
 	| { type: "server_tool_use"; contentIndex: number; partial: AssistantMessage }
-	| { type: "done"; reason: Extract<StopReason, "stop" | "length" | "toolUse" | "pauseTurn">; message: AssistantMessage }
+	| { type: "done"; reason: Extract<StopReason, "stop" | "length" | "toolUse">; message: AssistantMessage }
 	| { type: "error"; reason: Extract<StopReason, "aborted" | "error">; error: AssistantMessage };
 
 /**
@@ -613,18 +616,8 @@ export interface Model<TApi extends Api> {
 			: TApi extends "anthropic-messages"
 				? AnthropicMessagesCompat
 				: never;
-	/** GSD extension: cross-provider capability flags (see pi-coding-agent capability-patches). */
-	capabilities?: ModelCapabilities;
 	/** Provider-specific options passed through to stream handlers. */
 	providerOptions?: Record<string, unknown>;
-}
-
-/** GSD extension: provider-agnostic capability declarations. */
-export interface ModelCapabilities {
-	supportsXhigh?: boolean;
-	requiresToolCallId?: boolean;
-	supportsServiceTier?: boolean;
-	charsPerToken?: number;
 }
 
 export interface ImagesModel<TApi extends ImagesApi>

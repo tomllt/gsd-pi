@@ -204,28 +204,6 @@ describe("Agent", () => {
 		expect(agent.state.isStreaming).toBe(false);
 	});
 
-	it("should forward shouldStopAfterTurn to the low-level loop", async () => {
-		let llmCalls = 0;
-		const agent = new Agent({
-			shouldStopAfterTurn: () => true,
-			streamFn: () => {
-				llmCalls++;
-				const stream = new MockAssistantStream();
-				queueMicrotask(() => {
-					stream.push({ type: "done", reason: "stop", message: createAssistantMessage(`turn ${llmCalls}`) });
-				});
-				return stream;
-			},
-		});
-
-		await agent.prompt("hello");
-
-		expect(llmCalls).toBe(1);
-		expect(agent.state.messages.at(-1)?.role).toBe("assistant");
-		if (agent.state.messages.at(-1)?.role !== "assistant") throw new Error("Expected assistant message");
-		expect(agent.state.messages.at(-1)?.content).toEqual([{ type: "text", text: "turn 1" }]);
-	});
-
 	it("should pass the active abort signal to subscribers", async () => {
 		let receivedSignal: AbortSignal | undefined;
 		const agent = new Agent({

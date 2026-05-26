@@ -40,8 +40,11 @@ export function applyCapabilityPatches<T extends Model<Api>>(models: T[]): T[] {
 			if (patch.match(model)) {
 				return {
 					...model,
-					capabilities: { ...patch.caps, ...model.capabilities },
-				};
+					capabilities: {
+						...patch.caps,
+						...(model as T & { capabilities?: Record<string, boolean> }).capabilities,
+					},
+				} as T;
 			}
 		}
 		return model;

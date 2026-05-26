@@ -3,6 +3,7 @@
  */
 
 import { getKeybindings, type Keybinding, type KeyId } from "@gsd/pi-tui";
+import type { AppAction } from "../keybindings.js";
 import { theme } from "../../theme/theme.js";
 
 export interface KeyTextFormatOptions {
@@ -31,8 +32,8 @@ function formatKeys(keys: KeyId[], options: KeyTextFormatOptions = {}): string {
 	return formatKeyText(keys.join("/"), options);
 }
 
-export function keyText(keybinding: Keybinding): string {
-	return formatKeys(getKeybindings().getKeys(keybinding));
+export function keyText(keybinding: Keybinding | AppAction): string {
+	return formatKeys(getKeybindings().getKeys(keybinding as Keybinding));
 }
 
 export function keyDisplayText(keybinding: Keybinding): string {

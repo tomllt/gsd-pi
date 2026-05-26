@@ -1,7 +1,7 @@
 {
   "name": "@gsd/pi-ai",
-  "version": "1.0.2",
-  "description": "Unified LLM API (vendored from earendil-works/pi)",
+  "version": "0.75.5",
+  "description": "Unified LLM API with automatic model discovery and provider configuration",
   "type": "module",
   "gsd": {
     "linkable": true,
@@ -15,17 +15,61 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./anthropic": {
+      "types": "./dist/providers/anthropic.d.ts",
+      "import": "./dist/providers/anthropic.js"
+    },
+    "./azure-openai-responses": {
+      "types": "./dist/providers/azure-openai-responses.d.ts",
+      "import": "./dist/providers/azure-openai-responses.js"
+    },
+    "./google": {
+      "types": "./dist/providers/google.d.ts",
+      "import": "./dist/providers/google.js"
+    },
+    "./google-vertex": {
+      "types": "./dist/providers/google-vertex.d.ts",
+      "import": "./dist/providers/google-vertex.js"
+    },
+    "./mistral": {
+      "types": "./dist/providers/mistral.d.ts",
+      "import": "./dist/providers/mistral.js"
+    },
+    "./openai-codex-responses": {
+      "types": "./dist/providers/openai-codex-responses.d.ts",
+      "import": "./dist/providers/openai-codex-responses.js"
+    },
+    "./openai-completions": {
+      "types": "./dist/providers/openai-completions.d.ts",
+      "import": "./dist/providers/openai-completions.js"
+    },
+    "./openai-responses": {
+      "types": "./dist/providers/openai-responses.d.ts",
+      "import": "./dist/providers/openai-responses.js"
+    },
     "./oauth": {
       "types": "./dist/oauth.d.ts",
       "import": "./dist/oauth.js"
     },
     "./bedrock-provider": {
-      "types": "./bedrock-provider.d.ts",
-      "import": "./bedrock-provider.js"
+      "types": "./dist/bedrock-provider.d.ts",
+      "import": "./dist/bedrock-provider.js"
     }
   },
+  "bin": {
+    "pi-ai": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.json --incremental false"
+    "clean": "shx rm -rf dist",
+    "generate-models": "node scripts/generate-models.ts",
+    "generate-image-models": "node scripts/generate-image-models.ts",
+    "build": "npm run generate-models && npm run generate-image-models && tsc -p tsconfig.json --incremental false",
+    "test": "vitest --run",
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.91.1",
@@ -37,8 +81,27 @@
     "https-proxy-agent": "7.0.6",
     "openai": "6.26.0",
     "partial-json": "0.1.7",
-    "typebox": "1.1.38",
-    "@sinclair/typebox": "^0.34.41"
+    "typebox": "1.1.38"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "openai",
+    "anthropic",
+    "gemini",
+    "bedrock",
+    "unified",
+    "api"
+  ],
+  "author": "Mario Zechner",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/earendil-works/pi-mono.git",
+    "directory": "packages/ai"
+  },
+  "engines": {
+    "node": ">=22.19.0"
   },
   "devDependencies": {
     "@types/node": "24.12.4",
