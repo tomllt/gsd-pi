@@ -34,8 +34,10 @@ test("build-native can skip main package when bootstrapping engine packages", ()
     "Build",
     "Verify dist exists",
     "Validate package is installable",
+    "Publish workspace packages",
     "Publish main package",
     "Post-publish smoke test",
+    "Post-publish MCP server smoke test",
   ];
 
   for (const name of gatedSteps) {
@@ -59,12 +61,38 @@ test("build-native requires token auth when engine packages are missing from npm
 
   assert.ok(step, "publish job must guard trusted auth when packages are new");
   assert.equal(step.if, "github.event.inputs.publish_auth != 'token'");
+  assert.match(step.run, /@opengsd\/mcp-server/);
   assert.match(step.run, /do not exist on npm yet/);
   assert.match(step.run, /publish_auth=token/);
 
   assert.ok(tokenCheck, "publish job must verify NPM_TOKEN for token bootstrap");
   assert.equal(tokenCheck.if, "github.event.inputs.publish_auth == 'token'");
   assert.match(tokenCheck.run, /NPM_TOKEN/);
+});
+
+test("build-native publishes MCP server workspace to npm before the main package", () => {
+  const steps = publishJob.steps;
+  const workspacePublish = steps.find(
+    (entry) => entry.name === "Publish workspace packages",
+  );
+  const mainPublishIndex = steps.findIndex(
+    (entry) => entry.name === "Publish main package",
+  );
+  const workspacePublishIndex = steps.indexOf(workspacePublish);
+  const smoke = steps.find(
+    (entry) => entry.name === "Post-publish MCP server smoke test",
+  );
+
+  assert.ok(workspacePublish, "workflow must publish workspace packages");
+  assert.ok(workspacePublishIndex > -1 && workspacePublishIndex < mainPublishIndex);
+  assert.match(workspacePublish.run, /@opengsd\/contracts/);
+  assert.match(workspacePublish.run, /@opengsd\/rpc-client/);
+  assert.match(workspacePublish.run, /@opengsd\/mcp-server/);
+  assert.match(workspacePublish.run, /npm publish --workspace "\$\{workspace\}"/);
+
+  assert.ok(smoke, "workflow must smoke-test the standalone MCP server package");
+  assert.match(smoke.run, /npm install "@opengsd\/mcp-server@\$\{VERSION\}"/);
+  assert.match(smoke.run, /gsd-mcp-server/);
 });
 
 test("publish-engine-packages script continues through all platforms", () => {

@@ -207,8 +207,15 @@ jobs:
               MISSING+=("${PKG}")
             fi
           done
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ github.event.inputs.platform_packages_only }}" != "true" ]; then
+            for pkg in @opengsd/contracts @opengsd/rpc-client @opengsd/mcp-server; do
+              if ! npm view "${pkg}" name >/dev/null 2>&1; then
+                MISSING+=("${pkg}")
+              fi
+            done
+          fi
           if [ "${#MISSING[@]}" -gt 0 ]; then
-            echo "::error::These @opengsd/engine-* packages do not exist on npm yet:"
+            echo "::error::These npm packages do not exist on npm yet:"
             for pkg in "${MISSING[@]}"; do
               echo "::error::  - ${pkg}"
             done
@@ -295,6 +302,21 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
         run: npm run validate-pack
 
+      - name: Publish workspace packages
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ github.event.inputs.publish_auth == 'token' && secrets.NPM_TOKEN || '' }}
+          TAG_FLAG: ${{ steps.version-check.outputs.tag_flag }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          for workspace in @opengsd/contracts @opengsd/rpc-client @opengsd/mcp-server; do
+            if npm view "${workspace}@${VERSION}" version >/dev/null 2>&1; then
+              echo "${workspace}@${VERSION} already published, skipping"
+              continue
+            fi
+            npm publish --workspace "${workspace}" --ignore-scripts ${TAG_FLAG}
+          done
+
       - name: Publish main package
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
         env:
@@ -363,6 +385,31 @@ jobs:
             DELAY=$((DELAY * 2))
           done
           echo "::error::Smoke test failed — @opengsd/gsd-pi@${VERSION} not installable"
+          exit 1
+
+      - name: Post-publish MCP server smoke test
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          npm init -y > /dev/null 2>&1
+
+          echo "Installing @opengsd/mcp-server@${VERSION}..."
+          DELAY=5
+          for attempt in 1 2 3; do
+            if npm install "@opengsd/mcp-server@${VERSION}" 2>&1 | tee /tmp/mcp-install-output.txt; then
+              test -x node_modules/.bin/gsd-mcp-server || { echo "::error::gsd-mcp-server bin missing"; exit 1; }
+              node -e "import('@opengsd/mcp-server').then((mod) => { if (!Object.keys(mod).length) throw new Error('empty @opengsd/mcp-server exports'); })"
+              echo "Published MCP server package is functional"
+              exit 0
+            fi
+            echo "MCP server install attempt ${attempt}/3 failed, retrying in ${DELAY}s..."
+            cat /tmp/mcp-install-output.txt
+            sleep "$DELAY"
+            DELAY=$((DELAY * 2))
+          done
+          echo "::error::Smoke test failed — @opengsd/mcp-server@${VERSION} not installable"
           exit 1
 
       - name: Verify dist-tag after publish
