@@ -2,6 +2,7 @@
 // File Purpose: Tests for interactive terminal tool execution rendering.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import stripAnsi from "strip-ansi";
 import { ToolExecutionComponent, ToolPhaseSummaryComponent, type ToolExecutionPhase } from "../tool-execution.js";
 import { initTheme } from "../../theme/theme.js";
@@ -53,6 +54,17 @@ function renderToolCollapsed(
 }
 
 describe("ToolExecutionComponent", () => {
+	test("reuses shared tool-argument normalization for pending invocation matching", () => {
+		const sourceUrl = existsSync(new URL("../tool-execution.ts", import.meta.url))
+			? new URL("../tool-execution.ts", import.meta.url)
+			: new URL("../tool-execution.js", import.meta.url);
+		const source = readFileSync(sourceUrl, "utf8");
+
+		assert.match(source, /import \{ normalizeToolArguments \} from "@gsd\/pi-ai";/);
+		assert.doesNotMatch(source, /function tryParseJsonValue/);
+		assert.doesNotMatch(source, /filePath \?\? normalized\.file_path \?\? normalized\.file/);
+	});
+
 	test("matches pending invocations after normalizing equivalent path aliases", () => {
 		const component = new ToolExecutionComponent(
 			"read",
