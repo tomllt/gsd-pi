@@ -11,7 +11,7 @@ jobs:
   check-forensics:
     # Only run on bug reports
     if: contains(github.event.issue.labels.*.name, 'bug')
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check for forensics output and comment if missing
         uses: actions/github-script@v7

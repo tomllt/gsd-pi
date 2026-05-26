@@ -36,7 +36,7 @@ jobs:
   fast-gates:
     name: fast-gates
     timeout-minutes: 8
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       heavy-code-changed: ${{ steps.classify.outputs.heavy-code-changed }}
       web-changed: ${{ steps.classify.outputs.web-changed }}
@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 45
     needs: [fast-gates]
     if: needs.fast-gates.outputs.heavy-code-changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -129,7 +129,7 @@ jobs:
     timeout-minutes: 20
     needs: [fast-gates, build]
     if: needs.fast-gates.outputs.heavy-code-changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -155,7 +155,7 @@ jobs:
     timeout-minutes: 15
     needs: [fast-gates, build]
     if: needs.fast-gates.outputs.heavy-code-changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -185,7 +185,7 @@ jobs:
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/test')) ||
         (github.event_name == 'workflow_dispatch' && inputs.run_coverage)
       )
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -209,7 +209,7 @@ jobs:
     timeout-minutes: 25
     needs: [fast-gates, build]
     if: needs.fast-gates.outputs.heavy-code-changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -238,7 +238,7 @@ jobs:
     timeout-minutes: 15
     needs: [fast-gates, build]
     if: needs.fast-gates.outputs.heavy-code-changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -276,7 +276,7 @@ jobs:
     if: >-
       needs.fast-gates.outputs.heavy-code-changed == 'true' &&
       needs.fast-gates.outputs.docker-changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - uses: actions/checkout@v6
@@ -303,7 +303,7 @@ jobs:
       needs.fast-gates.outputs.heavy-code-changed == 'true' &&
       (needs.fast-gates.outputs.portability-changed == 'true' ||
        needs.fast-gates.outputs.windows-e2e-changed == 'true')
-    runs-on: windows-latest
+    runs-on: blacksmith-4vcpu-windows-2025
 
     steps:
       - uses: actions/checkout@v6

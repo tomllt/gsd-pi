@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   discord-changelog:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Post release changelog to Discord

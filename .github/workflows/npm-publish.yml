@@ -44,7 +44,7 @@ jobs:
     name: Publish @${{ github.event.inputs.channel }}
     if: ${{ github.event.inputs.channel != 'latest' }}
     # npm trusted publishing requires GitHub-hosted runners for OIDC.
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: ${{ github.event.inputs.channel }}
     container:
       image: ghcr.io/open-gsd/gsd-ci-builder:latest
@@ -146,7 +146,7 @@ jobs:
     name: Verify @${{ github.event.inputs.channel }} package
     if: ${{ github.event.inputs.channel != 'latest' }}
     needs: prerelease-publish
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v6
         with:
@@ -201,7 +201,7 @@ jobs:
     name: Production Release
     if: ${{ github.event.inputs.channel == 'latest' }}
     # npm trusted publishing requires GitHub-hosted runners for OIDC.
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: prod
     steps:
       - uses: actions/checkout@v6
