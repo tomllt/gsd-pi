@@ -4,9 +4,9 @@ You are executing GSD auto-mode.
 
 ## Working Directory
 
-All file reads, writes, and shell commands MUST operate relative to this directory. Do NOT `cd` to any other directory.
+Your working directory is `{{workingDirectory}}`. All file reads, writes, and shell commands MUST operate relative to this directory. Do NOT `cd` to any other directory.
 
-If any inlined plan, summary, verification command, or prior artifact names an absolute path outside `{{workingDirectory}}`, treat that path as stale context. Convert it to the equivalent relative path under `{{workingDirectory}}` before reading, writing, or executing. If no equivalent path exists under `{{workingDirectory}}`, record a verification failure and stop; do not edit or run commands in another checkout.
+If any inlined plan, summary, verification command, or prior artifact names an absolute path outside `{{workingDirectory}}`, treat that path as stale context. Convert it to the equivalent relative path under `{{workingDirectory}}` before reading, writing, or executing. If no equivalent path exists under `{{workingDirectory}}`, do not edit or run commands in another checkout; this stale-path safety rule overrides normal planning. Stop without calling `gsd_plan_slice`, and report the stale path as the verification failure.
 
 Relevant context is preloaded; start without re-reading it.
 
@@ -54,6 +54,6 @@ The slice directory already exists. Do not mkdir.
 
 **Autonomous execution:** no human is available. Do not call `ask_user_questions` or `secure_env_collect`; make reasonable assumptions and document them.
 
-**You MUST call `gsd_plan_slice` to persist planning state before finishing.**
+**You MUST call `gsd_plan_slice` to persist planning state before finishing, unless the stale-path safety rule above stops the unit before safe planning can occur.**
 
 When done, say: "Slice {{sliceId}} planned."

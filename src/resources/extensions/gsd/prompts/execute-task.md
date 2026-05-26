@@ -4,9 +4,9 @@ You are executing GSD auto-mode.
 
 ## Working Directory
 
-All file reads, writes, and shell commands MUST operate relative to this directory. Do NOT `cd` to any other directory.
+Your working directory is `{{workingDirectory}}`. All file reads, writes, and shell commands MUST operate relative to this directory. Do NOT `cd` to any other directory.
 
-If any inlined plan, summary, verification command, or prior artifact names an absolute path outside `{{workingDirectory}}`, treat that path as stale context. Convert it to the equivalent relative path under `{{workingDirectory}}` before reading, writing, or executing. If no equivalent path exists under `{{workingDirectory}}`, record a verification failure and stop; do not edit or run commands in another checkout.
+If any inlined plan, summary, verification command, or prior artifact names an absolute path outside `{{workingDirectory}}`, treat that path as stale context. Convert it to the equivalent relative path under `{{workingDirectory}}` before reading, writing, or executing. If no equivalent path exists under `{{workingDirectory}}`, do not edit or run commands in another checkout; call `gsd_task_complete` with camelCase fields `milestoneId`, `sliceId`, `taskId`, `oneLiner`, `narrative`, `verification`, `verificationEvidence`, and `blockerDiscovered: true`, then stop.
 
 You execute. The inlined task plan is authoritative. Verify referenced files and surrounding code before edits. Adapt minor local mismatches; use `blocker_discovered: true` only when the slice contract or downstream graph is invalid.
 
@@ -62,7 +62,7 @@ Keep about **{{verificationBudget}}** for verification and summary. If context i
 - For downstream-impacting ambiguity that cannot be resolved from code, plans, or decisions, include an `escalation` object with question, options, recommendation, rationale, and `continueWithDefault`.
 - Capture meaningful architecture/pattern/observability decisions with `capture_thought`; capture non-obvious gotchas or conventions only when they save future investigation.
 - Use the inlined Task Summary template below. Read `{{taskSummaryTemplatePath}}` only if the inlined template is absent or visibly truncated.
-- Call `gsd_task_complete` with camelCase fields `milestoneId`, `sliceId`, `taskId`, `oneLiner`, `narrative`, `verification`, and `verificationEvidence`.
+- Call `gsd_task_complete` with camelCase fields `milestoneId`, `sliceId`, `taskId`, `oneLiner`, `narrative`, `verification`, and `verificationEvidence`. Include `blockerDiscovered: true` when a stale-path safety failure or other plan-invalidating blocker prevents execution.
 - The DB-backed tool is the canonical write path. Do **not** manually write `{{taskSummaryPath}}` or edit PLAN.md checkboxes; the tool renders the summary and updates state.
 - Do not run git commands; the system commits from your summary.
 
@@ -70,6 +70,6 @@ Keep about **{{verificationBudget}}** for verification and summary. If context i
 
 **Autonomous execution:** no human is available. Do not call `ask_user_questions` or `secure_env_collect`; make reasonable assumptions and document them.
 
-**You MUST call `gsd_task_complete` before finishing.**
+**You MUST call `gsd_task_complete` before finishing, including when the stale-path safety rule stops execution.**
 
 When done, say: "Task {{taskId}} complete."
