@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { resolveTypeStrippingFlag, resolveSubprocessModule, buildSubprocessPrefixArgs } from "./ts-subprocess-flags.ts";
 import { safePackageRootFromImportUrl } from "./safe-import-meta-resolve.ts";
 
-import type { AgentSessionEvent, SessionStateChangeReason } from "@gsd/agent-core";
+import type { AgentSessionEvent, SessionStateChangeReason } from "../../packages/pi-coding-agent/src/core/agent-session.ts";
 import type {
   RpcCommand,
   RpcExtensionUIRequest,
