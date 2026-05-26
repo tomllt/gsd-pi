@@ -67,6 +67,7 @@ import { getChangelogPath, getNewEntries, parseChangelog } from "../../utils/cha
 import { readClipboardImage } from "../../utils/clipboard-image.js";
 import { ensureTool } from "../../utils/tools-manager.js";
 import { AssistantMessageComponent } from "./components/assistant-message.js";
+import { chatTurnFollowsUser } from "./components/chat-turn-connect.js";
 import { AdaptiveLayoutComponent } from "./components/adaptive-layout.js";
 import { BashExecutionComponent } from "./components/bash-execution.js";
 import { BorderedLoader } from "./components/bordered-loader.js";
@@ -2473,6 +2474,8 @@ export class InteractiveMode {
 					this.hideThinkingBlock,
 					this.getMarkdownThemeWithSettings(),
 					timestampFormat,
+					undefined,
+					chatTurnFollowsUser(this.chatContainer.children),
 				);
 				this.chatContainer.addChild(assistantComponent);
 				break;
@@ -2517,7 +2520,10 @@ export class InteractiveMode {
 			this.updateEditorBorderColor();
 		}
 
-		for (const message of sessionContext.messages) {
+		for (let messageIndex = 0; messageIndex < sessionContext.messages.length; messageIndex++) {
+			const message = sessionContext.messages[messageIndex];
+			const prevMessage = messageIndex > 0 ? sessionContext.messages[messageIndex - 1] : undefined;
+			const turnFollowsUser = prevMessage?.role === "user";
 			// Assistant messages need special handling for tool calls
 			if (message.role === "assistant") {
 				const hasToolBlocks = message.content.some((c) => c.type === "toolCall" || c.type === "serverToolUse");
@@ -2528,6 +2534,7 @@ export class InteractiveMode {
 
 				const assistantSegments: AssistantMessageComponent[] = [];
 				const replaySegments = buildAssistantReplaySegments(message.content);
+				let connectFromUser = turnFollowsUser;
 
 				for (const segment of replaySegments) {
 					if (segment.kind === "assistant") {
@@ -2537,7 +2544,9 @@ export class InteractiveMode {
 							this.getMarkdownThemeWithSettings(),
 							timestampFormat,
 							{ startIndex: segment.startIndex, endIndex: segment.endIndex },
+							connectFromUser,
 						);
+						connectFromUser = false;
 						this.chatContainer.addChild(assistantComponent);
 						assistantSegments.push(assistantComponent);
 						continue;

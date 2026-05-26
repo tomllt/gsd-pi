@@ -140,13 +140,10 @@ export class BashExecutionComponent extends Container {
 						: "error";
 
 		if (!this.expanded && this.status !== "error") {
-			return [
-				"",
-				...renderCommandCard(this.command.replace(/\s+/g, " ").trim(), frameWidth, {
-					status: elapsedStatus,
-					tone,
-				}),
-			];
+			return renderCommandCard(this.command.replace(/\s+/g, " ").trim(), frameWidth, {
+				status: elapsedStatus,
+				tone,
+			});
 		}
 
 		const output = this.outputLines.join("\n");
@@ -169,16 +166,13 @@ export class BashExecutionComponent extends Container {
 			...(hidden > 0 ? [theme.fg("muted", `... ${hidden} earlier lines`)] : []),
 			...truncationWarning,
 		];
-		return [
-			"",
-			...renderTranscriptCard(body, frameWidth, {
-				title: "command",
-				right: elapsedStatus,
-				tone,
-				footerLeft: this.expanded ? "output expanded" : "output preview",
-				footerRight: this.expanded ? "ctrl+o collapse" : "ctrl+o expand",
-			}),
-		];
+		return renderTranscriptCard(body, frameWidth, {
+			title: "command",
+			right: elapsedStatus,
+			tone,
+			footerLeft: this.expanded ? "output expanded" : "output preview",
+			footerRight: this.expanded ? "ctrl+o collapse" : "ctrl+o expand",
+		});
 	}
 
 	private updateDisplay(): void {

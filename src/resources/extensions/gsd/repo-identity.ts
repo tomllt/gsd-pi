@@ -11,6 +11,11 @@ import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { gsdHome } from "./gsd-home.js";
+import {
+  isGsdWorktreePath,
+  resolveExternalStateProjectGsdFromWorktreePath,
+  resolveExternalStateProjectIdentityFromWorktreePath,
+} from "./worktree-root.js";
 
 
 // ─── Repo Metadata ───────────────────────────────────────────────────────────
@@ -428,6 +433,17 @@ function hasProjectState(externalPath: string): boolean {
  * Returns the resolved external path (may differ from the computed identity).
  */
 function resolveExternalPathWithRecovery(projectPath: string): { path: string; identity: string } {
+  // External-state worktrees (`~/.gsd/projects/<hash>/worktrees/<MID>/`) are
+  // often standalone git repos with a `.git` directory, not a `gitdir:` file.
+  // repoIdentity() would hash the worktree path and create a split-brain store.
+  const externalProjectGsd = resolveExternalStateProjectGsdFromWorktreePath(projectPath);
+  if (externalProjectGsd) {
+    const identity = resolveExternalStateProjectIdentityFromWorktreePath(projectPath);
+    if (identity) {
+      return { path: externalProjectGsd, identity };
+    }
+  }
+
   const base = process.env.GSD_STATE_DIR || gsdHome();
   const computedId = repoIdentity(projectPath);
   const computedPath = join(base, "projects", computedId);
@@ -510,7 +526,7 @@ export function ensureGsdSymlink(projectPath: string): string {
   // Write .gsd-id marker so future relocations can recover this state (#2750).
   // Only write for the project root (not subdirectories or worktrees that
   // delegate to a parent .gsd).
-  if (!isInsideWorktree(projectPath)) {
+  if (!isInsideWorktree(projectPath) && !isGsdWorktreePath(projectPath)) {
     writeGsdIdMarker(projectPath, identity);
   }
 
@@ -521,7 +537,7 @@ function ensureGsdSymlinkCore(projectPath: string): { path: string; identity: st
   const resolved = resolveExternalPathWithRecovery(projectPath);
   const externalPath = resolved.path;
   const localGsd = join(projectPath, ".gsd");
-  const inWorktree = isInsideWorktree(projectPath);
+  const inWorktree = isInsideWorktree(projectPath) || isGsdWorktreePath(projectPath);
 
   // Guard: Never create a symlink at ~/.gsd — that's the user-level GSD home,
   // not a project .gsd. This can happen if resolveProjectRoot() or
@@ -578,7 +594,10 @@ function ensureGsdSymlinkCore(projectPath: string): { path: string; identity: st
   mkdirSync(externalPath, { recursive: true });
 
   // Write repo metadata once so cleanup commands can identify this directory later.
-  writeRepoMeta(externalPath, getRemoteUrl(projectPath), resolveGitRoot(projectPath));
+  // Skip refresh for external-state worktrees — parent store already has metadata.
+  if (!(isGsdWorktreePath(projectPath) && resolveExternalStateProjectGsdFromWorktreePath(projectPath))) {
+    writeRepoMeta(externalPath, getRemoteUrl(projectPath), resolveGitRoot(projectPath));
+  }
 
   const replaceWithSymlink = (): { path: string; identity: string } => {
     rmSync(localGsd, { recursive: true, force: true });

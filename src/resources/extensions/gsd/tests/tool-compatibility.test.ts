@@ -51,11 +51,11 @@ describe("tool compatibility registry", () => {
     assert.equal(compat.minCapabilityTier, "standard");
   });
 
-  test("registerMcpToolCompatibility sets default schema features", () => {
+  test("registerMcpToolCompatibility stores metadata", () => {
     registerMcpToolCompatibility("mcp__test__tool");
     const compat = getToolCompatibility("mcp__test__tool");
     assert.ok(compat);
-    assert.ok(compat.schemaFeatures?.includes("patternProperties"));
+    assert.equal(compat.producesImages, undefined);
   });
 
   test("registerMcpToolCompatibility allows overrides", () => {
@@ -63,7 +63,6 @@ describe("tool compatibility registry", () => {
     const compat = getToolCompatibility("mcp__test__override");
     assert.ok(compat);
     assert.equal(compat.producesImages, true);
-    assert.ok(compat.schemaFeatures?.includes("patternProperties"));
   });
 
   test("getAllToolCompatibility returns all entries", () => {
@@ -118,12 +117,12 @@ describe("isToolCompatibleWithProvider", () => {
     assert.equal(isToolCompatibleWithProvider("screenshot", anthropicCaps), true);
   });
 
-  test("tool with unsupported schema features filtered for Google", () => {
+  test("tool with schema metadata stays available on Google (sanitized at wire time)", () => {
     registerToolCompatibility("complex_schema_tool", {
       schemaFeatures: ["patternProperties"],
     });
     const googleCaps = getProviderCapabilities("google-generative-ai");
-    assert.equal(isToolCompatibleWithProvider("complex_schema_tool", googleCaps), false);
+    assert.equal(isToolCompatibleWithProvider("complex_schema_tool", googleCaps), true);
 
     const anthropicCaps = getProviderCapabilities("anthropic-messages");
     assert.equal(isToolCompatibleWithProvider("complex_schema_tool", anthropicCaps), true);
@@ -152,12 +151,12 @@ describe("filterToolsForProvider", () => {
     assert.deepEqual(filtered, ["browser_screenshot"]);
   });
 
-  test("MCP tool with patternProperties filtered for Google", () => {
+  test("MCP tools stay available on Google (sanitized at wire time)", () => {
     registerMcpToolCompatibility("mcp__repowise__search");
     const toolNames = ["bash", "read", "mcp__repowise__search"];
     const { compatible, filtered } = filterToolsForProvider(toolNames, "google-generative-ai");
-    assert.deepEqual(compatible, ["bash", "read"]);
-    assert.deepEqual(filtered, ["mcp__repowise__search"]);
+    assert.deepEqual(compatible, toolNames);
+    assert.deepEqual(filtered, []);
   });
 
   test("unknown provider passes all tools (permissive default)", () => {
@@ -185,17 +184,13 @@ describe("adjustToolSet", () => {
     assert.deepEqual(removedTools, []);
   });
 
-  test("removes incompatible tools and reports them", () => {
+  test("keeps MCP tools on Google (sanitized at wire time)", () => {
     registerToolCompatibility("screenshot", { producesImages: true });
     registerMcpToolCompatibility("mcp_complex");
     const toolNames = ["bash", "read", "screenshot", "mcp_complex"];
     const { toolNames: result, removedTools } = adjustToolSet(toolNames, "google-generative-ai");
-    // Google supports images but not patternProperties
-    assert.ok(result.includes("bash"));
-    assert.ok(result.includes("read"));
-    assert.ok(result.includes("screenshot")); // Google supports images
-    assert.ok(!result.includes("mcp_complex")); // patternProperties not supported
-    assert.deepEqual(removedTools, ["mcp_complex"]);
+    assert.deepEqual(result, toolNames);
+    assert.deepEqual(removedTools, []);
   });
 });
 

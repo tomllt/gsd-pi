@@ -76,6 +76,7 @@ import {
   isInAutoWorktree,
   teardownAutoWorktree,
 } from "./auto-worktree.js";
+import { resolveRoadmapForMilestoneMerge } from "./milestone-merge-roadmap.js";
 
 const recentWorktreeMergeFailures = new Map<string, number>();
 const MERGE_FAILURE_DEDUPE_MS = 60_000;
@@ -328,6 +329,26 @@ function readLifecycleFile(
 ): string {
   return primitiveOverrides(deps).readFileSync?.(path, "utf-8") ??
     readFileSync(path, "utf-8");
+}
+
+function resolveRoadmapForMerge(
+  deps: WorktreeLifecycleDeps,
+  searchPaths: string[],
+  milestoneId: string,
+  notify: NotifyCtx["notify"],
+) {
+  const resolution = resolveRoadmapForMilestoneMerge(
+    searchPaths,
+    milestoneId,
+    (path) => readLifecycleFile(deps, path),
+  );
+  if (resolution?.synthesized) {
+    notify(
+      `Synthesized ${milestoneId}-ROADMAP.md from database records for milestone merge.`,
+      "info",
+    );
+  }
+  return resolution;
 }
 
 function currentLifecycleBranch(
@@ -970,43 +991,25 @@ function _mergeWorktreeModeImpl(
       });
     }
 
-    // Resolve roadmap — try project root first, then worktree path as
-    // fallback. The worktree may hold the only copy when state-back
-    // projection silently dropped it or .gsd/ is not symlinked. Without
-    // the fallback, a missing roadmap triggers bare teardown which
-    // deletes the branch and orphans all milestone commits (#1573).
-    let roadmapPath = resolveMilestoneFile(
-      originalBasePath,
-      milestoneId,
-      "ROADMAP",
-    );
-    if (
-      !roadmapPath &&
-      !isSamePathPhysical(worktreeBasePath, originalBasePath)
-    ) {
-      roadmapPath = resolveMilestoneFile(
-        worktreeBasePath,
-        milestoneId,
-        "ROADMAP",
-      );
-      if (roadmapPath) {
-        debugLog("WorktreeLifecycle", {
-          action: "mergeAndExit",
-          milestoneId,
-          phase: "roadmap-fallback",
-          note: "resolved from worktree path",
-        });
-      }
+    const roadmapSearchPaths = [originalBasePath];
+    if (!isSamePathPhysical(worktreeBasePath, originalBasePath)) {
+      roadmapSearchPaths.push(worktreeBasePath);
     }
+    const roadmapResolution = resolveRoadmapForMerge(
+      deps,
+      roadmapSearchPaths,
+      milestoneId,
+      notify,
+    );
 
-    if (!roadmapPath) {
-      // No roadmap at either location — teardown but PRESERVE the branch
-      // so commits are not orphaned (#1573).
+    if (!roadmapResolution) {
+      // No roadmap projection and no DB slice records — preserve the branch
+      // so product commits are not orphaned (#1573).
       lifecycleTeardownAutoWorktree(deps, originalBasePath, milestoneId, {
         preserveBranch: true,
       });
       notify(
-        `Exited worktree for ${milestoneId} (no roadmap found — branch preserved for manual merge).`,
+        `Exited worktree for ${milestoneId} (no roadmap or slice records found — branch preserved for manual merge).`,
         "warning",
       );
       return {
@@ -1017,11 +1020,10 @@ function _mergeWorktreeModeImpl(
       };
     }
 
-    const roadmapContent = readLifecycleFile(deps, roadmapPath);
     const mergeResult = deps.mergeMilestoneToMain(
       originalBasePath,
       milestoneId,
-      roadmapContent,
+      roadmapResolution.content,
     );
 
     // #2945 Bug 3: mergeMilestoneToMain performs best-effort worktree
@@ -1163,18 +1165,19 @@ function _mergeBranchModeImpl(
       }
     }
 
-    const roadmapPath = resolveMilestoneFile(
-      worktreeBasePath,
+    const roadmapResolution = resolveRoadmapForMerge(
+      deps,
+      [worktreeBasePath],
       milestoneId,
-      "ROADMAP",
+      notify,
     );
-    if (!roadmapPath) {
+    if (!roadmapResolution) {
       debugLog("WorktreeLifecycle", {
         action: "mergeAndExit",
         milestoneId,
         mode: "branch",
         skipped: true,
-        reason: "no-roadmap",
+        reason: "no-roadmap-or-slices",
       });
       return {
         merged: false,
@@ -1184,11 +1187,10 @@ function _mergeBranchModeImpl(
       };
     }
 
-    const roadmapContent = readLifecycleFile(deps, roadmapPath);
     const mergeResult = deps.mergeMilestoneToMain(
       worktreeBasePath,
       milestoneId,
-      roadmapContent,
+      roadmapResolution.content,
     );
 
     if (mergeResult.codeFilesChanged) {

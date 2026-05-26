@@ -4,11 +4,13 @@ import type { Mistral } from "@mistralai/mistralai";
 import type { RequestOptions } from "@mistralai/mistralai/lib/sdks.js";
 import type {
 	ChatCompletionStreamRequest,
-	ChatCompletionStreamRequestMessages,
 	CompletionEvent,
 	ContentChunk,
 	FunctionTool,
 } from "@mistralai/mistralai/models/components/index.js";
+
+/** SDK v1 exports `...Messages`; v2 exports `...Message` — derive from request shape instead. */
+type MistralStreamChatMessage = NonNullable<ChatCompletionStreamRequest["messages"]>[number];
 
 let _MistralClass: typeof Mistral | undefined;
 async function getMistralClass(): Promise<typeof Mistral> {
@@ -455,8 +457,8 @@ function toFunctionTools(tools: Tool[]): Array<FunctionTool & { type: "function"
 	}));
 }
 
-function toChatMessages(messages: Message[], supportsImages: boolean): ChatCompletionStreamRequestMessages[] {
-	const result: ChatCompletionStreamRequestMessages[] = [];
+function toChatMessages(messages: Message[], supportsImages: boolean): MistralStreamChatMessage[] {
+	const result: MistralStreamChatMessage[] = [];
 
 	for (const msg of messages) {
 		if (msg.role === "user") {
@@ -511,7 +513,7 @@ function toChatMessages(messages: Message[], supportsImages: boolean): ChatCompl
 				});
 			}
 
-			const assistantMessage: ChatCompletionStreamRequestMessages = { role: "assistant" };
+			const assistantMessage: MistralStreamChatMessage = { role: "assistant" };
 			if (contentParts.length > 0) assistantMessage.content = contentParts;
 			if (toolCalls.length > 0) assistantMessage.toolCalls = toolCalls;
 			if (contentParts.length > 0 || toolCalls.length > 0) result.push(assistantMessage);

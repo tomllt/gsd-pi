@@ -29,8 +29,12 @@ test("filterToolsForProviderRequest removes provider-incompatible tools", () => 
 			{ api: "google-generative-ai", provider: "google" },
 		);
 
-		assert.deepEqual(result.compatible.map((entry) => entry.name), ["bash", "image_result_tool"]);
-		assert.deepEqual(result.filtered.map((entry) => entry.name), ["complex_schema_tool"]);
+		assert.deepEqual(result.compatible.map((entry) => entry.name), [
+			"bash",
+			"image_result_tool",
+			"complex_schema_tool",
+		]);
+		assert.deepEqual(result.filtered.map((entry) => entry.name), []);
 	} finally {
 		resetToolCompatibilityRegistry();
 	}

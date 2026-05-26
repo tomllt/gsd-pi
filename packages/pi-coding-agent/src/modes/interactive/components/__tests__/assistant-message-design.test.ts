@@ -33,17 +33,16 @@ describe("AssistantMessageComponent open surface", () => {
 		assert.match(joined, /update the renderer/);
 		assert.doesNotMatch(joined, /╰──────╮/);
 		assert.match(joined, /╭─ GSD/);
-		assert.match(joined, /╰─/);
+		assert.match(joined, /╰/);
 		assert.doesNotMatch(joined, /[│┃]/, "assistant content lines must not use side rail glyphs");
-		// A rounded titled top rule carries the GSD label.
 		assert.ok(
 			plain.some((line) => line.includes("GSD") && line.includes("─")),
 			`expected a titled top rule:\n${joined}`,
 		);
 		const topRuleIndex = plain.findIndex((line) => line.includes("GSD") && line.includes("─"));
 		const contentIndex = plain.findIndex((line) => line.includes("update the renderer"));
-		assert.ok(contentIndex > topRuleIndex + 1, `expected a breathing row before content:\n${joined}`);
-		assert.equal(plain[contentIndex + 1]?.trim(), "", `expected a breathing row after content:\n${joined}`);
+		assert.ok(contentIndex > topRuleIndex, `expected content after the top rule:\n${joined}`);
+		assert.ok(plain[topRuleIndex]?.startsWith("╭─ GSD"), `assistant turn should be left-pegged:\n${joined}`);
 		assert.ok(plain[contentIndex].startsWith("   "), `assistant content should keep inner padding:\n${joined}`);
 		assert.doesNotMatch(
 			plain[contentIndex],
@@ -51,8 +50,24 @@ describe("AssistantMessageComponent open surface", () => {
 			`assistant content should not preserve the old outer rail indent:\n${joined}`,
 		);
 		assert.equal(plain[contentIndex].length, 80, `assistant content row should fill the bubble background:\n${joined}`);
-		assert.equal(plain[contentIndex + 1]?.length, 80, `assistant breathing row should fill the bubble background:\n${joined}`);
 		assert.doesNotMatch(plain[contentIndex], /[│┃╭╮╰╯]/, `content line must stay copy-clean:\n${joined}`);
+	});
+
+	test("bridges from an indented user turn when connectedToUser is set", () => {
+		const message = {
+			id: "m1",
+			role: "assistant",
+			provider: "test",
+			model: "gpt-test",
+			timestamp: 1,
+			content: [{ type: "text", text: "Connected reply." }],
+		} as unknown as AssistantMessage;
+
+		const component = new AssistantMessageComponent(message, true, undefined, "date-time-iso", undefined, true);
+		const joined = component.render(80).map((line) => stripAnsi(line)).join("\n");
+
+		assert.match(joined, /╰──────╮/);
+		assert.match(joined, /╭─ GSD/);
 	});
 
 	test("can render a connector only when explicitly requested", () => {

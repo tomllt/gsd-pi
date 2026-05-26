@@ -105,7 +105,8 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapabilities> = {
     structuredOutput: true,
     toolCallIdFormat: { maxLength: 64, allowedChars: /^[a-zA-Z0-9_-]+$/ },
     thinkingPersistence: "text-only",
-    unsupportedSchemaFeatures: ["patternProperties", "const"],
+    // google-shared.ts sanitizes patternProperties/const at conversion time.
+    unsupportedSchemaFeatures: [],
   },
   "google-gemini-cli": {
     toolCalling: true,
@@ -114,7 +115,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapabilities> = {
     structuredOutput: true,
     toolCallIdFormat: { maxLength: 64, allowedChars: /^[a-zA-Z0-9_-]+$/ },
     thinkingPersistence: "text-only",
-    unsupportedSchemaFeatures: ["patternProperties", "const"],
+    unsupportedSchemaFeatures: [],
   },
   "google-vertex": {
     toolCalling: true,
@@ -123,7 +124,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapabilities> = {
     structuredOutput: true,
     toolCallIdFormat: { maxLength: 64, allowedChars: /^[a-zA-Z0-9_-]+$/ },
     thinkingPersistence: "text-only",
-    unsupportedSchemaFeatures: ["patternProperties", "const"],
+    unsupportedSchemaFeatures: [],
   },
   "mistral-conversations": {
     toolCalling: true,

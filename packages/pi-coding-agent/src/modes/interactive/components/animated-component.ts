@@ -24,6 +24,7 @@ export class ManagedInterval {
 	}
 
 	stop(): void {
+		this.disposed = true;
 		if (!this.interval) return;
 		clearInterval(this.interval);
 		this.interval = undefined;

@@ -42,6 +42,11 @@ import {
   type ErrorClass,
 } from "../error-classifier.js";
 import { blockModel, isModelBlocked } from "../blocked-models.js";
+import { getProjectGSDPreferencesPath } from "../preferences.js";
+import {
+  formatProviderErrorGuidance,
+  resolveProviderErrorGuidance,
+} from "../provider-error-guidance.js";
 
 const retryState = createRetryState();
 const MAX_NETWORK_RETRIES = 2;
@@ -114,6 +119,138 @@ export function shouldDeferTransientErrorToCoreRetry(
 ): boolean {
   if (!isTransient(cls) || cls.kind === "rate-limit") return false;
   return !/retry failed after \d+ attempts:/i.test(rawErrorMsg);
+}
+
+type ProviderModelFallbackParams = {
+  ctx: ExtensionContext;
+  pi: ExtensionAPI;
+  rejectedProvider?: string;
+  rejectedId?: string;
+  basePath?: string;
+  unitType?: string;
+  switchedNotify: (label: string) => void;
+};
+
+/** Try configured fallbacks, then the auto-mode start model. Returns true if switched. */
+async function tryProviderModelFallback(params: ProviderModelFallbackParams): Promise<boolean> {
+  const { ctx, pi, rejectedProvider, rejectedId, basePath, unitType, switchedNotify } = params;
+  if (!basePath || !unitType) return false;
+
+  const modelConfig = resolveModelWithFallbacksForUnit(unitType);
+  const availableModels = ctx.modelRegistry.getAvailable();
+
+  if (modelConfig && modelConfig.fallbacks.length > 0) {
+    let cursorModelId: string | undefined = rejectedId;
+    while (true) {
+      const nextModelId = getNextFallbackModel(cursorModelId, modelConfig);
+      if (!nextModelId) break;
+      const candidate = resolveModelId(nextModelId, availableModels, rejectedProvider);
+      if (candidate && !isModelBlocked(basePath, candidate.provider, candidate.id)) {
+        const ok = await pi.setModel(candidate, { persist: false });
+        if (ok) {
+          setCurrentDispatchedModelId({ provider: candidate.provider, id: candidate.id });
+          switchedNotify(`${candidate.provider}/${candidate.id}`);
+          pi.sendMessage(
+            { customType: "gsd-auto-timeout-recovery", content: "Continue execution.", display: false },
+            { triggerTurn: true },
+          );
+          return true;
+        }
+      }
+      cursorModelId = nextModelId;
+    }
+  }
+
+  const sessionModel = getAutoModeStartModel();
+  if (
+    sessionModel &&
+    !(sessionModel.provider === rejectedProvider && sessionModel.id === rejectedId) &&
+    !isModelBlocked(basePath, sessionModel.provider, sessionModel.id)
+  ) {
+    const startModel = availableModels.find(
+      (m) => m.provider === sessionModel.provider && m.id === sessionModel.id,
+    );
+    if (startModel) {
+      const ok = await pi.setModel(startModel, { persist: false });
+      if (ok) {
+        setCurrentDispatchedModelId({ provider: startModel.provider, id: startModel.id });
+        switchedNotify(`${startModel.provider}/${startModel.id}`);
+        pi.sendMessage(
+          { customType: "gsd-auto-timeout-recovery", content: "Continue execution.", display: false },
+          { triggerTurn: true },
+        );
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+async function pauseForProviderModelRejection(
+  ctx: ExtensionContext,
+  pi: ExtensionAPI,
+  options: {
+    errorDetail: string;
+    rawErrorMsg: string;
+    rejectedProvider?: string;
+    rejectedId?: string;
+    unitType?: string;
+    basePath?: string;
+    blockReason: string;
+    blockNotify: string;
+    shouldBlockModel?: boolean;
+    switchedNotify: (label: string) => void;
+    buildPauseDetail: () => string;
+  },
+): Promise<void> {
+  const {
+    errorDetail,
+    rawErrorMsg,
+    rejectedProvider,
+    rejectedId,
+    unitType,
+    basePath,
+    blockReason,
+    blockNotify,
+    shouldBlockModel = true,
+    switchedNotify,
+    buildPauseDetail,
+  } = options;
+
+  if (shouldBlockModel && basePath && rejectedProvider && rejectedId) {
+    try {
+      blockModel(basePath, rejectedProvider, rejectedId, rawErrorMsg || blockReason);
+      ctx.ui.notify(blockNotify, "warning");
+    } catch (err) {
+      const m = err instanceof Error ? err.message : String(err);
+      logWarning("bootstrap", `Failed to persist blocked model: ${m}`);
+    }
+  }
+
+  const switched = await tryProviderModelFallback({
+    ctx,
+    pi,
+    rejectedProvider,
+    rejectedId,
+    basePath,
+    unitType,
+    switchedNotify,
+  });
+  if (switched) return;
+
+  const pauseDetail = buildPauseDetail();
+  await pauseAutoForProviderError(ctx.ui, errorDetail, () =>
+    pauseAuto(ctx, pi, {
+      message: pauseDetail,
+      category: "provider",
+      isTransient: false,
+    }),
+  {
+    isRateLimit: false,
+    isTransient: false,
+    retryAfterMs: 0,
+  });
 }
 
 function isBareClaudeCodeSessionSwitchAbortMarker(message: string | undefined | null): boolean {
@@ -449,90 +586,66 @@ export async function handleAgentEnd(
       const dash = getAutoDashboardData();
       const rejectedProvider = ctx.model?.provider;
       const rejectedId = ctx.model?.id;
-      if (dash.basePath && rejectedProvider && rejectedId) {
-        try {
-          blockModel(dash.basePath, rejectedProvider, rejectedId, rawErrorMsg || "unsupported for account");
+      const blockedLabel = rejectedProvider && rejectedId ? `${rejectedProvider}/${rejectedId}` : "current model";
+      await pauseForProviderModelRejection(ctx, pi, {
+        errorDetail,
+        rawErrorMsg,
+        rejectedProvider,
+        rejectedId,
+        unitType: dash.currentUnit?.type,
+        basePath: dash.basePath,
+        blockReason: "unsupported for account",
+        blockNotify: rejectedProvider && rejectedId
+          ? `Blocked ${rejectedProvider}/${rejectedId} for this project — provider rejected it for the current account.`
+          : "Blocked current model for this project.",
+        switchedNotify: (label) => {
           ctx.ui.notify(
-            `Blocked ${rejectedProvider}/${rejectedId} for this project — provider rejected it for the current account.`,
+            `Switched to fallback ${label} after account entitlement rejection.`,
             "warning",
           );
-        } catch (err) {
-          const m = err instanceof Error ? err.message : String(err);
-          logWarning("bootstrap", `Failed to persist blocked model: ${m}`);
-        }
-      }
+        },
+        buildPauseDetail: () =>
+          `Model ${blockedLabel} blocked for this account${errorDetail}. Configure a different model and restart /gsd auto.`,
+      });
+      return;
+    }
 
-      // Try configured fallback chain, skipping anything already blocked.
-      if (dash.currentUnit && dash.basePath) {
-        const modelConfig = resolveModelWithFallbacksForUnit(dash.currentUnit.type);
-        if (modelConfig && modelConfig.fallbacks.length > 0) {
-          const availableModels = ctx.modelRegistry.getAvailable();
-          let cursorModelId: string | undefined = ctx.model?.id;
-          while (true) {
-            const nextModelId = getNextFallbackModel(cursorModelId, modelConfig);
-            if (!nextModelId) break;
-            const candidate = resolveModelId(nextModelId, availableModels, ctx.model?.provider);
-            if (candidate && !isModelBlocked(dash.basePath, candidate.provider, candidate.id)) {
-              const ok = await pi.setModel(candidate, { persist: false });
-              if (ok) {
-                setCurrentDispatchedModelId({ provider: candidate.provider, id: candidate.id });
-                ctx.ui.notify(
-                  `Switched to fallback ${candidate.provider}/${candidate.id} after account entitlement rejection.`,
-                  "warning",
-                );
-                pi.sendMessage(
-                  { customType: "gsd-auto-timeout-recovery", content: "Continue execution.", display: false },
-                  { triggerTurn: true },
-                );
-                return;
-              }
-            }
-            cursorModelId = nextModelId;
-          }
-        }
+    // ── 1a2. Model-error: provider rejected the request payload for this model.
+    //        Try fallbacks, then pause with prefs guidance. Do not persistently
+    //        block the model: payload/schema bugs may be fixed without changing models.
+    if (cls.kind === "model-error") {
+      const dash = getAutoDashboardData();
+      const rejectedProvider = ctx.model?.provider;
+      const rejectedId = ctx.model?.id;
+      const unitType = dash.currentUnit?.type;
+      const modelConfig = unitType ? resolveModelWithFallbacksForUnit(unitType) : undefined;
+      const guidance = resolveProviderErrorGuidance({
+        errorMsg: displayMsg || rawErrorMsg,
+        provider: rejectedProvider,
+        modelId: rejectedId,
+        unitType,
+        preferencesPath: dash.basePath ? getProjectGSDPreferencesPath(dash.basePath) : undefined,
+        hasConfiguredFallbacks: (modelConfig?.fallbacks.length ?? 0) > 0,
+      });
+      const guidanceText = formatProviderErrorGuidance(guidance);
 
-        // Fallback chain exhausted — try the auto-mode start model if it isn't
-        // the same one we just blocked and isn't itself blocked.
-        const sessionModel = getAutoModeStartModel();
-        if (
-          sessionModel &&
-          !(sessionModel.provider === rejectedProvider && sessionModel.id === rejectedId) &&
-          !isModelBlocked(dash.basePath, sessionModel.provider, sessionModel.id)
-        ) {
-          const startModel = ctx.modelRegistry
-            .getAvailable()
-            .find((m) => m.provider === sessionModel.provider && m.id === sessionModel.id);
-          if (startModel) {
-            const ok = await pi.setModel(startModel, { persist: false });
-            if (ok) {
-              setCurrentDispatchedModelId({ provider: startModel.provider, id: startModel.id });
-              ctx.ui.notify(
-                `Restored auto-mode start model ${startModel.provider}/${startModel.id} after entitlement rejection.`,
-                "warning",
-              );
-              pi.sendMessage(
-                { customType: "gsd-auto-timeout-recovery", content: "Continue execution.", display: false },
-                { triggerTurn: true },
-              );
-              return;
-            }
-          }
-        }
-      }
-
-      // No usable fallback — pause with a clearly named message.
-      const blockedLabel = rejectedProvider && rejectedId ? `${rejectedProvider}/${rejectedId}` : "current model";
-      const pauseDetail = `Model ${blockedLabel} blocked for this account${errorDetail}. Configure a different model and restart /gsd auto.`;
-      await pauseAutoForProviderError(ctx.ui, pauseDetail, () =>
-        pauseAuto(ctx, pi, {
-          message: pauseDetail,
-          category: "provider",
-          isTransient: false,
-        }),
-      {
-        isRateLimit: false,
-        isTransient: false,
-        retryAfterMs: 0,
+      await pauseForProviderModelRejection(ctx, pi, {
+        errorDetail,
+        rawErrorMsg,
+        rejectedProvider,
+        rejectedId,
+        unitType,
+        basePath: dash.basePath,
+        blockReason: "invalid request for model",
+        blockNotify: rejectedProvider && rejectedId
+          ? `Provider rejected ${rejectedProvider}/${rejectedId} request.`
+          : "Provider rejected the current model request.",
+        shouldBlockModel: false,
+        switchedNotify: (label) => {
+          ctx.ui.notify(`Switched to ${label} after provider request rejection.`, "warning");
+        },
+        buildPauseDetail: () =>
+          `${guidanceText}${errorDetail ? `\n\nDetails${errorDetail}` : ""}`,
       });
       return;
     }

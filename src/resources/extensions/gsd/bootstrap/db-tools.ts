@@ -123,11 +123,9 @@ export function registerDbTools(pi: ExtensionAPI): void {
       rationale: Type.String({ description: "Why this choice was made" }),
       revisable: Type.Optional(Type.String({ description: "Whether this can be revisited (default: 'Yes')" })),
       when_context: Type.Optional(Type.String({ description: "When/context for the decision (e.g. milestone ID)" })),
-      made_by: Type.Optional(Type.Union([
-        Type.Literal("human"),
-        Type.Literal("agent"),
-        Type.Literal("collaborative"),
-      ], { description: "Who made this decision: 'human' (user directed), 'agent' (LLM decided autonomously), or 'collaborative' (discussed and agreed). Default: 'agent'" })),
+      made_by: Type.Optional(StringEnum(["human", "agent", "collaborative"], {
+        description: "Who made this decision: 'human' (user directed), 'agent' (LLM decided autonomously), or 'collaborative' (discussed and agreed). Default: 'agent'",
+      })),
     }),
     execute: decisionSaveExecute,
     renderCall(args: any, theme: any) {
@@ -722,16 +720,13 @@ export function registerDbTools(pi: ExtensionAPI): void {
         }),
       }, { description: "ADR-011 Phase 2: optional escalation payload. Only honored when phases.mid_execution_escalation is true." })),
       verificationEvidence: Type.Optional(Type.Array(
-        Type.Union([
-          Type.Object({
-            command: Type.String({ description: "Verification command that was run" }),
-            exitCode: Type.Number({ description: "Exit code of the command" }),
-            verdict: Type.String({ description: "Pass/fail verdict (e.g. '✅ pass', '❌ fail')" }),
-            durationMs: Type.Number({ description: "Duration of the command in milliseconds" }),
-          }),
-          Type.String({ description: "Fallback: verification summary string" }),
-        ]),
-        { description: "Array of verification evidence entries" },
+        Type.Object({
+          command: Type.String({ description: "Verification command that was run" }),
+          exitCode: Type.Number({ description: "Exit code of the command" }),
+          verdict: Type.String({ description: "Pass/fail verdict (e.g. '✅ pass', '❌ fail')" }),
+          durationMs: Type.Number({ description: "Duration of the command in milliseconds" }),
+        }),
+        { description: "Array of verification evidence entries (structured objects only)" },
       )),
       // Single-writer v3 audit trail (Stream 2): caller-provided actor identity + causation.
       actorName: Type.Optional(Type.String({ description: "Caller-provided actor identity for the audit trail (e.g. 'executor-01', 'gsd-orchestrator')" })),
@@ -776,70 +771,47 @@ export function registerDbTools(pi: ExtensionAPI): void {
       deviations: Type.Optional(Type.String({ description: "Deviations from the slice plan, or 'None.'" })),
       knownLimitations: Type.Optional(Type.String({ description: "Known limitations or gaps, or 'None.'" })),
       followUps: Type.Optional(Type.String({ description: "Follow-up work discovered during execution, or 'None.'" })),
-      keyFiles: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "Key files created or modified" })),
-      keyDecisions: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "Key decisions made during this slice" })),
-      patternsEstablished: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "Patterns established by this slice" })),
-      observabilitySurfaces: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "Observability surfaces added" })),
-      provides: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "What this slice provides to downstream slices" })),
-      requirementsSurfaced: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "New requirements surfaced" })),
-      drillDownPaths: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "Paths to task summaries for drill-down" })),
-      affects: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "Downstream slices affected" })),
+      keyFiles: Type.Optional(Type.Array(Type.String(), { description: "Key files created or modified" })),
+      keyDecisions: Type.Optional(Type.Array(Type.String(), { description: "Key decisions made during this slice" })),
+      patternsEstablished: Type.Optional(Type.Array(Type.String(), { description: "Patterns established by this slice" })),
+      observabilitySurfaces: Type.Optional(Type.Array(Type.String(), { description: "Observability surfaces added" })),
+      provides: Type.Optional(Type.Array(Type.String(), { description: "What this slice provides to downstream slices" })),
+      requirementsSurfaced: Type.Optional(Type.Array(Type.String(), { description: "New requirements surfaced" })),
+      drillDownPaths: Type.Optional(Type.Array(Type.String(), { description: "Paths to task summaries for drill-down" })),
+      affects: Type.Optional(Type.Array(Type.String(), { description: "Downstream slices affected" })),
       requirementsAdvanced: Type.Optional(Type.Array(
-        Type.Union([
-          Type.Object({
-            id: Type.String({ description: "Requirement ID" }),
-            how: Type.String({ description: "How it was advanced" }),
-          }),
-          Type.String({ description: "Fallback: 'ID — how' string" }),
-        ]),
+        Type.Object({
+          id: Type.String({ description: "Requirement ID" }),
+          how: Type.String({ description: "How it was advanced" }),
+        }),
         { description: "Requirements advanced by this slice" },
       )),
       requirementsValidated: Type.Optional(Type.Array(
-        Type.Union([
-          Type.Object({
-            id: Type.String({ description: "Requirement ID" }),
-            proof: Type.String({ description: "What proof validates it" }),
-          }),
-          Type.Object({
-            id: Type.String({ description: "Requirement ID" }),
-            how: Type.String({ description: "Alias accepted for proof (normalized internally)" }),
-          }),
-          Type.String({ description: "Fallback: 'ID — proof' string" }),
-        ]),
+        Type.Object({
+          id: Type.String({ description: "Requirement ID" }),
+          proof: Type.String({ description: "What proof validates it" }),
+        }),
         { description: "Requirements validated by this slice" },
       )),
       requirementsInvalidated: Type.Optional(Type.Array(
-        Type.Union([
-          Type.Object({
-            id: Type.String({ description: "Requirement ID" }),
-            what: Type.String({ description: "What changed" }),
-          }),
-          Type.Object({
-            id: Type.String({ description: "Requirement ID" }),
-            how: Type.String({ description: "Alias accepted for what (normalized internally)" }),
-          }),
-          Type.String({ description: "Fallback: 'ID — what' string" }),
-        ]),
+        Type.Object({
+          id: Type.String({ description: "Requirement ID" }),
+          what: Type.String({ description: "What changed" }),
+        }),
         { description: "Requirements invalidated or re-scoped" },
       )),
       filesModified: Type.Optional(Type.Array(
-        Type.Union([
-          Type.Object({
-            path: Type.String({ description: "File path" }),
-            description: Type.String({ description: "What changed" }),
-          }),
-          Type.String({ description: "Fallback: file path string" }),
-        ]),
+        Type.Object({
+          path: Type.String({ description: "File path" }),
+          description: Type.String({ description: "What changed" }),
+        }),
         { description: "Files modified with descriptions" },
       )),
       requires: Type.Optional(Type.Array(
-        Type.Union([
-          Type.Object({
-            slice: Type.String({ description: "Dependency slice ID" }),
-            provides: Type.String({ description: "What was consumed from it" }),
-          }),
-          Type.String({ description: "Fallback: slice ID string" }),
-        ]),
+        Type.Object({
+          slice: Type.String({ description: "Dependency slice ID" }),
+          provides: Type.String({ description: "What was consumed from it" }),
+        }),
         { description: "Upstream slice dependencies consumed" },
       )),
       // Single-writer v3 audit trail (Stream 2): caller-provided actor identity + causation.

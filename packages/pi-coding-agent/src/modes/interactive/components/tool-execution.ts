@@ -1,5 +1,6 @@
 // Project/App: gsd-pi
 // File Purpose: Interactive terminal tool execution renderer for commands, tool calls, diffs, images, and summaries.
+import { normalizeToolArguments } from "@gsd/pi-ai";
 import {
 	Box,
 	Container,
@@ -25,7 +26,14 @@ import { getLanguageFromPath, highlightCode, theme } from "../theme/theme.js";
 import { shortenPath } from "../utils/shorten-path.js";
 import { renderDiff } from "./diff.js";
 import { keyHint } from "./keybinding-hints.js";
-import { renderCommandCard, renderToolLineCard, renderTranscriptCard, type StatusTone } from "./transcript-design.js";
+import {
+	renderCommandCard,
+	renderToolLineCard,
+	renderTranscriptCard,
+	TRANSCRIPT_CARD_INDENT,
+	collapseBlankLines,
+	type StatusTone,
+} from "./transcript-design.js";
 import { truncateToVisualLines } from "./visual-truncate.js";
 
 // Preview line limit for bash when not expanded
@@ -288,6 +296,24 @@ function formatCompactArgs(args: unknown, expanded: boolean): string {
 	return lines.slice(0, maxLines).join("\n") + "\n...";
 }
 
+function stableJsonStringify(value: unknown): string {
+	return JSON.stringify(value, (_key, nestedValue) => {
+		if (nestedValue == null || typeof nestedValue !== "object" || Array.isArray(nestedValue)) {
+			return nestedValue;
+		}
+		return Object.fromEntries(
+			Object.keys(nestedValue as Record<string, unknown>)
+				.sort()
+				.map((key) => [key, (nestedValue as Record<string, unknown>)[key]]),
+		);
+	});
+}
+
+function normalizeComparableArgs(toolName: string, args: unknown): unknown {
+	if (!args || typeof args !== "object" || Array.isArray(args)) return args;
+	return normalizeToolArguments(toolName, { ...(args as Record<string, unknown>) });
+}
+
 export interface ToolExecutionOptions {
 	showImages?: boolean; // default: true (only used if terminal supports images)
 }
@@ -340,6 +366,21 @@ export class ToolExecutionComponent extends Container {
 		return typeof this.toolName === "string" ? this.toolName.toLowerCase() : "";
 	}
 
+	/** Match pending tool calls when stream adapters disagree on toolCallId. */
+	matchesInvocation(toolName: string, args: unknown): boolean {
+		const other = typeof toolName === "string" ? toolName.toLowerCase() : "";
+		if (this.normalizedToolName !== other) return false;
+		return (
+			stableJsonStringify(normalizeComparableArgs(this.normalizedToolName, this.args) ?? null) ===
+			stableJsonStringify(normalizeComparableArgs(other, args) ?? null)
+		);
+	}
+
+	/** True while the tool call is still running (no final result yet). */
+	isInFlight(): boolean {
+		return this.isPartial || !this.result;
+	}
+
 	constructor(
 		toolName: string,
 		args: any,
@@ -356,11 +397,8 @@ export class ToolExecutionComponent extends Container {
 		this.ui = ui;
 		this.cwd = cwd;
 
-		this.addChild(new Spacer(1));
-
-		// Always create both - contentBox for custom tools/bash, contentText for other built-ins
-		this.contentBox = new Box(1, 1, (text: string) => theme.bg("toolPendingBg", text));
-		this.contentText = new Text("", 1, 1, (text: string) => theme.bg("toolPendingBg", text));
+		this.contentBox = new Box(0, 0, (text: string) => theme.bg("toolPendingBg", text));
+		this.contentText = new Text("", 0, 0, (text: string) => theme.bg("toolPendingBg", text));
 
 		// Use contentBox for bash (visual truncation) or custom tools with custom renderers
 		// Use contentText for built-in tools (including overrides without custom renderers)
@@ -660,7 +698,7 @@ export class ToolExecutionComponent extends Container {
 			return [];
 		}
 		const frameWidth = Math.max(20, width);
-		const contentWidth = Math.max(1, frameWidth - 4);
+		const contentWidth = Math.max(1, frameWidth - TRANSCRIPT_CARD_INDENT - 3);
 		const frameTone: "pending" | "success" | "error" =
 			this.result?.isError ? "error" : this.isPartial || !this.result ? "pending" : "success";
 		const elapsed = formatElapsed((this.endedAt ?? Date.now()) - this.startedAt);
@@ -675,35 +713,28 @@ export class ToolExecutionComponent extends Container {
 
 		if (this.normalizedToolName === "bash" && !this.expanded && !this.result?.isError) {
 			const command = str(this.args?.command);
-			return [
-				"",
-				...renderCommandCard(command && command.length > 0 ? formatCommandPreview(command) : frameLabel, frameWidth, {
-					status: frameStatus,
-					tone: recommendedTone,
-				}),
-			];
+			return renderCommandCard(command && command.length > 0 ? formatCommandPreview(command) : frameLabel, frameWidth, {
+				status: frameStatus,
+				tone: recommendedTone,
+			});
 		}
 		const hasImages = this.result?.content?.some((block) => block.type === "image") ?? false;
 		if (!this.expanded && !this.result?.isError && !hasImages) {
 			const compactTarget = this.getCompactTarget();
-			return [
-				"",
-				...renderToolLineCard(frameLabel, compactTarget, frameWidth, {
-					status: frameStatus,
-					tone: recommendedTone,
-					hidden: !this.isPartial && !!this.result,
-				}),
-			];
+			return renderToolLineCard(frameLabel, compactTarget, frameWidth, {
+				status: frameStatus,
+				tone: recommendedTone,
+				hidden: !this.isPartial && !!this.result,
+			});
 		}
-		const lines = super.render(contentWidth);
-		const framed = renderTranscriptCard(lines, frameWidth, {
+		const lines = collapseBlankLines(super.render(contentWidth));
+		return renderTranscriptCard(lines, frameWidth, {
 			title: frameLabel,
 			right: frameStatus,
 			tone: recommendedTone,
 			footerLeft: this.expanded ? "output expanded" : undefined,
 			footerRight: this.expanded ? "ctrl+o collapse" : undefined,
 		});
-		return framed.length > 0 ? ["", ...framed] : framed;
 	}
 
 	private shouldRenderCompactSuccess(): boolean {
@@ -975,8 +1006,7 @@ export class ToolExecutionComponent extends Container {
 					.join("\n");
 
 				if (this.expanded) {
-					// Show all lines when expanded
-					this.contentBox.addChild(new Text(`\n${styledOutput}`, 0, 0));
+					this.contentBox.addChild(new Text(styledOutput, 0, 0));
 				} else {
 					// Use visual line truncation when collapsed with width-aware caching
 					let cachedWidth: number | undefined;
@@ -995,10 +1025,9 @@ export class ToolExecutionComponent extends Container {
 								const hint =
 									theme.fg("muted", `... (${cachedSkipped} earlier lines,`) +
 									` ${keyHint("expandTools", "to expand")})`;
-								return ["", truncateToWidth(hint, width, "..."), ...cachedLines];
+								return [truncateToWidth(hint, width, "..."), ...cachedLines];
 							}
-							// Add blank line for spacing (matches expanded case)
-							return ["", ...cachedLines];
+							return cachedLines;
 						},
 						invalidate: () => {
 							cachedWidth = undefined;
@@ -1014,7 +1043,7 @@ export class ToolExecutionComponent extends Container {
 			const fullOutputPath = this.result.details?.fullOutputPath;
 			const cwd = this.result.details?.cwd;
 			if (this.expanded && typeof cwd === "string" && cwd.length > 0) {
-				this.contentBox.addChild(new Text(`\n${theme.fg("muted", `cwd ${shortenPath(cwd)}`)}`, 0, 0));
+				this.contentBox.addChild(new Text(theme.fg("muted", `cwd ${shortenPath(cwd)}`), 0, 0));
 			}
 			if (truncation?.truncated || fullOutputPath) {
 				const warnings: string[] = [];
@@ -1030,7 +1059,7 @@ export class ToolExecutionComponent extends Container {
 						);
 					}
 				}
-				this.contentBox.addChild(new Text(`\n${theme.fg("warning", `[${warnings.join(". ")}]`)}`, 0, 0));
+				this.contentBox.addChild(new Text(theme.fg("warning", `[${warnings.join(". ")}]`), 0, 0));
 			}
 		}
 	}

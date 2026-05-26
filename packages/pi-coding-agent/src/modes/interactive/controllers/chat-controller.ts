@@ -5,6 +5,7 @@ import { Loader, Markdown, Spacer, Text } from "@gsd/pi-tui";
 import type { InteractiveModeEvent, InteractiveModeStateHost } from "../interactive-mode-state.js";
 import { theme } from "../theme/theme.js";
 import { AssistantMessageComponent } from "../components/assistant-message.js";
+import { chatTurnFollowsUser } from "../components/chat-turn-connect.js";
 import {
 	ToolExecutionComponent,
 	ToolPhaseSummaryComponent,
@@ -41,6 +42,60 @@ let renderedSegments: RenderedSegment[] = [];
 // a content[] shrink resets renderedSegments. Keep the displaced segments so
 // claude-code MCP pruning can remove stale provisional text later.
 let orphanedSegments: RenderedSegment[] = [];
+
+type ToolRegistrationSource = "content" | "standalone";
+
+// Invocation matching only reconciles IDs reported by different event streams.
+// Same-source identical invocations are separate concurrent tool calls.
+const toolRegistrationSources = new WeakMap<ToolExecutionComponent, Set<ToolRegistrationSource>>();
+
+function findPendingToolByInvocation(
+	pendingTools: Map<string, ToolExecutionComponent>,
+	toolName: string,
+	args: unknown,
+	source: ToolRegistrationSource,
+): ToolExecutionComponent | undefined {
+	let fallback: ToolExecutionComponent | undefined;
+	for (const component of pendingTools.values()) {
+		if (!component.isInFlight()) continue;
+		if (!component.matchesInvocation(toolName, args)) continue;
+
+		const sources = toolRegistrationSources.get(component);
+		if (!sources?.has(source)) {
+			return component;
+		}
+		if (sources.size > 1 && !fallback) fallback = component;
+	}
+	return fallback;
+}
+
+function registerPendingToolComponent(
+	host: InteractiveModeStateHost,
+	toolCallId: string,
+	toolName: string,
+	args: unknown,
+	source: ToolRegistrationSource,
+	createComponent: () => ToolExecutionComponent,
+): { component: ToolExecutionComponent; created: boolean } {
+	const existing = host.pendingTools.get(toolCallId);
+	if (existing) {
+		return { component: existing, created: false };
+	}
+
+	const matched = findPendingToolByInvocation(host.pendingTools, toolName, args, source);
+	if (matched) {
+		host.pendingTools.set(toolCallId, matched);
+		toolRegistrationSources.get(matched)?.add(source);
+		return { component: matched, created: false };
+	}
+
+	const component = createComponent();
+	component.setExpanded(host.toolOutputExpanded);
+	host.chatContainer.addChild(component);
+	host.pendingTools.set(toolCallId, component);
+	toolRegistrationSources.set(component, new Set([source]));
+	return { component, created: true };
+}
 
 function startLoadingAnimation(host: InteractiveModeStateHost): void {
 	if (host.pendingWorkingMessage === null) {
@@ -450,33 +505,38 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				for (let i = lastProcessedContentIndex; i < contentBlocks.length; i++) {
 					const content = contentBlocks[i];
 					if (content.type === "toolCall") {
-						if (!host.pendingTools.has(content.id)) {
-							const component = new ToolExecutionComponent(
-								content.name,
-								content.arguments,
-								{ showImages: host.settingsManager.getShowImages() },
-								host.getRegisteredToolDefinition(content.name),
-								host.ui,
-							);
-							component.setExpanded(host.toolOutputExpanded);
-							host.chatContainer.addChild(component);
-							host.pendingTools.set(content.id, component);
-						} else {
-							host.pendingTools.get(content.id)?.updateArgs(content.arguments);
-						}
+						const { component } = registerPendingToolComponent(
+							host,
+							content.id,
+							content.name,
+							content.arguments,
+							"content",
+							() =>
+								new ToolExecutionComponent(
+									content.name,
+									content.arguments,
+									{ showImages: host.settingsManager.getShowImages() },
+									host.getRegisteredToolDefinition(content.name),
+									host.ui,
+								),
+						);
+						component.updateArgs(content.arguments);
 					} else if (content.type === "serverToolUse") {
-						if (!host.pendingTools.has(content.id)) {
-							const component = new ToolExecutionComponent(
-								content.name,
-								content.input ?? {},
-								{ showImages: host.settingsManager.getShowImages() },
-								undefined,
-								host.ui,
-							);
-							component.setExpanded(host.toolOutputExpanded);
-							host.chatContainer.addChild(component);
-							host.pendingTools.set(content.id, component);
-						}
+						registerPendingToolComponent(
+							host,
+							content.id,
+							content.name,
+							content.input ?? {},
+							"content",
+							() =>
+								new ToolExecutionComponent(
+									content.name,
+									content.input ?? {},
+									{ showImages: host.settingsManager.getShowImages() },
+									undefined,
+									host.ui,
+								),
+						);
 					} else if (content.type === "webSearchResult") {
 						const component = host.pendingTools.get(content.toolUseId);
 						if (component) {
@@ -618,12 +678,16 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 								(s) => s.kind === "text-run" && s.startIndex === seg.startIndex && s.contentType === seg.contentType,
 							);
 							if (!existing) {
+								const connectedToUser =
+									renderedSegments.filter((s) => s.kind === "text-run").length === 0 &&
+									chatTurnFollowsUser(host.chatContainer.children);
 								const comp = new AssistantMessageComponent(
 									undefined,
 									host.hideThinkingBlock,
 									host.getMarkdownThemeWithSettings(),
 									timestampFormat,
 									{ startIndex: seg.startIndex, endIndex: seg.endIndex },
+									connectedToUser,
 								);
 								host.chatContainer.addChild(comp);
 								renderedSegments.push({
@@ -828,12 +892,16 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 								continue;
 							}
 
+							const connectedToUser =
+								renderedSegments.filter((s) => s.kind === "text-run").length === 0 &&
+								chatTurnFollowsUser(host.chatContainer.children);
 							const comp = new AssistantMessageComponent(
 								undefined,
 								host.hideThinkingBlock,
 								host.getMarkdownThemeWithSettings(),
 								timestampFormat,
 								{ startIndex: seg.startIndex, endIndex: seg.endIndex },
+								connectedToUser,
 							);
 							comp.updateContent(host.streamingMessage);
 							host.chatContainer.addChild(comp);
@@ -854,6 +922,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 							host.hideThinkingBlock,
 							host.getMarkdownThemeWithSettings(),
 							timestampFormat,
+							undefined,
+							chatTurnFollowsUser(host.chatContainer.children),
 						);
 					host.chatContainer.addChild(host.streamingComponent);
 				}
@@ -900,22 +970,28 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 			host.ui.requestRender();
 			break;
 
-		case "tool_execution_start":
-			if (!host.pendingTools.has(event.toolCallId)) {
-				const component = new ToolExecutionComponent(
-					event.toolName,
-					event.args,
-					{ showImages: host.settingsManager.getShowImages() },
-					host.getRegisteredToolDefinition(event.toolName),
-					host.ui,
-				);
-				component.setExpanded(host.toolOutputExpanded);
-				host.chatContainer.addChild(component);
-				host.pendingTools.set(event.toolCallId, component);
+		case "tool_execution_start": {
+			const { component, created } = registerPendingToolComponent(
+				host,
+				event.toolCallId,
+				event.toolName,
+				event.args,
+				"standalone",
+				() =>
+					new ToolExecutionComponent(
+						event.toolName,
+						event.args,
+						{ showImages: host.settingsManager.getShowImages() },
+						host.getRegisteredToolDefinition(event.toolName),
+						host.ui,
+					),
+			);
+			if (created) {
 				renderedSegments.push({ kind: "tool", contentIndex: Number.MAX_SAFE_INTEGER, component });
-				host.ui.requestRender();
 			}
+			host.ui.requestRender();
 			break;
+		}
 
 		case "tool_execution_update": {
 			const component = host.pendingTools.get(event.toolCallId);

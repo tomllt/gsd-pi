@@ -1,0 +1,54 @@
+{
+  "repository": "https://github.com/earendil-works/pi",
+  "npmScope": "@earendil-works",
+  "pinnedRef": "v0.75.5",
+  "pinnedCommit": null,
+  "packageMap": {
+    "packages/agent": "packages/pi-agent-core",
+    "packages/ai": "packages/pi-ai",
+    "packages/tui": "packages/pi-tui",
+    "packages/coding-agent": "packages/pi-coding-agent"
+  },
+  "gsdPackageNames": {
+    "packages/agent": "@gsd/pi-agent-core",
+    "packages/ai": "@gsd/pi-ai",
+    "packages/tui": "@gsd/pi-tui",
+    "packages/coding-agent": "@gsd/pi-coding-agent"
+  },
+  "protectedPaths": [
+    "packages/gsd-agent-core",
+    "packages/gsd-agent-modes"
+  ],
+  "patchAllowlist": [
+    "packages/pi-ai/src/providers/google-shared.ts",
+    "packages/pi-ai/src/providers/mistral.ts",
+    "packages/pi-ai/src/providers/provider-capabilities.ts",
+    "packages/pi-ai/src/providers/provider-capabilities.test.ts",
+    "packages/pi-ai/src/utils/tests/normalize-tool-arguments.test.ts",
+    "packages/pi-ai/test/google-shared-convert-tools.test.ts",
+    "packages/pi-coding-agent/src/agent-core.d.ts",
+    "packages/pi-coding-agent/src/core/gsd-seam-types.ts",
+    "packages/pi-coding-agent/src/core/extensions/loader.ts",
+    "packages/pi-coding-agent/src/core/keybindings.ts",
+    "packages/pi-coding-agent/src/core/model-registry.ts",
+    "packages/pi-coding-agent/src/core/settings-manager.ts",
+    "packages/pi-coding-agent/src/core/model-discovery.ts",
+    "packages/pi-coding-agent/src/core/discovery-cache.ts",
+    "packages/pi-coding-agent/src/core/models-json-writer.ts",
+    "packages/pi-coding-agent/src/core/package-commands.ts",
+    "packages/pi-coding-agent/src/core/local-model-check.ts",
+    "packages/pi-coding-agent/src/core/capability-patches.ts",
+    "packages/pi-coding-agent/src/core/bash-interceptor.ts",
+    "packages/pi-coding-agent/src/core/constants.ts",
+    "packages/pi-coding-agent/src/core/chat-controller-ordering.test.ts",
+    "packages/pi-coding-agent/src/core/sdk-tool-filter.test.ts",
+    "packages/pi-coding-agent/src/core/tools/tool-compatibility-registry.ts",
+    "packages/pi-coding-agent/src/modes/interactive/controllers/chat-controller.ts",
+    "packages/pi-coding-agent/src/theme/**",
+    "packages/pi-coding-agent/scripts/copy-assets.cjs",
+    "packages/pi-tui/src/style.ts",
+    "packages/pi-tui/src/editor-keybindings.ts"
+  ],
+  "legacyScopes": ["@mariozechner"],
+  "notes": "Run scripts/vendor-pi.cjs to sync vendored pi-* packages from earendil-works/pi. patchAllowlist enforced by verify:pi-patches (see docs/dev/pi-overlay-execution-plan.md). Expand allowlist when adding documented GSD deltas."
+}

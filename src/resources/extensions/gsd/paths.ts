@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 import { nativeScanGsdTree, type GsdTreeEntry } from "./native-parser-bridge.js";
 import { DIR_CACHE_MAX } from "./constants.js";
 import { gsdHome } from "./gsd-home.js";
-import { isGsdWorktreePath, resolveWorktreeProjectRoot } from "./worktree-root.js";
+import { isGsdWorktreePath, resolveExternalStateProjectGsdFromWorktreePath, resolveWorktreeProjectRoot } from "./worktree-root.js";
 
 // ─── Directory Listing Cache ──────────────────────────────────────────────────
 
@@ -329,10 +329,8 @@ export function resolveGsdPathContract(
   const resolvedWorkRoot = resolve(workRoot || process.cwd());
   const isWorktree = isGsdWorktreePath(resolvedWorkRoot);
   if (isWorktree && !originalProjectRoot?.trim()) {
-    const externalMatch = /[/\\]\.gsd[/\\]projects[/\\][^/\\]+[/\\]worktrees(?:[/\\]|$)/.exec(resolvedWorkRoot);
-    if (externalMatch) {
-      const worktreesIdx = externalMatch[0].search(/[/\\]worktrees(?:[/\\]|$)/);
-      const projectGsd = resolvedWorkRoot.slice(0, externalMatch.index + worktreesIdx);
+    const projectGsd = resolveExternalStateProjectGsdFromWorktreePath(resolvedWorkRoot);
+    if (projectGsd) {
       return {
         projectRoot: dirname(dirname(projectGsd)),
         workRoot: resolvedWorkRoot,

@@ -2,6 +2,7 @@
 // File Purpose: Tests for interactive terminal tool execution rendering.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import stripAnsi from "strip-ansi";
 import { ToolExecutionComponent, ToolPhaseSummaryComponent, type ToolExecutionPhase } from "../tool-execution.js";
 import { initTheme } from "../../theme/theme.js";
@@ -53,10 +54,33 @@ function renderToolCollapsed(
 }
 
 describe("ToolExecutionComponent", () => {
+	test("reuses shared tool-argument normalization for pending invocation matching", () => {
+		const sourceUrl = existsSync(new URL("../tool-execution.ts", import.meta.url))
+			? new URL("../tool-execution.ts", import.meta.url)
+			: new URL("../tool-execution.js", import.meta.url);
+		const source = readFileSync(sourceUrl, "utf8");
+
+		assert.match(source, /import \{ normalizeToolArguments \} from "@gsd\/pi-ai";/);
+		assert.doesNotMatch(source, /function tryParseJsonValue/);
+		assert.doesNotMatch(source, /filePath \?\? normalized\.file_path \?\? normalized\.file/);
+	});
+
+	test("matches pending invocations after normalizing equivalent path aliases", () => {
+		const component = new ToolExecutionComponent(
+			"read",
+			{ filePath: "README.md" },
+			{},
+			undefined,
+			{ requestRender() {} } as any,
+		);
+
+		assert.equal(component.matchesInvocation("read", { path: "README.md" }), true);
+	});
+
 	test("renders framed header with running status while tool is partial", () => {
 		const rendered = renderToolCollapsed("mcp__demo__do_thing", { ok: true });
 
-		assert.match(rendered, /demo\u00b7do_thing/);
+		assert.match(rendered, /DEMO\u00b7DO_THING/);
 		assert.doesNotMatch(rendered, /Tool demo\u00b7do_thing/);
 		assert.match(rendered, /running/);
 		assert.match(rendered, /running · \d+(ms|s)/);
@@ -72,8 +96,8 @@ describe("ToolExecutionComponent", () => {
 			},
 		);
 
-		const labelMatches = rendered.match(/Agent/g) ?? [];
-		assert.equal(labelMatches.length, 1, `expected only the card title to contain Agent:\n${rendered}`);
+		const labelMatches = rendered.match(/AGENT/g) ?? [];
+		assert.equal(labelMatches.length, 1, `expected only the card title to contain AGENT:\n${rendered}`);
 		assert.doesNotMatch(rendered, /description="Scout habit tracker codebase"/);
 		assert.doesNotMatch(rendered, /subagent_type="Explore"/);
 		assert.match(rendered, /running · \d+(ms|s)/);
@@ -86,7 +110,7 @@ describe("ToolExecutionComponent", () => {
 			{ content: [{ type: "text", text: "boom" }], isError: true },
 		);
 
-		assert.match(rendered, /demo\u00b7do_thing/);
+		assert.match(rendered, /DEMO\u00b7DO_THING/);
 		assert.doesNotMatch(rendered, /Tool demo\u00b7do_thing/);
 		assert.match(rendered, /failed/);
 		assert.match(rendered, /failed · \d+(ms|s)/);
@@ -101,7 +125,7 @@ describe("ToolExecutionComponent", () => {
 		);
 
 		assert.match(rendered, /success · \d+(ms|s)/);
-		assert.match(rendered, /demo\u00b7noop/);
+		assert.match(rendered, /DEMO\u00b7NOOP/);
 		assert.doesNotMatch(rendered, /Completed/);
 		assert.doesNotMatch(rendered, /ok=true/);
 	});
@@ -113,8 +137,8 @@ describe("ToolExecutionComponent", () => {
 			{ content: [{ type: "text", text: "TodoWrite" }], isError: false },
 		);
 
-		const labelMatches = rendered.match(/TodoWrite/g) ?? [];
-		assert.equal(labelMatches.length, 1, `expected only the card title to contain TodoWrite:\n${rendered}`);
+		const labelMatches = rendered.match(/TODOWRITE/g) ?? [];
+		assert.equal(labelMatches.length, 1, `expected only the card title to contain TODOWRITE:\n${rendered}`);
 		assert.match(rendered, /output hidden/);
 		assert.match(rendered, /ctrl\+o expand/);
 	});
@@ -164,7 +188,7 @@ describe("ToolExecutionComponent", () => {
 			},
 		);
 
-		assert.match(rendered, /Read/);
+		assert.match(rendered, /READ/);
 		assert.match(rendered, /src\/Inspector\.tsx:4-12/);
 		assert.doesNotMatch(rendered, /source/);
 		assert.doesNotMatch(rendered, /output hidden\n\s*│\s*ctrl\+o expand/);
@@ -177,7 +201,7 @@ describe("ToolExecutionComponent", () => {
 			{ content: [{ type: "text", text: "hidden body output" }], isError: false },
 		);
 
-		assert.match(rendered, /Read/);
+		assert.match(rendered, /READ/);
 		assert.match(rendered, /health-widget-core\.ts/);
 		assert.doesNotMatch(rendered, /hidden body output/);
 	});
@@ -196,7 +220,7 @@ describe("ToolExecutionComponent", () => {
 			},
 		);
 
-		assert.match(rendered, /Read/);
+		assert.match(rendered, /READ/);
 		assert.match(rendered, /health-widget-core\.ts:1-12/);
 		assert.doesNotMatch(rendered, /hidden body output/);
 	});
@@ -220,7 +244,7 @@ describe("ToolExecutionComponent", () => {
 			},
 		);
 
-		assert.match(rendered, /Edit/);
+		assert.match(rendered, /EDIT/);
 		assert.match(rendered, /src\/Inspector\.tsx:42/);
 		assert.doesNotMatch(rendered, /Updated src\/Inspector\.tsx/);
 	});
@@ -228,10 +252,10 @@ describe("ToolExecutionComponent", () => {
 	test("renders running edit rows with title and target on the top line", () => {
 		const rendered = renderToolCollapsed("edit", { path: "src/Inspector.tsx" });
 
-		const labelMatches = rendered.match(/Edit/g) ?? [];
+		const labelMatches = rendered.match(/EDIT/g) ?? [];
 		assert.equal(labelMatches.length, 1, `expected tool name only in the card title:\n${rendered}`);
 		assert.match(rendered, /src\/Inspector\.tsx/);
-		assert.match(rendered, /Edit src\/Inspector\.tsx/);
+		assert.match(rendered, /EDIT src\/Inspector\.tsx/);
 		assert.match(rendered, /running · \d+(ms|s)/);
 	});
 
@@ -253,7 +277,7 @@ describe("ToolExecutionComponent", () => {
 			},
 		);
 
-		assert.match(rendered, /Write/);
+		assert.match(rendered, /WRITE/);
 		assert.match(rendered, /src\/output\.ts/);
 		assert.doesNotMatch(rendered, /Successfully wrote/);
 	});
@@ -265,7 +289,7 @@ describe("ToolExecutionComponent", () => {
 			{ content: [{ type: "text", text: "hidden body output" }], isError: false },
 		);
 
-		assert.match(rendered, /Grep/);
+		assert.match(rendered, /GREP/);
 		assert.doesNotMatch(rendered, /^│\.\s+│/m, `expected no placeholder cwd body:\n${rendered}`);
 		assert.match(rendered, /output hidden/);
 		assert.doesNotMatch(rendered, /hidden body output/);
@@ -417,7 +441,7 @@ describe("ToolExecutionComponent", () => {
 			{ content: [{ type: "text", text: "react@18.3.1" }], isError: false },
 		);
 
-		assert.match(rendered, /context7\u00b7resolve_library_id/);
+		assert.match(rendered, /CONTEXT7\u00b7RESOLVE_LIBRARY_ID/);
 		assert.doesNotMatch(rendered, /mcp__/);
 		assert.match(rendered, /name="react"/);
 		assert.match(rendered, /react@18\.3\.1/);
@@ -429,7 +453,7 @@ describe("ToolExecutionComponent", () => {
 			{ count: 3, enabled: true, label: "hello" },
 		);
 
-		assert.match(rendered, /Some Unknown Tool/);
+		assert.match(rendered, /SOME UNKNOWN TOOL/);
 		assert.match(rendered, /count=3/);
 		assert.match(rendered, /enabled=true/);
 		assert.match(rendered, /label="hello"/);
@@ -444,7 +468,7 @@ describe("ToolExecutionComponent", () => {
 			{ label: "Complete Slice" },
 		);
 
-		assert.match(rendered, /Complete Slice/);
+		assert.match(rendered, /COMPLETE SLICE/);
 		assert.doesNotMatch(rendered, /Tool Complete Slice/);
 		assert.doesNotMatch(rendered, /gsd_slice_complete/);
 	});
@@ -452,7 +476,7 @@ describe("ToolExecutionComponent", () => {
 	test("frame header strips gsd_ prefix and title-cases when no label is registered", () => {
 		const rendered = renderToolCollapsed("gsd_requirement_update", { id: "R005" });
 
-		assert.match(rendered, /Requirement Update/);
+		assert.match(rendered, /REQUIREMENT UPDATE/);
 		assert.doesNotMatch(rendered, /Tool Requirement Update/);
 		assert.doesNotMatch(rendered, /gsd_requirement_update/);
 	});
@@ -465,7 +489,7 @@ describe("ToolExecutionComponent", () => {
 			worktree: longPath,
 		});
 
-		assert.match(rendered, /Slice Complete/);
+		assert.match(rendered, /SLICE COMPLETE/);
 		assert.match(rendered, /running · \d+(ms|s)/);
 		assert.doesNotMatch(rendered, /sliceId="S03"/);
 		assert.doesNotMatch(rendered, /milestoneId="M001"/);
@@ -492,7 +516,7 @@ describe("ToolExecutionComponent", () => {
 			{ content: [{ type: "text", text: longOutput }], isError: false },
 		);
 
-		assert.match(rendered, /demo\u00b7do_thing/);
+		assert.match(rendered, /DEMO\u00b7DO_THING/);
 		assert.match(rendered, /success · \d+(ms|s)/);
 		assert.doesNotMatch(rendered, /line 1\b/);
 		assert.doesNotMatch(rendered, /\(15 more lines/);
@@ -504,7 +528,7 @@ describe("ToolExecutionComponent", () => {
 			{ payload: { nested: { deeply: ["a", "b", "c"] } }, name: "x" },
 		);
 
-		assert.match(rendered, /demo\u00b7nested/);
+		assert.match(rendered, /DEMO\u00b7NESTED/);
 		// Multi-line JSON dump for the complex payload
 		assert.match(rendered, /"payload"/);
 		assert.match(rendered, /"nested"/);

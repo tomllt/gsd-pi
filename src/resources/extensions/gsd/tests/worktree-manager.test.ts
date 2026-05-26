@@ -106,6 +106,21 @@ describe("createWorktree", () => {
       "should throw on invalid worktree name",
     );
   });
+
+  test("removes stale directory with standalone .git directory and recreates worktree", () => {
+    const staleDir = worktreePath(base, "M010");
+    mkdirSync(staleDir, { recursive: true });
+    run("git init -b main", staleDir);
+    writeFileSync(join(staleDir, "orphan.txt"), "stale leftover\n", "utf-8");
+    assert.ok(existsSync(join(staleDir, ".git")), "stale directory has standalone .git directory");
+
+    const info = createWorktree(base, "M010");
+    assert.strictEqual(info.name, "M010");
+    assert.ok(existsSync(info.path));
+    assert.ok(existsSync(join(info.path, ".git")), "recovered worktree has .git marker");
+    run("git rev-parse --git-dir", info.path);
+    assert.ok(!existsSync(join(info.path, "orphan.txt")), "stale file removed by recovery");
+  });
 });
 
 describe("createWorktree — duplicate rejection", () => {

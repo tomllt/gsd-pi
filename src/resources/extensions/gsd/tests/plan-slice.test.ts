@@ -710,3 +710,50 @@ test('regression: validateTasks surfaces clean per-field errors for non-array IO
     cleanup(base);
   }
 });
+
+test('handlePlanSlice skips prose and sentinel values in planning path scope', async () => {
+  const base = makeTmpBase();
+  openDatabase(join(base, '.gsd', 'gsd.db'));
+
+  try {
+    seedParentSlice();
+    const result = await handlePlanSlice({
+      ...validParams(),
+      tasks: [{
+        ...validParams().tasks[0],
+        inputs: ['Current enum shape in codebase', 'None'],
+        expectedOutput: ['Updated planning-path-scope.ts — validates paths only'],
+      }],
+    }, base);
+
+    assert.ok(!('error' in result), `expected success, got: ${(result as { error?: string }).error}`);
+    assert.equal(getSliceTasks('M001', 'S02').length, 1);
+  } finally {
+    cleanup(base);
+  }
+});
+
+test('handlePlanSlice resolves relative task IO paths against worktree roots', async () => {
+  const base = makeTmpBase();
+  const worktree = join(base, '.gsd', 'worktrees', 'M001');
+  mkdirSync(join(worktree, 'src'), { recursive: true });
+  writeFileSync(join(worktree, 'index.html'), '<html></html>', 'utf-8');
+  openDatabase(join(base, '.gsd', 'gsd.db'));
+
+  try {
+    seedParentSlice();
+    const result = await handlePlanSlice({
+      ...validParams(),
+      tasks: [{
+        ...validParams().tasks[0],
+        files: ['index.html'],
+        inputs: ['index.html'],
+        expectedOutput: ['index.html'],
+      }],
+    }, worktree);
+
+    assert.ok(!('error' in result), `expected success, got: ${(result as { error?: string }).error}`);
+  } finally {
+    cleanup(base);
+  }
+});

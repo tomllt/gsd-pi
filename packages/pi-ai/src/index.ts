@@ -33,4 +33,5 @@ export type {
 export * from "./utils/overflow.js";
 export * from "./utils/typebox-helpers.js";
 export * from "./utils/repair-tool-json.js";
+export * from "./utils/normalize-tool-arguments.js";
 export * from "./utils/validation.js";

@@ -203,7 +203,7 @@ export async function mergeCompletedMilestone(
       error:
         result.mode === "skipped"
           ? `Merge skipped for ${milestoneId} (mode=none or isolation degraded).`
-          : `No roadmap for ${milestoneId} — milestone branch preserved for manual merge.`,
+          : `No roadmap or slice records for ${milestoneId} — milestone branch preserved for manual merge.`,
     };
   }
 

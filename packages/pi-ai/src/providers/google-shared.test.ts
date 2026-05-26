@@ -1,10 +1,77 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertTools, normalizeClaudeToolSchemaForGoogle, sanitizeSchemaForGoogle } from "./google-shared.js";
+import type { AssistantMessage, Context, Model } from "../types.js";
+import { convertMessages, convertTools, normalizeClaudeToolSchemaForGoogle, sanitizeSchemaForGoogle } from "./google-shared.js";
+import { setProviderSwitchObserver, type ProviderSwitchReport } from "./transform-messages.js";
+
+function makeGoogleModel(overrides: Partial<Model<"google-generative-ai">> = {}): Model<"google-generative-ai"> {
+	return {
+		id: "gemini-2.5-pro",
+		name: "Gemini 2.5 Pro",
+		api: "google-generative-ai",
+		provider: "google",
+		baseUrl: "",
+		reasoning: false,
+		input: ["text", "image"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 1_000_000,
+		maxTokens: 8192,
+		...overrides,
+	};
+}
+
+function makeAssistantMessage(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
+	return {
+		role: "assistant",
+		content: [],
+		api: "anthropic-messages",
+		provider: "anthropic",
+		model: "claude-sonnet-4-6",
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+		stopReason: "stop",
+		timestamp: Date.now(),
+		...overrides,
+	};
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // sanitizeSchemaForGoogle
 // ═══════════════════════════════════════════════════════════════════════════
+
+describe("convertMessages", () => {
+	it("emits provider switch reports for Google message conversion", () => {
+		const reports: ProviderSwitchReport[] = [];
+		setProviderSwitchObserver((report) => reports.push(report));
+		try {
+			const context: Context = {
+				messages: [
+					makeAssistantMessage({
+						content: [
+							{ type: "thinking", thinking: "Need to reason through this." },
+							{ type: "text", text: "Answer" },
+						],
+					}),
+				],
+			};
+
+			convertMessages(makeGoogleModel(), context);
+
+			assert.equal(reports.length, 1);
+			assert.equal(reports[0].fromApi, "google-generative-ai");
+			assert.equal(reports[0].toApi, "google-generative-ai");
+			assert.equal(reports[0].thinkingBlocksDowngraded, 1);
+		} finally {
+			setProviderSwitchObserver(undefined);
+		}
+	});
+});
 
 describe("sanitizeSchemaForGoogle", () => {
 	it("passes through primitives unchanged", () => {
@@ -74,8 +141,7 @@ describe("sanitizeSchemaForGoogle", () => {
 			oneOf: [{ const: "x" }, { const: "y" }],
 		};
 		const result = sanitizeSchemaForGoogle(schema) as any;
-		assert.deepEqual(result.oneOf[0], { enum: ["x"], type: "string" });
-		assert.deepEqual(result.oneOf[1], { enum: ["y"], type: "string" });
+		assert.deepEqual(result, { enum: ["x", "y"], type: "string" });
 	});
 
 	it("recursively sanitizes deeply nested schemas", () => {

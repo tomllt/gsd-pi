@@ -42,6 +42,7 @@ import {
   openDatabase,
   closeDatabase,
   insertMilestone,
+  insertSlice,
   updateMilestoneStatus,
 } from "../../gsd-db.ts";
 
@@ -97,6 +98,18 @@ function cleanup(dir: string): void {
  * through the Module, which performs mode detection — branch mode keeps
  * the test simple while still going through the Module.
  */
+function setupWorktreeIsolation(repo: string): void {
+  mkdirSync(join(repo, ".gsd"), { recursive: true });
+  writeFileSync(
+    join(repo, ".gsd", "preferences.md"),
+    "## Git\n- isolation: worktree\n",
+  );
+  try {
+    run("git add .gsd/preferences.md", repo);
+    run('git commit -m "test: add worktree-isolation preferences"', repo);
+  } catch { /* file may already be committed */ }
+}
+
 function setupBranchIsolation(repo: string): void {
   mkdirSync(join(repo, ".gsd"), { recursive: true });
   writeFileSync(
@@ -283,7 +296,7 @@ test("mergeCompletedMilestone — missing roadmap returns error result", async (
   const savedCwd = process.cwd();
   // Use a real git repo so the standalone's branch-mode merge body can
   // call `getCurrentBranch` without throwing. The roadmap is intentionally
-  // omitted so the merge ends in the "no-roadmap" branch.
+  // omitted so the merge ends in the "no-roadmap-or-slices" branch.
   const repo = createTempRepo();
   try {
     setupBranchIsolation(repo);
@@ -305,10 +318,54 @@ test("mergeCompletedMilestone — missing roadmap returns error result", async (
     // What matters is `success: false`; the exact wording can shift as
     // the standalone evolves.
     assert.ok(result.error, "should report a non-empty error");
+    assert.match(result.error!, /No roadmap or slice records/);
     assert.equal(result.milestoneId, "M999");
   } finally {
     process.chdir(savedCwd);
     try { run("git reset --hard HEAD", repo); } catch { /* */ }
+    cleanup(repo);
+  }
+});
+
+test("mergeCompletedMilestone — synthesizes roadmap from DB when projection is missing", async () => {
+  const savedCwd = process.cwd();
+  const repo = createTempRepo();
+
+  try {
+    setupWorktreeIsolation(repo);
+    openDatabase(join(repo, ".gsd", "gsd.db"));
+    insertMilestone({ id: "M010", title: "Search and Filters", status: "complete" });
+    insertSlice({
+      id: "S01",
+      milestoneId: "M010",
+      title: "Task Editing",
+      status: "complete",
+    });
+    insertSlice({
+      id: "S02",
+      milestoneId: "M010",
+      title: "Search Bar",
+      status: "complete",
+    });
+
+    createMilestoneBranch(repo, "M010", [
+      { name: "app.js", content: "export const app = true;\n" },
+    ]);
+
+    // Stale session marker dir without a registered git worktree — mirrors
+    // torn-down worktrees that still leave `.gsd/worktrees/<MID>/`.
+    mkdirSync(join(repo, ".gsd", "worktrees", "M010", ".gsd"), { recursive: true });
+
+    process.chdir(repo);
+    const result = await mergeCompletedMilestone(repo, "M010");
+
+    assert.equal(result.success, true, result.error);
+    assert.match(run("git show HEAD:app.js", repo), /export const app = true/);
+    assert.equal(run("git branch --list milestone/M010", repo), "");
+  } finally {
+    closeDatabase();
+    process.chdir(savedCwd);
+    try { run("git reset --hard HEAD~1", repo); } catch { /* */ }
     cleanup(repo);
   }
 });

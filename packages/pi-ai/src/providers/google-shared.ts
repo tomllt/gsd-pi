@@ -1,5 +1,5 @@
 /**
- * Shared utilities for Google Generative AI and Google Cloud Code Assist providers.
+ * Shared utilities for Google Generative AI and Google Vertex providers.
  */
 
 import { type Content, FinishReason, FunctionCallingConfigMode, type Part } from "@google/genai";
@@ -8,6 +8,12 @@ import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 import { transformMessagesWithReport } from "./transform-messages.js";
 
 type GoogleApiType = "google-generative-ai" | "google-gemini-cli" | "google-vertex";
+
+/**
+ * Thinking level for Gemini 3 models.
+ * Mirrors Google's ThinkingLevel enum values.
+ */
+export type GoogleThinkingLevel = "THINKING_LEVEL_UNSPECIFIED" | "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
 
 /**
  * Determines whether a streamed Gemini `Part` should be treated as "thinking".
@@ -44,11 +50,8 @@ export function retainThoughtSignature(existing: string | undefined, incoming: s
 
 // Thought signatures must be base64 for Google APIs (TYPE_BYTES).
 const base64SignaturePattern = /^[A-Za-z0-9+/]+={0,2}$/;
-
-// Sentinel value that tells the Gemini API to skip thought signature validation.
-// Used for unsigned function call parts (e.g. replayed from providers without thought signatures).
-// See: https://ai.google.dev/gemini-api/docs/thought-signatures
-const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator";
+// Google-documented sentinel for unsigned Gemini 3 function calls.
+const SKIP_THOUGHT_SIGNATURE_VALIDATOR = "skip_thought_signature_validator";
 
 function isValidThoughtSignature(signature: string | undefined): boolean {
 	if (!signature) return false;
@@ -66,8 +69,22 @@ function resolveThoughtSignature(isSameProviderAndModel: boolean, signature: str
 /**
  * Models via Google APIs that require explicit tool call IDs in function calls/responses.
  */
-function requiresToolCallId(modelId: string): boolean {
+export function requiresToolCallId(modelId: string): boolean {
 	return modelId.startsWith("claude-") || modelId.startsWith("gpt-oss-");
+}
+
+function getGeminiMajorVersion(modelId: string): number | undefined {
+	const match = modelId.toLowerCase().match(/^gemini(?:-live)?-(\d+)/);
+	if (!match) return undefined;
+	return Number.parseInt(match[1], 10);
+}
+
+function supportsMultimodalFunctionResponse(modelId: string): boolean {
+	const geminiMajorVersion = getGeminiMajorVersion(modelId);
+	if (geminiMajorVersion !== undefined) {
+		return geminiMajorVersion >= 3;
+	}
+	return false;
 }
 
 /**
@@ -80,7 +97,12 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 		return id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 	};
 
-	const transformedMessages = transformMessagesWithReport(context.messages, model, normalizeToolCallId, "google-generative-ai");
+	const transformedMessages = transformMessagesWithReport(
+		context.messages,
+		model,
+		normalizeToolCallId,
+		"google-generative-ai",
+	);
 
 	for (const msg of transformedMessages) {
 		if (msg.role === "user") {
@@ -90,7 +112,10 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 					parts: [{ text: sanitizeSurrogates(msg.content) }],
 				});
 			} else {
-				const parts: Part[] = msg.content.map((item) => {
+				const supportedContent = model.input.includes("image")
+					? msg.content
+					: msg.content.filter((item) => item.type === "text");
+				const parts: Part[] = supportedContent.map((item) => {
 					if (item.type === "text") {
 						return { text: sanitizeSurrogates(item.text) };
 					} else {
@@ -102,11 +127,10 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 						};
 					}
 				});
-				const filteredParts = !model.input.includes("image") ? parts.filter((p) => p.text !== undefined) : parts;
-				if (filteredParts.length === 0) continue;
+				if (parts.length === 0) continue;
 				contents.push({
 					role: "user",
-					parts: filteredParts,
+					parts,
 				});
 			}
 		} else if (msg.role === "assistant") {
@@ -116,7 +140,7 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 
 			for (const block of msg.content) {
 				if (block.type === "text") {
-					// Skip empty text blocks - they can cause issues with some models (e.g. Claude via Antigravity)
+					// Skip empty text blocks
 					if (!block.text || block.text.trim() === "") continue;
 					const thoughtSignature = resolveThoughtSignature(isSameProviderAndModel, block.textSignature);
 					parts.push({
@@ -142,11 +166,10 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 					}
 				} else if (block.type === "toolCall") {
 					const thoughtSignature = resolveThoughtSignature(isSameProviderAndModel, block.thoughtSignature);
-					// Gemini 3 requires thoughtSignature on all function calls when thinking mode is enabled.
-					// Use the skip_thought_signature_validator sentinel for unsigned function calls
-					// (e.g. replayed from providers without thought signatures like Claude via Antigravity).
-					const isGemini3 = model.id.toLowerCase().includes("gemini-3");
-					const effectiveSignature = thoughtSignature || (isGemini3 ? SKIP_THOUGHT_SIGNATURE : undefined);
+					// Gemini 3 requires a signature on function calls when thinking is enabled.
+					const effectiveSignature =
+						thoughtSignature ??
+						(getGeminiMajorVersion(model.id) === 3 ? SKIP_THOUGHT_SIGNATURE_VALIDATOR : undefined);
 					const part: Part = {
 						functionCall: {
 							name: block.name,
@@ -175,10 +198,10 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 			const hasText = textResult.length > 0;
 			const hasImages = imageContent.length > 0;
 
-			// Gemini 3 supports multimodal function responses with images nested inside functionResponse.parts
-			// See: https://ai.google.dev/gemini-api/docs/function-calling#multimodal
-			// Older models don't support this, so we put images in a separate user message.
-			const supportsMultimodalFunctionResponse = model.id.includes("gemini-3");
+			// Gemini 3+ models support multimodal function responses with images nested inside
+			// functionResponse.parts. Claude and other non-Gemini models behind Cloud Code Assist /
+			// Gemini < 3 still needs a separate user image turn.
+			const modelSupportsMultimodalFunctionResponse = supportsMultimodalFunctionResponse(model.id);
 
 			// Use "output" key for success, "error" key for errors as per SDK documentation
 			const responseValue = hasText ? sanitizeSurrogates(textResult) : hasImages ? "(see attached image)" : "";
@@ -195,8 +218,7 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 				functionResponse: {
 					name: msg.toolName,
 					response: msg.isError ? { error: responseValue } : { output: responseValue },
-					// Nest images inside functionResponse.parts for Gemini 3
-					...(hasImages && supportsMultimodalFunctionResponse && { parts: imageParts }),
+					...(hasImages && modelSupportsMultimodalFunctionResponse && { parts: imageParts }),
 					...(includeId ? { id: msg.toolCallId } : {}),
 				},
 			};
@@ -213,8 +235,8 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 				});
 			}
 
-			// For older models, add images in a separate user message
-			if (hasImages && !supportsMultimodalFunctionResponse) {
+			// For Gemini < 3, add images in a separate user message
+			if (hasImages && !modelSupportsMultimodalFunctionResponse) {
 				contents.push({
 					role: "user",
 					parts: [{ text: "Tool result image:" }, ...imageParts],
@@ -226,80 +248,65 @@ export function convertMessages<T extends GoogleApiType>(model: Model<T>, contex
 	return contents;
 }
 
-/**
- * Sanitize a JSON Schema for Google's function declarations API.
- * Google's API rejects `patternProperties` and `const` fields which are valid in JSON Schema.
- *
- * This function recursively:
- * - Removes all `patternProperties` fields
- * - Converts `const: value` to `enum: [value]` in anyOf/oneOf blocks
- *
- * This is needed for providers like `google-antigravity` when proxying Claude models,
- * since Google Cloud Code Assist uses a restricted subset of JSON Schema.
- */
-export function sanitizeSchemaForGoogle(schema: unknown): unknown {
-	if (!schema || typeof schema !== "object") {
-		return schema;
+const JSON_SCHEMA_META_DECLARATIONS = new Set([
+	"$schema",
+	"$id",
+	"$anchor",
+	"$dynamicAnchor",
+	"$vocabulary",
+	"$comment",
+	"$defs",
+	"definitions", // pre-draft-2019-09 equivalent of $defs
+	"unevaluatedProperties",
+]);
+
+const CLAUDE_UNSUPPORTED_SCHEMA_KEYS = new Set([
+	...JSON_SCHEMA_META_DECLARATIONS,
+	"$ref",
+	"nullable",
+	"examples",
+	"example",
+	"readOnly",
+	"writeOnly",
+]);
+
+function inferJsonSchemaType(value: unknown): string {
+	if (typeof value === "number") {
+		return Number.isInteger(value) ? "integer" : "number";
 	}
-
-	if (Array.isArray(schema)) {
-		return schema.map((item) => sanitizeSchemaForGoogle(item));
+	if (typeof value === "boolean") {
+		return "boolean";
 	}
-
-	const obj = schema as Record<string, unknown>;
-	const sanitized: Record<string, unknown> = {};
-
-	for (const [key, value] of Object.entries(obj)) {
-		// Skip keywords not supported by Google's function declaration subset.
-		if (key === "patternProperties" || key === "$schema" || key === "$id" || key === "unevaluatedProperties") {
-			continue;
-		}
-
-		if (key === "additionalProperties" && value === false) {
-			continue;
-		}
-
-		if (key === "required" && Array.isArray(value) && value.length === 0) {
-			continue;
-		}
-
-		// Convert const to enum — Google's API rejects the const keyword
-		if (key === "const") {
-			sanitized.enum = [value];
-			const inferredType = inferJsonSchemaType(value);
-			if (inferredType) {
-				sanitized.type = inferredType;
-			}
-			continue;
-		}
-
-		// Recursively sanitize all nested objects and arrays
-		if (typeof value === "object") {
-			sanitized[key] = sanitizeSchemaForGoogle(value);
-		} else {
-			sanitized[key] = value;
-		}
-	}
-
-	return sanitized;
+	return "string";
 }
 
-function inferJsonSchemaType(value: unknown): string | undefined {
-	if (typeof value === "string") return "string";
-	if (typeof value === "number") return Number.isInteger(value) ? "integer" : "number";
-	if (typeof value === "boolean") return "boolean";
-	return undefined;
+function isConstOnlySchema(schema: unknown): schema is { const: unknown } {
+	if (typeof schema !== "object" || schema === null || Array.isArray(schema)) {
+		return false;
+	}
+	const obj = schema as Record<string, unknown>;
+	return "const" in obj;
+}
+
+function collapseConstUnion(
+	obj: Record<string, unknown>,
+	unionKey: "oneOf" | "anyOf",
+): Record<string, unknown> {
+	const variants = obj[unionKey] as unknown[];
+	const enumValues = variants.map((variant) => (variant as { const: unknown }).const);
+	const enumTypes = new Set(enumValues.map(inferJsonSchemaType));
+	const { [unionKey]: _removed, ...rest } = obj;
+	return {
+		...rest,
+		type: enumTypes.size === 1 ? [...enumTypes][0] : "string",
+		enum: enumValues,
+	};
 }
 
 function mergePropertySchemas(a: unknown, b: unknown): unknown {
 	if (!a) return b;
 	if (!b) return a;
-	if (
-		typeof a !== "object"
-		|| typeof b !== "object"
-		|| Array.isArray(a)
-		|| Array.isArray(b)
-	) {
+	if (typeof a !== "object" || typeof b !== "object" || Array.isArray(a) || Array.isArray(b)) {
 		return b;
 	}
 
@@ -320,7 +327,9 @@ function mergePropertySchemas(a: unknown, b: unknown): unknown {
 	}
 
 	if (Array.isArray(left.enum) || Array.isArray(right.enum)) {
-		const enumValues = Array.from(new Set([...(Array.isArray(left.enum) ? left.enum : []), ...(Array.isArray(right.enum) ? right.enum : [])]));
+		const enumValues = Array.from(
+			new Set([...(Array.isArray(left.enum) ? left.enum : []), ...(Array.isArray(right.enum) ? right.enum : [])]),
+		);
 		return {
 			...left,
 			...right,
@@ -353,13 +362,13 @@ export function normalizeClaudeToolSchemaForGoogle(schema: unknown): unknown {
 			: [];
 	const objectVariants = variants.filter(
 		(candidate): candidate is Record<string, unknown> =>
-			!!candidate
-			&& typeof candidate === "object"
-			&& !Array.isArray(candidate)
-			&& candidate.type === "object"
-			&& typeof candidate.properties === "object"
-			&& candidate.properties !== null
-			&& !Array.isArray(candidate.properties),
+			!!candidate &&
+			typeof candidate === "object" &&
+			!Array.isArray(candidate) &&
+			candidate.type === "object" &&
+			typeof candidate.properties === "object" &&
+			candidate.properties !== null &&
+			!Array.isArray(candidate.properties),
 	);
 
 	if (objectVariants.length === 0) {
@@ -367,7 +376,9 @@ export function normalizeClaudeToolSchemaForGoogle(schema: unknown): unknown {
 			...jsonSchema,
 			type: "object",
 			properties:
-				typeof jsonSchema.properties === "object" && jsonSchema.properties !== null && !Array.isArray(jsonSchema.properties)
+				typeof jsonSchema.properties === "object" &&
+				jsonSchema.properties !== null &&
+				!Array.isArray(jsonSchema.properties)
 					? jsonSchema.properties
 					: {},
 			required: Array.isArray(jsonSchema.required)
@@ -408,6 +419,256 @@ export function normalizeClaudeToolSchemaForGoogle(schema: unknown): unknown {
 	return normalized;
 }
 
+function convertPatternPropertiesToAdditionalProperties(
+	obj: Record<string, unknown>,
+	sanitize: (schema: unknown) => unknown,
+): Record<string, unknown> {
+	if (!("patternProperties" in obj)) {
+		return obj;
+	}
+
+	const { patternProperties, ...rest } = obj;
+	if ("additionalProperties" in rest) {
+		return rest;
+	}
+
+	const valueSchemas = Object.values(patternProperties as Record<string, unknown>).map((value) => sanitize(value));
+	if (valueSchemas.length === 1) {
+		return { ...rest, additionalProperties: valueSchemas[0] };
+	}
+	if (valueSchemas.length > 1) {
+		return { ...rest, additionalProperties: true };
+	}
+	return rest;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function simplifyNonConstUnion(
+	obj: Record<string, unknown>,
+	unionKey: "oneOf" | "anyOf" | "allOf",
+	sanitize: (schema: unknown) => unknown,
+): Record<string, unknown> {
+	const variants = (obj[unionKey] as unknown[]).map((variant) => sanitize(variant));
+	const { [unionKey]: _removed, description, ...rest } = obj;
+	const desc = typeof description === "string" ? description : undefined;
+
+	const objectVariants = variants.filter(
+		(variant): variant is Record<string, unknown> => isRecord(variant) && variant.type === "object",
+	);
+	if (objectVariants.length > 0 && objectVariants.length === variants.length) {
+		const merged = sanitize(
+			normalizeClaudeToolSchemaForGoogle({
+				type: "object",
+				properties: objectVariants.reduce(
+					(acc: Record<string, unknown>, candidate) => ({
+						...acc,
+						...Object.fromEntries(
+							Object.entries((candidate.properties as Record<string, unknown>) ?? {}).map(([key, value]) => [
+								key,
+								mergePropertySchemas(acc[key], value),
+							]),
+						),
+					}),
+					{},
+				),
+			}),
+		);
+		return {
+			...(isRecord(merged) ? merged : { type: "object" }),
+			...rest,
+			...(desc ? { description: desc } : {}),
+		};
+	}
+
+	const arrayVariant = variants.find((variant) => isRecord(variant) && variant.type === "array");
+	const stringVariant = variants.find((variant) => isRecord(variant) && variant.type === "string");
+	if (arrayVariant && stringVariant && variants.length === 2) {
+		return {
+			...arrayVariant,
+			...rest,
+			...(desc ? { description: desc } : {}),
+		};
+	}
+
+	if (objectVariants[0] && stringVariant && variants.length === 2) {
+		return {
+			...objectVariants[0],
+			...rest,
+			...(desc
+				? { description: `${desc}. A plain string fallback is also accepted.` }
+				: { description: "Structured object preferred; a plain string fallback is also accepted." }),
+		};
+	}
+
+	const firstVariant = variants.find(isRecord);
+	if (firstVariant) {
+		return {
+			...firstVariant,
+			...rest,
+			...(desc ? { description: desc } : {}),
+		};
+	}
+
+	return {
+		type: "string",
+		...rest,
+		...(desc ? { description: desc } : {}),
+	};
+}
+
+function normalizeAdditionalProperties(value: unknown): unknown {
+	if (value === false) {
+		return undefined;
+	}
+	if (isRecord(value) && Object.keys(value).length === 0) {
+		return true;
+	}
+	return value;
+}
+
+/**
+ * Deep sanitizer for Claude custom tool schemas on Cloud Code Assist.
+ * Anthropic accepts a strict JSON Schema draft 2020-12 subset: no nested
+ * anyOf/oneOf/allOf, $ref, or patternProperties.
+ */
+function sanitizeForClaudeInputSchemaDeep(schema: unknown): unknown {
+	if (Array.isArray(schema)) {
+		return schema.map(sanitizeForClaudeInputSchemaDeep);
+	}
+	if (!isRecord(schema)) {
+		return schema;
+	}
+
+	let obj = convertPatternPropertiesToAdditionalProperties(schema, sanitizeForClaudeInputSchemaDeep);
+
+	const unionKey =
+		"oneOf" in obj && Array.isArray(obj.oneOf)
+			? ("oneOf" as const)
+			: "anyOf" in obj && Array.isArray(obj.anyOf)
+				? ("anyOf" as const)
+				: "allOf" in obj && Array.isArray(obj.allOf)
+					? ("allOf" as const)
+					: null;
+	if (unionKey) {
+		const variants = obj[unionKey] as unknown[];
+		if (variants.length > 0 && variants.every(isConstOnlySchema)) {
+			const collapsedUnionKey = unionKey === "allOf" ? "anyOf" : unionKey;
+			const { [unionKey]: unionVariants, ...restWithoutUnion } = obj;
+			return sanitizeForClaudeInputSchemaDeep(
+				collapseConstUnion({ ...restWithoutUnion, [collapsedUnionKey]: unionVariants }, collapsedUnionKey),
+			);
+		}
+		return sanitizeForClaudeInputSchemaDeep(simplifyNonConstUnion(obj, unionKey, sanitizeForClaudeInputSchemaDeep));
+	}
+
+	if ("const" in obj) {
+		const { const: constValue, ...rest } = obj;
+		const next: Record<string, unknown> = { ...rest };
+		if (!("enum" in next)) {
+			next.enum = [constValue];
+		}
+		if (!("type" in next)) {
+			next.type = inferJsonSchemaType(constValue);
+		}
+		return sanitizeForClaudeInputSchemaDeep(next);
+	}
+
+	const result: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(obj)) {
+		if (CLAUDE_UNSUPPORTED_SCHEMA_KEYS.has(key)) continue;
+		if (key === "additionalProperties") {
+			const normalized = normalizeAdditionalProperties(value);
+			if (normalized === undefined) continue;
+			result[key] = sanitizeForClaudeInputSchemaDeep(normalized);
+			continue;
+		}
+		if (key === "required" && Array.isArray(value) && value.length === 0) continue;
+		result[key] = sanitizeForClaudeInputSchemaDeep(value);
+	}
+	return result;
+}
+
+/**
+ * Build a Claude-compatible tool input schema root from a TypeBox/JSON Schema
+ * tool definition. Matches the direct Anthropic provider's conservative shape.
+ */
+export function toClaudeInputSchemaRoot(schema: unknown): Record<string, unknown> {
+	const sanitized = sanitizeForClaudeInputSchemaDeep(normalizeClaudeToolSchemaForGoogle(schema)) as Record<
+		string,
+		unknown
+	>;
+	const root: Record<string, unknown> = {
+		type: "object",
+		properties: (sanitized.properties as Record<string, unknown>) ?? {},
+	};
+	if (Array.isArray(sanitized.required) && sanitized.required.length > 0) {
+		root.required = sanitized.required.filter((key): key is string => typeof key === "string");
+	}
+	return root;
+}
+
+/**
+ * Strip meta-declarations and rewrite JSON Schema features unsupported by the
+ * Cloud Code Assist legacy OpenAPI `parameters` field (OpenAPI 3.03).
+ *
+ * TypeBox `Type.Literal` unions compile to `anyOf`/`oneOf` entries with `const`,
+ * which the API rejects ("Unknown name \"const\""). Collapse those to `enum`.
+ * TypeBox `Type.Record` compiles to `patternProperties`, which the API also rejects.
+ */
+function sanitizeForOpenApi(schema: unknown): unknown {
+	if (Array.isArray(schema)) {
+		return schema.map(sanitizeForOpenApi);
+	}
+	if (typeof schema !== "object" || schema === null) {
+		return schema;
+	}
+
+	let obj = schema as Record<string, unknown>;
+	obj = convertPatternPropertiesToAdditionalProperties(obj, sanitizeForOpenApi);
+
+	const unionKey =
+		"oneOf" in obj && Array.isArray(obj.oneOf)
+			? ("oneOf" as const)
+			: "anyOf" in obj && Array.isArray(obj.anyOf)
+				? ("anyOf" as const)
+				: null;
+	if (unionKey) {
+		const variants = obj[unionKey] as unknown[];
+		if (variants.length > 0 && variants.every(isConstOnlySchema)) {
+			return sanitizeForOpenApi(collapseConstUnion(obj, unionKey));
+		}
+	}
+
+	if ("const" in obj) {
+		const { const: constValue, ...rest } = obj;
+		const next: Record<string, unknown> = { ...rest };
+		if (!("enum" in next)) {
+			next.enum = [constValue];
+		}
+		if (!("type" in next)) {
+			next.type = inferJsonSchemaType(constValue);
+		}
+		return sanitizeForOpenApi(next);
+	}
+
+	const result: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(obj)) {
+		if (JSON_SCHEMA_META_DECLARATIONS.has(key)) continue;
+		if (key === "additionalProperties" && value === false) continue;
+		if (key === "required" && Array.isArray(value) && value.length === 0) continue;
+		result[key] = sanitizeForOpenApi(value);
+	}
+	return result;
+}
+
+/** Legacy export name used by google-shared.test.ts and provider-capabilities docs. */
+export function sanitizeSchemaForGoogle(schema: unknown): unknown {
+	return sanitizeForOpenApi(schema);
+}
+
 /**
  * Convert tools to Gemini function declarations format.
  *
@@ -416,8 +677,8 @@ export function normalizeClaudeToolSchemaForGoogle(schema: unknown): unknown {
  * field instead (OpenAPI 3.03 Schema). This is needed for Cloud Code Assist with Claude
  * models, where the API translates `parameters` into Anthropic's `input_schema`.
  *
- * The schema is automatically sanitized to remove fields not supported by Google's
- * function declarations API (patternProperties, const converted to enum, etc.).
+ * Schemas are sanitized to remove fields not supported by Cloud Code Assist
+ * (patternProperties, const converted to enum, etc.).
  */
 export function convertTools(
 	tools: Tool[],
@@ -430,8 +691,10 @@ export function convertTools(
 				name: tool.name,
 				description: tool.description,
 				...(useParameters
-					? { parameters: sanitizeSchemaForGoogle(normalizeClaudeToolSchemaForGoogle(tool.parameters)) }
-					: { parametersJsonSchema: sanitizeSchemaForGoogle(tool.parameters) }),
+					? {
+							parameters: toClaudeInputSchemaRoot(tool.parameters as unknown),
+						}
+					: { parametersJsonSchema: sanitizeForOpenApi(tool.parameters as unknown) }),
 			})),
 		},
 	];

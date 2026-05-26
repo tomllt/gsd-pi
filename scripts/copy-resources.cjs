@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const { spawnSync } = require('child_process');
 const { createHash } = require('crypto');
-const { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('fs');
+const { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('fs');
 const { dirname, join } = require('path');
 
 const SKIP_DIRS = new Set(['tests', '__tests__']);
@@ -31,6 +31,16 @@ function copyNonTsFiles(srcDir, destDir) {
 
     if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
       continue;
+    }
+
+    // Skip stale compiled siblings — tsc output in destDir is authoritative when
+    // a .ts source exists (e.g. worktree-root.ts → worktree-root.js).
+    if (entry.name.endsWith('.js')) {
+      const tsSibling = join(srcDir, entry.name.replace(/\.js$/, '.ts'));
+      const tsxSibling = join(srcDir, entry.name.replace(/\.js$/, '.tsx'));
+      if (existsSync(tsSibling) || existsSync(tsxSibling)) {
+        continue;
+      }
     }
 
     mkdirSync(dirname(destPath), { recursive: true });

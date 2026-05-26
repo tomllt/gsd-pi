@@ -31,11 +31,9 @@ for (const [name, compat] of Object.entries(BUILTIN_TOOLS)) {
 }
 
 // ─── MCP Tool Defaults ─────────────────────────────────────────────────────
-// MCP tools may use complex schemas. Default to cautious compatibility.
-
-const MCP_TOOL_DEFAULTS: ToolCompatibility = {
-  schemaFeatures: ["patternProperties"],
-};
+// MCP tools may use complex schemas. Metadata is retained for diagnostics;
+// Google providers sanitize patternProperties/const at wire time instead of pre-filtering.
+const MCP_TOOL_DEFAULTS: ToolCompatibility = {};
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 

@@ -167,6 +167,45 @@ export function isInsideWorktreesDir(basePath: string, targetPath: string): bool
   return resolved === wtDir || resolved.startsWith(wtDir + sep);
 }
 
+function isRegisteredGitWorktreeAtPath(basePath: string, wtPath: string): boolean {
+  try {
+    const normalizedTarget = normalizeWorktreePathForCompare(
+      existsSync(wtPath) ? realpathSync(wtPath) : resolve(wtPath),
+    );
+    const entries = nativeWorktreeList(basePath);
+    return entries.some((entry) => {
+      if (!entry.path) return false;
+      const normalizedEntry = normalizeWorktreePathForCompare(
+        existsSync(entry.path) ? realpathSync(entry.path) : resolve(entry.path),
+      );
+      return normalizedEntry === normalizedTarget;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function removeStaleWorktreeDirectory(wtPath: string, name: string): void {
+  logWarning(
+    "reconcile",
+    `Removing stale worktree directory (not registered with git): ${wtPath}`,
+    { worktree: name },
+  );
+  try {
+    rmSync(wtPath, { recursive: true, force: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException)?.code;
+    if (code === "EPERM" || code === "EBUSY") {
+      throw new GSDError(
+        GSD_GIT_ERROR,
+        `Cannot remove stale worktree directory at ${wtPath} (${code}: directory may be locked by another process). Close editors/antivirus/git tools using this path and retry.`,
+        { cause: error as Error },
+      );
+    }
+    throw error;
+  }
+}
+
 /**
  * Return the canonical path from which a milestone's artifacts should be read.
  *
@@ -240,29 +279,14 @@ export function createWorktree(basePath: string, name: string, opts: { branch?: 
   const branch = opts.branch ?? worktreeBranchName(name);
 
   if (existsSync(wtPath)) {
-    // A valid git worktree has a .git file (not directory) containing a
-    // "gitdir:" pointer.  If the directory exists but has no .git file,
-    // it is a stale leftover from a prior crash — remove it so a fresh
-    // worktree can be created in its place.
-    const gitFilePath = join(wtPath, ".git");
-    if (!existsSync(gitFilePath)) {
-      logWarning("reconcile", `Removing stale worktree directory (no .git file): ${wtPath}`, { worktree: name });
-      try {
-        rmSync(wtPath, { recursive: true, force: true });
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException)?.code;
-        if (code === "EPERM" || code === "EBUSY") {
-          throw new GSDError(
-            GSD_GIT_ERROR,
-            `Cannot remove stale worktree directory at ${wtPath} (${code}: directory may be locked by another process). Close editors/antivirus/git tools using this path and retry.`,
-            { cause: error as Error },
-          );
-        }
-        throw error;
-      }
-    } else {
+    // A valid git worktree is registered in `git worktree list` and has a .git
+    // *file* with a gitdir: pointer. Leftover directories (no .git, a standalone
+    // .git directory from accidental `git init`, or an orphan pointer) block
+    // creation unless removed.
+    if (isRegisteredGitWorktreeAtPath(basePath, wtPath)) {
       throw new GSDError(GSD_STALE_STATE, `Worktree "${name}" already exists at ${wtPath}`);
     }
+    removeStaleWorktreeDirectory(wtPath, name);
   }
 
   // Ensure the .gsd/worktrees/ directory exists

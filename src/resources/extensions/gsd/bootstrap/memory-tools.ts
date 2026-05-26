@@ -6,7 +6,7 @@
 // to the LLM over MCP. All three degrade gracefully when the GSD database
 // is unavailable.
 
-import { Type } from "@sinclair/typebox";
+import { Type, StringEnum } from "@gsd/pi-ai";
 import type { ExtensionAPI } from "@gsd/pi-coding-agent";
 
 import { ensureDbOpen, resolveCtxCwd } from "./dynamic-tools.js";
@@ -36,15 +36,8 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
       "Set confidence: 0.6 tentative, 0.8 solid, 0.95 well-confirmed (default 0.8).",
     ],
     parameters: Type.Object({
-      category: Type.Union(
-        [
-          Type.Literal("architecture"),
-          Type.Literal("convention"),
-          Type.Literal("gotcha"),
-          Type.Literal("preference"),
-          Type.Literal("environment"),
-          Type.Literal("pattern"),
-        ],
+      category: StringEnum(
+        ["architecture", "convention", "gotcha", "preference", "environment", "pattern"],
         { description: "Memory category" },
       ),
       content: Type.String({ description: "The memory text (1–3 sentences, no secrets)" }),
@@ -54,7 +47,8 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
       tags: Type.Optional(Type.Array(Type.String(), { description: "Free-form tags (reserved for future use)" })),
       scope: Type.Optional(Type.String({ description: "Scope name (reserved for future use; defaults to project)" })),
       structuredFields: Type.Optional(
-        Type.Record(Type.String(), Type.Unknown(), {
+        Type.Object({}, {
+          additionalProperties: true,
           description: "Optional structured payload preserved alongside content (ADR-013). Use for decisions to retain scope/decision/choice/rationale/made_by/revisable. Omit for plain captures.",
         }),
       ),
@@ -91,15 +85,8 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
       query: Type.String({ description: "Keyword query (2+ char terms)" }),
       k: Type.Optional(Type.Number({ description: "Max results (default 10, max 50)", minimum: 1, maximum: 50 })),
       category: Type.Optional(
-        Type.Union(
-          [
-            Type.Literal("architecture"),
-            Type.Literal("convention"),
-            Type.Literal("gotcha"),
-            Type.Literal("preference"),
-            Type.Literal("environment"),
-            Type.Literal("pattern"),
-          ],
+        StringEnum(
+          ["architecture", "convention", "gotcha", "preference", "environment", "pattern"],
           { description: "Restrict results to a single category" },
         ),
       ),
@@ -138,18 +125,15 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
       "Phase 1 only exposes supersedes edges; additional relation types arrive in later phases.",
     ],
     parameters: Type.Object({
-      mode: Type.Union([Type.Literal("build"), Type.Literal("query")], {
+      mode: StringEnum(["build", "query"], {
         description: "build = recompute graph (placeholder), query = inspect edges",
       }),
       memoryId: Type.Optional(Type.String({ description: "Memory ID (required when mode=query)" })),
       depth: Type.Optional(Type.Number({ description: "Hops to traverse (0–5, default 1)", minimum: 0, maximum: 5 })),
-      rel: Type.Optional(Type.Union([
-        Type.Literal("related_to"),
-        Type.Literal("depends_on"),
-        Type.Literal("contradicts"),
-        Type.Literal("elaborates"),
-        Type.Literal("supersedes"),
-      ], { description: "Only include edges with this relation type" })),
+      rel: Type.Optional(StringEnum(
+        ["related_to", "depends_on", "contradicts", "elaborates", "supersedes"],
+        { description: "Only include edges with this relation type" },
+      )),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       const ok = await ensureDbOpen(resolveCtxCwd(_ctx));

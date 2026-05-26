@@ -460,9 +460,19 @@ function extractPathFromAnnotation(raw: string): string {
  * explicit backticks, globs, separators, dot-paths, or single-token basenames
  * like Dockerfile.
  */
+const NON_PATH_SENTINEL_RE = /^(none|null|n\/a|na|undefined|—|-)$/i;
+
+/** Skip prose, sentinels, and non-path annotations in planning IO fields. */
+export function shouldValidatePlanningPathReference(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed || NON_PATH_SENTINEL_RE.test(trimmed)) return false;
+  return shouldValidateInputAsPath(raw);
+}
+
 function shouldValidateInputAsPath(raw: string): boolean {
   const trimmed = raw.trim();
   if (!trimmed) return false;
+  if (NON_PATH_SENTINEL_RE.test(trimmed)) return false;
 
   if (isRuntimeOnlyInput(trimmed)) return false;
 

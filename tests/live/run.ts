@@ -11,11 +11,18 @@ import { execFileSync } from "child_process";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
+import { loadLiveCredentialsFromAuth } from "./load-live-credentials.ts";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 if (process.env.GSD_LIVE_TESTS !== "1") {
   console.log("Skipping live tests (set GSD_LIVE_TESTS=1 to enable)");
   process.exit(0);
+}
+
+const loadedFromAuth = loadLiveCredentialsFromAuth();
+if (loadedFromAuth.length > 0) {
+  console.log(`Loaded credentials: ${loadedFromAuth.join(", ")}`);
 }
 
 const testFiles = readdirSync(__dirname)
@@ -39,6 +46,7 @@ for (const file of testFiles) {
       encoding: "utf8",
       stdio: "pipe",
       timeout: 60_000,
+      env: process.env,
     });
     console.log(`  PASS  ${label}`);
     passed++;

@@ -26,6 +26,7 @@ import { deriveState } from "./state.js";
 import type { GSDState } from "./types.js";
 import { renderPlanFromDb, renderRoadmapFromDb } from "./markdown-renderer.js";
 import { readManifest } from "./workflow-manifest.js";
+import { gsdRoot } from "./paths.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -412,7 +413,7 @@ export async function renderStateProjection(basePath: string): Promise<void> {
     }
     const state = await deriveState(basePath);
     const content = renderStateContent(state);
-    const dir = join(basePath, ".gsd");
+    const dir = gsdRoot(basePath);
     const statePath = join(dir, "STATE.md");
     const milestoneTotal = state.progress?.milestones?.total ?? 0;
     if (milestoneTotal === 0 && existsSync(statePath)) {

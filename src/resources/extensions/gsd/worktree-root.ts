@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { gsdHome } from "./gsd-home.js";
 
 export interface WorktreeSegment {
@@ -39,11 +39,74 @@ export function findWorktreeSegment(normalizedPath: string): WorktreeSegment | n
     };
   }
 
+  const projectsRoot = join(process.env.GSD_STATE_DIR || gsdHome(), "projects")
+    .replaceAll("\\", "/")
+    .replace(/\/+$/, "");
+  const marker = `${projectsRoot}/`;
+  if (normalizedPath.startsWith(marker)) {
+    const rel = normalizedPath.slice(marker.length);
+    const worktreesIdx = rel.indexOf("/worktrees/");
+    if (worktreesIdx > 0) {
+      const gsdIdx = marker.length + worktreesIdx;
+      return {
+        gsdIdx,
+        afterWorktrees: gsdIdx + "/worktrees/".length,
+      };
+    }
+  }
+
   return null;
 }
 
 export function isGsdWorktreePath(path: string): boolean {
   return findWorktreeSegment(path.replaceAll("\\", "/")) !== null;
+}
+
+/**
+ * When a milestone worktree lives under the external-state layout
+ * (`<gsdHome>/projects/<hash>/worktrees/<MID>/`, or the `GSD_STATE_DIR`
+ * equivalent), return the parent project's authoritative external `.gsd`
+ * directory. Returns null for direct layout worktrees
+ * (`<repo>/.gsd/worktrees/<MID>/`).
+ */
+export function resolveExternalStateProjectGsdFromWorktreePath(projectPath: string): string | null {
+  const normalized = resolve(projectPath).replaceAll("\\", "/");
+
+  // Direct layout — parent state is resolved via repoIdentity(git root).
+  if (normalized.includes("/.gsd/worktrees/") && !normalized.includes("/.gsd/projects/")) {
+    return null;
+  }
+
+  const externalDotGsd = /[/\\]\.gsd[/\\]projects[/\\][^/\\]+[/\\]worktrees(?:[/\\]|$)/.exec(normalized);
+  if (externalDotGsd && externalDotGsd.index !== undefined) {
+    const worktreesIdx = externalDotGsd[0].search(/[/\\]worktrees(?:[/\\]|$)/);
+    return resolve(normalized.slice(0, externalDotGsd.index + worktreesIdx));
+  }
+
+  const projectsRoot = join(process.env.GSD_STATE_DIR || gsdHome(), "projects").replaceAll("\\", "/").replace(/\/+$/, "");
+  const marker = `${projectsRoot}/`;
+  if (normalized.startsWith(marker)) {
+    const rel = normalized.slice(marker.length);
+    const slash = rel.indexOf("/");
+    if (slash === -1) return null;
+    const hash = rel.slice(0, slash);
+    const rest = rel.slice(slash + 1);
+    if (rest.startsWith("worktrees/") || rest === "worktrees") {
+      return resolve(projectsRoot, hash);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Identity hash for an external-state project directory (`basename` of the
+ * `~/.gsd/projects/<hash>` path). Returns null when the path is not in that
+ * layout.
+ */
+export function resolveExternalStateProjectIdentityFromWorktreePath(projectPath: string): string | null {
+  const projectGsd = resolveExternalStateProjectGsdFromWorktreePath(projectPath);
+  return projectGsd ? basename(projectGsd) : null;
 }
 
 /**

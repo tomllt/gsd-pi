@@ -10,6 +10,7 @@ import { handleGSDCommand } from "../commands/dispatcher.ts";
 import {
   closeDatabase,
   insertMilestone,
+  insertSlice,
   openDatabase,
 } from "../gsd-db.ts";
 import { invalidateStateCache } from "../state.ts";
@@ -95,6 +96,30 @@ function writeWorktreePreferencesAndRoadmap(base: string): void {
   );
 }
 
+function seedRegisteredCompletedWorktreeWithoutRoadmap(base: string): void {
+  mkdirSync(join(base, ".gsd"), { recursive: true });
+  openDatabase(join(base, ".gsd", "gsd.db"));
+  insertMilestone({ id: "M008", title: "Live Text Search", status: "complete" });
+  insertSlice({
+    id: "S01",
+    milestoneId: "M008",
+    title: "Live Text Search",
+    status: "complete",
+  });
+  writeFileSync(
+    join(base, ".gsd", "PREFERENCES.md"),
+    "---\ngit:\n  isolation: worktree\n---\n",
+  );
+
+  const worktreePath = join(base, ".gsd", "worktrees", "M008");
+  mkdirSync(dirname(worktreePath), { recursive: true });
+  git(base, "worktree", "add", "-b", "milestone/M008", worktreePath, "main");
+  writeFileSync(join(worktreePath, "index.html"), "<h1>M008</h1>\n");
+  git(worktreePath, "add", "index.html");
+  git(worktreePath, "commit", "-m", "feat: live text search");
+  invalidateStateCache();
+}
+
 function seedRegisteredCompletedWorktree(base: string): void {
   mkdirSync(join(base, ".gsd"), { recursive: true });
   openDatabase(join(base, ".gsd", "gsd.db"));
@@ -177,6 +202,29 @@ test("dispatcher recovers a completed unmerged milestone through complete-milest
     assert.ok(
       calls.some((call) => call.message.includes("Milestone M008 merged to main")),
       "user sees merge recovery success",
+    );
+    assert.equal(readFileSync(join(base, "index.html"), "utf-8"), "<h1>M008</h1>\n");
+    assert.equal(git(base, "branch", "--list", "milestone/M008"), "");
+  } finally {
+    closeDatabase();
+    invalidateStateCache();
+    cleanup(base);
+  }
+});
+
+test("dispatcher recovers completed unmerged milestone without ROADMAP projection", async () => {
+  const base = makeTempRepo("gsd-dispatch-unmerged-no-roadmap-");
+  try {
+    seedRegisteredCompletedWorktreeWithoutRoadmap(base);
+    const { ctx, calls } = makeMockCtx(base);
+    const { pi, messages } = makeMockPi();
+
+    await handleGSDCommand("dispatch complete-milestone M008", ctx, pi);
+
+    assert.equal(messages.length, 0);
+    assert.ok(
+      calls.some((call) => call.message.includes("Milestone M008 merged to main")),
+      "merge recovery should succeed using DB-synthesized roadmap",
     );
     assert.equal(readFileSync(join(base, "index.html"), "utf-8"), "<h1>M008</h1>\n");
     assert.equal(git(base, "branch", "--list", "milestone/M008"), "");

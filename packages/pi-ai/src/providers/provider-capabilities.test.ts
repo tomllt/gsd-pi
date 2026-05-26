@@ -85,15 +85,14 @@ describe("provider-specific capabilities", () => {
     assert.equal(PROVIDER_CAPABILITIES["mistral-conversations"].thinkingPersistence, "none");
   });
 
-  test("Google does not support patternProperties", () => {
-    assert.ok(
-      PROVIDER_CAPABILITIES["google-generative-ai"].unsupportedSchemaFeatures.includes("patternProperties"),
+  test("Google providers rely on google-shared sanitization instead of pre-filtering", () => {
+    assert.deepEqual(
+      PROVIDER_CAPABILITIES["google-generative-ai"].unsupportedSchemaFeatures,
+      [],
     );
-  });
-
-  test("Google does not support const", () => {
-    assert.ok(
-      PROVIDER_CAPABILITIES["google-generative-ai"].unsupportedSchemaFeatures.includes("const"),
+    assert.deepEqual(
+      PROVIDER_CAPABILITIES["google-gemini-cli"].unsupportedSchemaFeatures,
+      [],
     );
   });
 
@@ -128,7 +127,7 @@ describe("getProviderCapabilities", () => {
 describe("getUnsupportedFeatures", () => {
   test("returns unsupported features for Google", () => {
     const unsupported = getUnsupportedFeatures("google-generative-ai", ["patternProperties", "const"]);
-    assert.deepEqual(unsupported, ["patternProperties", "const"]);
+    assert.deepEqual(unsupported, []);
   });
 
   test("returns empty for Anthropic with any features", () => {

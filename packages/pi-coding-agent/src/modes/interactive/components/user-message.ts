@@ -5,7 +5,7 @@ import { Container, Markdown, type MarkdownTheme } from "@gsd/pi-tui";
 import { getMarkdownTheme } from "../theme/theme.js";
 import { RenderCache } from "./render-cache.js";
 import { formatTimestamp, type TimestampFormat } from "./timestamp.js";
-import { chatMessageWidth, renderUserRail } from "./transcript-design.js";
+import { TRANSCRIPT_CARD_INDENT, renderUserRail } from "./transcript-design.js";
 
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
@@ -44,8 +44,7 @@ export class UserMessageComponent extends Container {
 		if (cached) return cached;
 
 		const frameWidth = Math.max(20, width);
-		const messageWidth = chatMessageWidth(frameWidth);
-		const contentWidth = Math.max(1, messageWidth - 2);
+		const contentWidth = Math.max(1, frameWidth - TRANSCRIPT_CARD_INDENT - 3);
 		const lines = super.render(contentWidth);
 		const meta =
 			this.timestamp !== undefined

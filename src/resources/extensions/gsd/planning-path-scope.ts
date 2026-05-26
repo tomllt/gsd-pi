@@ -1,5 +1,6 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import { normalizePlannedFileReference } from "./files.js";
+import { shouldValidatePlanningPathReference } from "./pre-execution-checks.js";
 
 export interface PlanningPathScopeField {
   field: string;
@@ -32,6 +33,9 @@ export function validatePlanningPathScope(
     : [basePath];
   for (const { field, values } of fields) {
     for (const raw of values) {
+      const trimmed = raw.trim();
+      if (!shouldValidatePlanningPathReference(trimmed)) continue;
+
       const candidate = normalizePlannedFileReference(raw);
       const resolvedCandidate = isAbsolute(candidate)
         ? resolve(candidate)

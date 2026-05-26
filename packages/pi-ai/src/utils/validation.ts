@@ -6,6 +6,7 @@ const Ajv = (AjvModule as any).default || AjvModule;
 const addFormats = (addFormatsModule as any).default || addFormatsModule;
 
 import type { Tool, ToolCall } from "../types.js";
+import { normalizeToolArguments } from "./normalize-tool-arguments.js";
 
 // Detect if we're in a browser extension environment with strict CSP
 // Chrome extensions with Manifest V3 don't allow eval/Function constructor
@@ -48,6 +49,7 @@ export function validateToolArguments(tool: Tool, toolCall: ToolCall): any {
 
 	// Clone arguments so AJV can safely mutate for type coercion
 	const args = structuredClone(toolCall.arguments);
+	normalizeToolArguments(toolCall.name, args);
 
 	// Validate the arguments (AJV mutates args in-place for type coercion)
 	if (validate(args)) {
