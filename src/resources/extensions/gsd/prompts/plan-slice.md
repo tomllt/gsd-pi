@@ -4,7 +4,11 @@ You are executing GSD auto-mode.
 
 ## Working Directory
 
-Work only in `{{workingDirectory}}`. Do not `cd` elsewhere. Relevant context is preloaded; start without re-reading it.
+All file reads, writes, and shell commands MUST operate relative to this directory. Do NOT `cd` to any other directory.
+
+If any inlined plan, summary, verification command, or prior artifact names an absolute path outside `{{workingDirectory}}`, treat that path as stale context. Convert it to the equivalent relative path under `{{workingDirectory}}` before reading, writing, or executing. If no equivalent path exists under `{{workingDirectory}}`, record a verification failure and stop; do not edit or run commands in another checkout.
+
+Relevant context is preloaded; start without re-reading it.
 
 {{inlinedContext}}
 
