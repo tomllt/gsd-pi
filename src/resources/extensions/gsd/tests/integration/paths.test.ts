@@ -1,11 +1,18 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { gsdRoot, _clearGsdRootCache } from "../../paths.ts";
+import {
+  gsdProjectionRoot,
+  gsdRoot,
+  milestonesDir,
+  resolveSliceFile,
+  resolveTaskFile,
+  _clearGsdRootCache,
+} from "../../paths.ts";
 /** Create a tmp dir and resolve symlinks + 8.3 short names (macOS /var→/private/var, Windows RUNNER~1→runneradmin). */
 function tmp(): string {
   const p = mkdtempSync(join(tmpdir(), "gsd-paths-test-"));
@@ -94,5 +101,69 @@ describe('paths', () => {
       const result = gsdRoot(inner);
       assert.deepStrictEqual(result, join(inner, ".gsd"), "precedence: nearest .gsd wins over ancestor");
     } finally { cleanup(outer); }
+  });
+
+  test('Case 7: milestone artifact readers use worktree projection root', () => {
+    const root = tmp();
+    try {
+      initGit(root);
+      const projectGsd = join(root, ".gsd");
+      mkdirSync(projectGsd);
+      const wtRoot = join(projectGsd, "worktrees", "M001");
+      const wtGsd = join(wtRoot, ".gsd");
+      const tasksDir = join(wtGsd, "milestones", "M001", "slices", "S01", "tasks");
+      mkdirSync(tasksDir, { recursive: true });
+      writeFileSync(join(wtRoot, ".git"), `gitdir: ${join(root, ".git")}\n`, "utf-8");
+      writeFileSync(join(wtGsd, "milestones", "M001", "slices", "S01", "S01-PLAN.md"), "# slice plan\n");
+      writeFileSync(join(tasksDir, "T01-PLAN.md"), "# task plan\n");
+
+      _clearGsdRootCache();
+
+      assert.deepStrictEqual(gsdRoot(wtRoot), projectGsd, "runtime/control root stays project .gsd");
+      assert.deepStrictEqual(gsdProjectionRoot(wtRoot), wtGsd, "projection root is worktree .gsd");
+      assert.deepStrictEqual(milestonesDir(wtRoot), join(wtGsd, "milestones"));
+      assert.deepStrictEqual(
+        resolveSliceFile(wtRoot, "M001", "S01", "PLAN"),
+        join(wtGsd, "milestones", "M001", "slices", "S01", "S01-PLAN.md"),
+      );
+      assert.deepStrictEqual(
+        resolveTaskFile(wtRoot, "M001", "S01", "T01", "PLAN"),
+        join(tasksDir, "T01-PLAN.md"),
+      );
+    } finally { cleanup(root); }
+  });
+
+  test('Case 8: external-state worktree milestone readers use projection root', () => {
+    const root = tmp();
+    const originalStateDir = process.env.GSD_STATE_DIR;
+    try {
+      const stateDir = join(root, "state");
+      process.env.GSD_STATE_DIR = stateDir;
+      const projectGsd = join(stateDir, "projects", "abc123");
+      const wtRoot = join(projectGsd, "worktrees", "M002");
+      const wtGsd = join(wtRoot, ".gsd");
+      const tasksDir = join(wtGsd, "milestones", "M002", "slices", "S01", "tasks");
+      mkdirSync(tasksDir, { recursive: true });
+      writeFileSync(join(wtGsd, "milestones", "M002", "slices", "S01", "S01-PLAN.md"), "# slice plan\n");
+      writeFileSync(join(tasksDir, "T01-PLAN.md"), "# task plan\n");
+
+      _clearGsdRootCache();
+
+      assert.deepStrictEqual(gsdRoot(wtRoot), projectGsd, "external-state control root stays project store");
+      assert.deepStrictEqual(gsdProjectionRoot(wtRoot), wtGsd, "external-state projection root is worktree .gsd");
+      assert.deepStrictEqual(milestonesDir(wtRoot), join(wtGsd, "milestones"));
+      assert.deepStrictEqual(
+        resolveSliceFile(wtRoot, "M002", "S01", "PLAN"),
+        join(wtGsd, "milestones", "M002", "slices", "S01", "S01-PLAN.md"),
+      );
+      assert.deepStrictEqual(
+        resolveTaskFile(wtRoot, "M002", "S01", "T01", "PLAN"),
+        join(tasksDir, "T01-PLAN.md"),
+      );
+    } finally {
+      if (originalStateDir === undefined) delete process.env.GSD_STATE_DIR;
+      else process.env.GSD_STATE_DIR = originalStateDir;
+      cleanup(root);
+    }
   });
 });
