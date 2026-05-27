@@ -123,3 +123,41 @@ test("handleRecoverableExtensionProcessError swallows EPIPE without writing a cr
     rmSync(tmpHome, { recursive: true, force: true });
   }
 });
+
+test("handleRecoverableExtensionProcessError swallows write EOF without code", () => {
+  let stderr = "";
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    const handled = handleRecoverableExtensionProcessError(
+      new Error("write EOF"),
+    );
+    assert.equal(handled, true);
+    assert.match(stderr, /swallowed write EOF/);
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+});
+
+test("handleRecoverableExtensionProcessError swallows read EOF without code", () => {
+  let stderr = "";
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    const handled = handleRecoverableExtensionProcessError(
+      new Error("read EOF"),
+    );
+    assert.equal(handled, true);
+    assert.match(stderr, /swallowed read EOF/);
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+});

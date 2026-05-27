@@ -27,14 +27,32 @@ import { initCmuxEventListeners } from "../../cmux/index.js";
 
 export { writeCrashLog } from "./crash-log.js";
 
+function isPipeClosedError(err: Error): boolean {
+  const errno = (err as NodeJS.ErrnoException).code;
+  if (errno === "EPIPE" || errno === "ECONNRESET") return true;
+  const message = err.message;
+  return message === "write EOF" || message === "read EOF";
+}
+
+function exitViaCleanupPath(fallbackExitCode: number): never {
+  try {
+    process.kill(process.pid, "SIGTERM");
+  } catch {
+    process.exit(fallbackExitCode);
+  }
+  process.exit(fallbackExitCode);
+}
+
 export function handleRecoverableExtensionProcessError(err: Error): boolean {
-  if ((err as NodeJS.ErrnoException).code === "EPIPE") {
+  if (isPipeClosedError(err)) {
+    const code = (err as NodeJS.ErrnoException).code;
+    const tag = code ?? err.message;
     const stdoutGone = process.stdout.destroyed || process.stdout.writableEnded;
     if (stdoutGone) {
       process.exit(0);
     }
     process.stderr.write(
-      `[gsd] swallowed EPIPE (syscall=${(err as NodeJS.ErrnoException).syscall ?? "?"})\n`,
+      `[gsd] swallowed ${tag} (syscall=${(err as NodeJS.ErrnoException).syscall ?? "?"})\n`,
     );
     return true;
   }
@@ -67,7 +85,7 @@ export function installEpipeGuard(): void {
       // Logging and continuing was the original double-fault fix (#3163), but
       // continuing in an indeterminate state is worse than a clean exit (#3348).
       writeCrashLog(err, "uncaughtException");
-      process.exit(1);
+      exitViaCleanupPath(1);
     };
     process.on("uncaughtException", _gsdEpipeGuard);
   }
@@ -77,7 +95,7 @@ export function installEpipeGuard(): void {
       const err = reason instanceof Error ? reason : new Error(String(reason));
       if (handleRecoverableExtensionProcessError(err)) return;
       writeCrashLog(err, "unhandledRejection");
-      process.exit(1);
+      exitViaCleanupPath(1);
     };
     process.on("unhandledRejection", _gsdRejectionGuard);
   }
