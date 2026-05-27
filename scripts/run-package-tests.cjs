@@ -39,6 +39,12 @@ function findDistTestFiles(pkgDir) {
 	return selectPackageTestFiles(distTestPkg, join(pkgDir, 'dist'))
 }
 
+function findPiAiPackageTestFiles(pkgDir) {
+	const fromPkgDist = findTestFiles(join(pkgDir, 'dist'))
+	if (fromPkgDist.length > 0) return fromPkgDist
+	return findDistTestFiles(pkgDir)
+}
+
 function commandExists(command, args = ['--version']) {
 	const result = spawnSync(command, args, { stdio: 'ignore' })
 	return result.status === 0 || result.status === 1
@@ -156,7 +162,7 @@ function main() {
 
 	for (const pkg of packages) {
 		if (pkg.packageName === '@gsd/pi-ai') {
-			const files = findDistTestFiles(pkg.path)
+			const files = findPiAiPackageTestFiles(pkg.path)
 			const vitestOnly = /(?:^|[\\/])(agent-shim|mcp-tool-name|tool-search-shim)\.test\.js$/i
 			const vitestFiles = files.filter((file) => vitestOnly.test(file))
 			const nodeTestFiles = files.filter((file) => !vitestOnly.test(file))
