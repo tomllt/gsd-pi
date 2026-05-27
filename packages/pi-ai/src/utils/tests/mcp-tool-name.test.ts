@@ -17,6 +17,11 @@ describe("mcp-tool-name", () => {
 });
 
 describe("resolveAgentToolName", () => {
+	test("maps Claude Code Grep to Pi grep when registered", () => {
+		expect(CLAUDE_CODE_TOOL_ALIASES.grep).toBe("grep");
+		expect(resolveAgentToolName("Grep")).toBe("grep");
+	});
+
 	test("maps Claude Code Glob to Pi find", () => {
 		expect(CLAUDE_CODE_TOOL_ALIASES.glob).toBe("find");
 		expect(resolveAgentToolName("Glob")).toBe("find");

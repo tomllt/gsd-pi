@@ -279,6 +279,30 @@ test("buildMinimalGsdWorkflowToolSet keeps workflow GSD tools but drops broad no
   assert.ok(!result.includes("gsd_graph"));
 });
 
+test("buildMinimalGsdWorkflowToolSet pulls investigation tools from registered names", () => {
+  const result = buildMinimalGsdWorkflowToolSet(
+    ["bash", "read", "write", "gsd_summary_save"],
+    ["bash", "read", "write", "grep", "find", "ls", "gsd_summary_save"],
+  );
+
+  assert.ok(result.includes("grep"));
+  assert.ok(result.includes("find"));
+  assert.ok(result.includes("ls"));
+});
+
+test("buildRequestScopedGsdToolSet keeps grep for guided discuss-milestone requests", () => {
+  const result = buildRequestScopedGsdToolSet(
+    ["bash", "read", "write", "gsd_summary_save"],
+    [{ customType: "gsd-discuss" }],
+    ["bash", "read", "write", "grep", "find", "ls", "gsd_summary_save", "gsd_requirement_update"],
+    "discuss-milestone",
+  );
+
+  assert.ok(result?.includes("grep"));
+  assert.ok(result?.includes("gsd_requirement_update"));
+  assert.ok(!result?.includes("gsd_task_complete"));
+});
+
 test("buildRequestScopedGsdToolSet scopes queued workflow custom-message requests", () => {
   const result = buildRequestScopedGsdToolSet([
     "ask_user_questions",

@@ -31,6 +31,7 @@ export {
 export const CLAUDE_CODE_TOOL_ALIASES: Readonly<Record<string, string>> = {
 	agent: "subagent",
 	glob: "find",
+	grep: "grep",
 	webfetch: "fetch_page",
 	websearch: "search-the-web",
 };

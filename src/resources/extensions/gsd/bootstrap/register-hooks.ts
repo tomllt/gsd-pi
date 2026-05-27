@@ -265,16 +265,28 @@ export function buildMinimalAutoGsdToolSet(
   return withPreservedShimTools([...new Set([...preserved, ...scoped])]);
 }
 
-export function buildMinimalGsdWorkflowToolSet(activeToolNames: readonly string[]): string[] {
+export function buildMinimalGsdWorkflowToolSet(
+  activeToolNames: readonly string[],
+  registeredToolNames: readonly string[] = activeToolNames,
+): string[] {
   const autoBaseTools = new Set<string>(MINIMAL_AUTO_BASE_TOOL_NAMES);
-  const preserved = activeToolNames.filter((name) => autoBaseTools.has(name));
-  const scoped = resolveScopedToolNames(activeToolNames, WORKFLOW_GSD_TOOL_NAMES);
+  const availableBaseTools = registeredToolNames.filter((name) => autoBaseTools.has(name));
+  const preserved = [...new Set([
+    ...activeToolNames.filter((name) => autoBaseTools.has(name)),
+    ...availableBaseTools,
+  ])];
+  const scoped = resolveScopedToolNames(
+    [...activeToolNames, ...registeredToolNames],
+    WORKFLOW_GSD_TOOL_NAMES,
+  );
   return withPreservedShimTools([...new Set([...preserved, ...scoped])]);
 }
 
 export function buildRequestScopedGsdToolSet(
   activeToolNames: readonly string[],
   requestCustomMessages: readonly { customType?: string }[] | undefined,
+  registeredToolNames: readonly string[] = activeToolNames,
+  guidedUnitType?: string,
 ): string[] | undefined {
   for (let index = (requestCustomMessages?.length ?? 0) - 1; index >= 0; index--) {
     const currentCustomType = requestCustomMessages?.[index]?.customType;
@@ -284,7 +296,10 @@ export function buildRequestScopedGsdToolSet(
       currentCustomType === "gsd-doctor-heal" ||
       currentCustomType === "gsd-triage"
     ) {
-      return buildMinimalGsdWorkflowToolSet(activeToolNames);
+      if (guidedUnitType) {
+        return buildMinimalAutoGsdToolSet(activeToolNames, guidedUnitType, registeredToolNames);
+      }
+      return buildMinimalGsdWorkflowToolSet(activeToolNames, registeredToolNames);
     }
   }
   return undefined;
@@ -1285,7 +1300,14 @@ export function registerHooks(
     if (isFullGsdToolSurfaceRequested()) return undefined;
     const removed = new Set(event.filteredTools);
     const providerCompatible = event.activeToolNames.filter((name) => !removed.has(name));
-    const requestScoped = buildRequestScopedGsdToolSet(providerCompatible, event.requestCustomMessages);
+    const registeredToolNames = resolveRegisteredToolNames(pi, event.activeToolNames);
+    const guidedUnit = getGuidedUnitContext();
+    const requestScoped = buildRequestScopedGsdToolSet(
+      providerCompatible,
+      event.requestCustomMessages,
+      registeredToolNames,
+      guidedUnit?.unitType,
+    );
     if (requestScoped) {
       return { toolNames: requestScoped };
     }
