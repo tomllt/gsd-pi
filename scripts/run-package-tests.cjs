@@ -157,7 +157,7 @@ function main() {
 	for (const pkg of packages) {
 		if (pkg.packageName === '@gsd/pi-ai') {
 			const files = findDistTestFiles(pkg.path)
-			const vitestOnly = /\/(agent-shim|mcp-tool-name|tool-search-shim)\.test\.js$/
+			const vitestOnly = /(?:^|[\\/])(agent-shim|mcp-tool-name|tool-search-shim)\.test\.js$/i
 			const vitestFiles = files.filter((file) => vitestOnly.test(file))
 			const nodeTestFiles = files.filter((file) => !vitestOnly.test(file))
 			let ok = true
