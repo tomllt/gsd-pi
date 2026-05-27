@@ -119,7 +119,7 @@
     "test:coverage:merge": "node scripts/merge-coverage-reports.mjs",
     "test:coverage:full": "npm run test:compile && npm run test:coverage:unit && npm run test:coverage:integration && npm run test:coverage:packages && npm run test:coverage:merge",
     "verify:extension-coverage": "node scripts/verify-extension-coverage.cjs",
-    "verify:fast": "bash scripts/ci-fast-gates.sh",
+    "verify:fast": "npm ci --ignore-scripts && bash scripts/ci-fast-gates.sh",
     "verify:pr": "npm run build:core && npm run typecheck:extensions && npm run test:unit",
     "verify:merge": "bash scripts/verify-merge.sh",
     "verify:full": "npm run verify:merge",
