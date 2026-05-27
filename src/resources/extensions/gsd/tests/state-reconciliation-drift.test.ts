@@ -568,6 +568,11 @@ test("ADR-017 (#5702): missing UAT.md clears stale full_uat_md from DB", async (
 
   const updated = getSlice("M001", "S01");
   assert.equal(updated?.full_uat_md ?? "", "", "full_uat_md should be cleared after UAT deletion");
+  assert.equal(
+    existsSync(join(sliceDir, "S01-UAT.md")),
+    false,
+    "UAT.md should not be recreated while clearing stale UAT content",
+  );
 });
 
 // ─── #5703: stale-worker drift ───────────────────────────────────────────────

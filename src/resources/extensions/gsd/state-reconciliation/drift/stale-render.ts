@@ -6,6 +6,9 @@
 // had zero callers in production code — wiring it through
 // reconcileBeforeDispatch closes that gap.
 
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+
 import {
   detectStaleRenders,
   renderPlanCheckboxes,
@@ -14,6 +17,7 @@ import {
   renderTaskSummary,
 } from "../../markdown-renderer.js";
 import { getMilestone, getSlice, setSliceSummaryMd } from "../../gsd-db.js";
+import { buildSliceFileName } from "../../paths.js";
 import type { GSDState } from "../../types.js";
 import { logWarning } from "../../workflow-logger.js";
 import type { DriftContext, DriftHandler, DriftRecord } from "../types.js";
@@ -127,7 +131,15 @@ async function repairStaleRenderFromBasePath(
         `stale-render drift: slice summary path missing milestone/slice segments: ${record.renderPath}`,
       );
     }
-    await renderSliceSummary(basePath, pathMatch[1], pathMatch[2]);
+    const milestoneId = pathMatch[1];
+    const sliceId = pathMatch[2];
+    const slice = getSlice(milestoneId, sliceId);
+    const uatPath = join(dirname(record.renderPath), buildSliceFileName(sliceId, "UAT"));
+    // renderSliceSummary writes both artifacts, so clear deleted UAT first.
+    if (slice?.full_uat_md && !existsSync(uatPath)) {
+      setSliceSummaryMd(milestoneId, sliceId, slice.full_summary_md ?? "", "");
+    }
+    await renderSliceSummary(basePath, milestoneId, sliceId);
     return;
   }
 
