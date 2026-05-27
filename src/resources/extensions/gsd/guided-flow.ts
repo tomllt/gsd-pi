@@ -71,6 +71,7 @@ import {
   loadCloseoutContext,
 } from "./closeout-wizard.js";
 import {
+  buildRequirementsBacklogDiscussContext,
   countUnmappedActiveRequirements,
   showRequirementsBacklogReview,
 } from "./requirements-backlog.js";
@@ -213,17 +214,57 @@ async function runQuickTaskChoice(ctx: ExtensionCommandContext, pi: ExtensionAPI
   await handleQuick(task, ctx, pi);
 }
 
-async function launchNextMilestoneDiscuss(
+export interface LaunchNextMilestoneDiscussOptions {
+  /** When true, force backlog-aware discuss even if no unmapped requirements remain. */
+  mapRequirementsBacklog?: boolean;
+}
+
+async function dispatchDiscussForNextMilestoneWithBacklog(
+  ctx: ExtensionCommandContext,
+  pi: ExtensionAPI,
+  basePath: string,
+  nextId: string,
+): Promise<void> {
+  const backlogContext = buildRequirementsBacklogDiscussContext(nextId);
+  const discussMilestoneTemplates = inlineTemplate("context", "Context");
+  const structuredQuestionsAvailable = getStructuredQuestionsAvailability(pi, ctx);
+  const basePrompt = loadPrompt("guided-discuss-milestone", {
+    workingDirectory: basePath,
+    milestoneId: nextId,
+    milestoneTitle: `New milestone ${nextId}`,
+    inlinedTemplates: discussMilestoneTemplates,
+    structuredQuestionsAvailable,
+    commitInstruction: buildDocsCommitInstruction(`docs(${nextId}): milestone context from discuss`),
+    fastPathInstruction: [
+      "> **Requirements backlog active.**",
+      "> Map unmapped active requirements to this milestone before finalizing context.",
+      "> Confirm ownership with the user when scope is ambiguous.",
+    ].join("\n"),
+  });
+  const prompt = backlogContext ? `${basePrompt}\n\n${backlogContext}` : basePrompt;
+  await dispatchWorkflow(pi, prompt, "gsd-discuss", ctx, "discuss-milestone", { basePath });
+}
+
+export async function launchNextMilestoneDiscuss(
   ctx: ExtensionCommandContext,
   pi: ExtensionAPI,
   basePath: string,
   stepMode: boolean,
+  options: LaunchNextMilestoneDiscussOptions = {},
 ): Promise<void> {
   const milestoneIds = findMilestoneIds(basePath);
   const uniqueMilestoneIds = !!loadEffectiveGSDPreferences()?.preferences?.unique_milestone_ids;
   const nextId = nextMilestoneIdReserved(milestoneIds, uniqueMilestoneIds, basePath);
+  const hasUnmappedBacklog = countUnmappedActiveRequirements() > 0;
+  const useBacklogDiscuss = options.mapRequirementsBacklog === true || hasUnmappedBacklog;
 
   setPendingAutoStart(basePath, { ctx, pi, basePath, milestoneId: nextId, step: stepMode });
+
+  if (useBacklogDiscuss) {
+    await dispatchDiscussForNextMilestoneWithBacklog(ctx, pi, basePath, nextId);
+    return;
+  }
+
   await dispatchWorkflow(
     pi,
     await prepareAndBuildDiscussPrompt(ctx, pi, nextId, `New milestone ${nextId}.`, basePath),
@@ -2479,7 +2520,7 @@ export async function showSmartEntry(
     } else if (choice === "review_requirements_backlog") {
       const reviewChoice = await showRequirementsBacklogReview(ctx, basePath);
       if (reviewChoice === "new_milestone") {
-        await launchNextMilestoneDiscuss(ctx, pi, basePath, stepMode);
+        await launchNextMilestoneDiscuss(ctx, pi, basePath, stepMode, { mapRequirementsBacklog: true });
       }
     } else if (choice === "new_milestone") {
       await launchNextMilestoneDiscuss(ctx, pi, basePath, stepMode);

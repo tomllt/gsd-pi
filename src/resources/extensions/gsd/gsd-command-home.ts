@@ -289,7 +289,8 @@ export async function showGsdHome(
   if (choice === "review_requirements_backlog") {
     const reviewChoice = await showRequirementsBacklogReview(ctx, basePath);
     if (reviewChoice === "new_milestone") {
-      await runDetailedEntry(ctx, pi, basePath);
+      const { launchNextMilestoneDiscuss } = await import("./guided-flow.js");
+      await launchNextMilestoneDiscuss(ctx, pi, basePath, true, { mapRequirementsBacklog: true });
     }
     return;
   }

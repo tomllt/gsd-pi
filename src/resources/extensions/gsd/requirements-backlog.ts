@@ -118,6 +118,32 @@ export function appendRequirementsBacklogToSummary(
 
 export type RequirementsBacklogReviewChoice = "new_milestone" | "not_yet";
 
+/** Prompt block injected into discuss-milestone when mapping backlog requirements. */
+export function buildRequirementsBacklogDiscussContext(milestoneId: string): string {
+  const unmapped = getUnmappedActiveRequirements();
+  if (unmapped.length === 0) return "";
+
+  const lines = [
+    "## Requirements Backlog — Milestone Ownership",
+    "",
+    `${unmapped.length} active requirement${unmapped.length === 1 ? "" : "s"} still lack milestone ownership.`,
+    `This discuss pass for **${milestoneId}** must assign ownership for requirements that belong in this milestone.`,
+    "",
+    "Unmapped active requirements:",
+    ...formatRequirementsTraceabilityPreview(unmapped, 20),
+    "",
+    "During this milestone discuss:",
+    "1. Read `.gsd/REQUIREMENTS.md` and confirm with the user which of these requirements belong in this milestone.",
+    `2. For each requirement assigned here, call \`gsd_requirement_update\` with \`primary_owner: "${milestoneId}/none yet"\` (provisional until slice planning) or \`${milestoneId}/S##\` when slice ownership is already clear.`,
+    '3. After updates, call `gsd_summary_save` with `artifact_type: "REQUIREMENTS"` so `.gsd/REQUIREMENTS.md` reflects the new ownership.',
+    "4. Do not leave in-scope requirements with `primary_owner: none`.",
+    "",
+    "Requirements that do not belong in this milestone stay unmapped for a later milestone.",
+  ];
+
+  return lines.join("\n");
+}
+
 export async function showRequirementsBacklogReview(
   ctx: ExtensionCommandContext,
   basePath: string,

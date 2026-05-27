@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
+  buildRequirementsBacklogDiscussContext,
   buildRequirementsBacklogSummaryLines,
   countUnmappedActiveRequirements,
   formatCompletePhaseNextAction,
@@ -99,6 +100,44 @@ test("summarizeRequirementsCoverage counts active, mapped-to-slice, and unmapped
     coverage.unmappedActiveRequirements.map((req) => req.id),
     ["R002"],
   );
+});
+
+test("buildRequirementsBacklogDiscussContext instructs milestone ownership updates", () => {
+  openDatabase(":memory:");
+  try {
+    insertRequirement({
+      id: "R002",
+      class: "functional",
+      status: "active",
+      description: "Needs milestone owner",
+      why: "test",
+      source: "test",
+      primary_owner: "",
+      supporting_slices: "",
+      validation: "unmapped",
+      notes: "",
+      full_content: "",
+      superseded_by: null,
+    });
+
+    const context = buildRequirementsBacklogDiscussContext("M002");
+    assert.match(context, /Requirements Backlog — Milestone Ownership/);
+    assert.match(context, /R002/);
+    assert.match(context, /gsd_requirement_update/);
+    assert.match(context, /M002\/none yet/);
+    assert.match(context, /artifact_type: "REQUIREMENTS"/);
+  } finally {
+    closeDatabase();
+  }
+});
+
+test("buildRequirementsBacklogDiscussContext returns empty when backlog is clear", () => {
+  openDatabase(":memory:");
+  try {
+    assert.equal(buildRequirementsBacklogDiscussContext("M002"), "");
+  } finally {
+    closeDatabase();
+  }
 });
 
 test("formatCompletePhaseNextAction uses unmapped count only", () => {
