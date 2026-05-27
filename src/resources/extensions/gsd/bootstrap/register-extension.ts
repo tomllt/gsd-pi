@@ -34,15 +34,6 @@ function isPipeClosedError(err: Error): boolean {
   return message === "write EOF" || message === "read EOF";
 }
 
-function exitViaCleanupPath(fallbackExitCode: number): never {
-  try {
-    process.kill(process.pid, "SIGTERM");
-  } catch {
-    process.exit(fallbackExitCode);
-  }
-  process.exit(fallbackExitCode);
-}
-
 export function handleRecoverableExtensionProcessError(err: Error): boolean {
   if (isPipeClosedError(err)) {
     const code = (err as NodeJS.ErrnoException).code;
@@ -85,7 +76,7 @@ export function installEpipeGuard(): void {
       // Logging and continuing was the original double-fault fix (#3163), but
       // continuing in an indeterminate state is worse than a clean exit (#3348).
       writeCrashLog(err, "uncaughtException");
-      exitViaCleanupPath(1);
+      process.exit(1);
     };
     process.on("uncaughtException", _gsdEpipeGuard);
   }
@@ -95,7 +86,7 @@ export function installEpipeGuard(): void {
       const err = reason instanceof Error ? reason : new Error(String(reason));
       if (handleRecoverableExtensionProcessError(err)) return;
       writeCrashLog(err, "unhandledRejection");
-      exitViaCleanupPath(1);
+      process.exit(1);
     };
     process.on("unhandledRejection", _gsdRejectionGuard);
   }
