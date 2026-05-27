@@ -6,6 +6,8 @@ import {
   getSessionModelOverride,
   setSessionModelOverride,
 } from "../session-model-override.js";
+import { cleanupAfterLoopExit } from "../auto.js";
+import { autoSession } from "../auto-runtime-state.js";
 
 test("setSessionModelOverride stores provider/model for the session", () => {
   const sessionId = `session-override-${Date.now()}`;
@@ -37,4 +39,29 @@ test("session model overrides are isolated by session id", () => {
     provider: "anthropic",
     id: "claude-sonnet-4-6",
   });
+});
+
+test("cleanupAfterLoopExit clears auto model override for the command session", async (t) => {
+  const sessionId = `session-auto-cleanup-${Date.now()}`;
+  autoSession.reset();
+  autoSession.active = true;
+  autoSession.cmdCtx = {
+    sessionManager: { getSessionId: () => sessionId },
+  } as any;
+  setSessionModelOverride(sessionId, { provider: "openai-codex", id: "gpt-5.4" });
+
+  t.after(() => {
+    autoSession.reset();
+    clearSessionModelOverride(sessionId);
+  });
+
+  await cleanupAfterLoopExit({
+    hasUI: false,
+    ui: {
+      setStatus: () => {},
+      setWidget: () => {},
+    },
+  } as any);
+
+  assert.equal(getSessionModelOverride(sessionId), undefined);
 });
