@@ -8,4 +8,5 @@
  */
 
 process.env.npm_lifecycle_event = process.env.npm_lifecycle_event || 'postinstall'
+process.env.GSD_POSTINSTALL = '1'
 import('./install.js')

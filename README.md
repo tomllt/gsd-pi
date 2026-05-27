@@ -62,6 +62,24 @@ gsd upgrade
 
 You can also run `npx @opengsd/gsd-pi@latest` to launch the installer from the new package. For deeper recovery steps, see [Upgrade GSD Pi](./docs/user-docs/getting-started.md#upgrade-gsd-pi) and [Upgrade from older gsd-pi installs](./docs/user-docs/troubleshooting.md#upgrade-from-older-gsd-pi-installs).
 
+## Uninstall
+
+Remove the global package and optional local GSD state files.
+
+macOS / Linux:
+
+```bash
+npm uninstall -g @opengsd/gsd-pi gsd-pi
+rm -rf ~/.gsd
+```
+
+Windows PowerShell:
+
+```powershell
+npm uninstall -g @opengsd/gsd-pi gsd-pi
+Remove-Item "$env:USERPROFILE\.gsd" -Recurse -Force -ErrorAction SilentlyContinue
+```
+
 ## Quick Start
 
 Need help choosing settings? Use the [GSD Pi web configurator](https://pi.opengsd.net/) to build a configuration in your browser.

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -18,4 +19,16 @@ test("postinstall respects PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", () => {
   });
 
   assert.equal(result.status, 0, `postinstall exits cleanly: ${result.stderr}`);
+});
+
+test("install script only treats npm postinstall as postinstall mode", () => {
+  const installScript = readFileSync(join(projectRoot, "scripts", "install.js"), "utf-8");
+  assert.match(
+    installScript,
+    /process\.env\.npm_lifecycle_event === 'postinstall'/,
+  );
+  assert.match(
+    installScript,
+    /process\.env\.GSD_POSTINSTALL === '1'/,
+  );
 });
