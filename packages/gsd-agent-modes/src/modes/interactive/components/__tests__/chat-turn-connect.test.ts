@@ -10,6 +10,7 @@ import { Container, Spacer, Text } from "@gsd/pi-tui";
 import { initTheme } from "@gsd/pi-coding-agent/theme/theme.js";
 import { AssistantMessageComponent } from "../assistant-message.js";
 import { reconcileChatTurnConnections } from "../chat-turn-connect.js";
+import { ToolExecutionComponent, ToolPhaseSummaryComponent } from "../tool-execution.js";
 import { UserMessageComponent } from "../user-message.js";
 
 initTheme("dark", false);
@@ -72,6 +73,31 @@ describe("reconcileChatTurnConnections", () => {
 		const lines = chat.render(80).map((line) => stripAnsi(line)).join("\n");
 		assert.doesNotMatch(lines.split("\n")[0] ?? "", /^\s*$/, "user turn should start flush at the top");
 		assert.match(lines, /╰──────╮[\s\S]*╭─ GSD/);
+	});
+
+	test("still connects turns when tool components sit between them", () => {
+		const chat = new Container();
+		const response = assistant("Done.");
+		chat.addChild(new UserMessageComponent("Inspect this"));
+		chat.addChild(
+			new ToolExecutionComponent("read", { path: "README.md" }, {}, undefined, {
+				requestRender() {},
+			} as any),
+		);
+		chat.addChild(
+			new ToolPhaseSummaryComponent([
+				{ label: "Context reads", count: 1, durationMs: 5, targets: ["README.md"] },
+			]),
+		);
+		chat.addChild(response);
+		reconcileChatTurnConnections(chat.children);
+
+		const assistantLines = response.render(80).map((line) => stripAnsi(line));
+		assert.doesNotMatch(
+			assistantLines[0] ?? "",
+			/^\s*$/,
+			"assistant should remain connected when tools sit between turns",
+		);
 	});
 
 	test("does not invalidate render caches when connections are unchanged", () => {

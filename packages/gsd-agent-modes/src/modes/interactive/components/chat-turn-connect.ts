@@ -32,6 +32,7 @@ export function reconcileChatTurnConnections(children: readonly unknown[]): void
 	let previousTurn: ChatTurnComponent | undefined;
 	for (const child of children) {
 		if (child instanceof Spacer) continue;
+		if (child instanceof ToolExecutionComponent || child instanceof ToolPhaseSummaryComponent) continue;
 		if (!isChatTurnComponent(child)) {
 			previousTurn = undefined;
 			continue;
