@@ -84,6 +84,33 @@ try {
   }
   console.log('    Bundled dependency coverage is complete.');
 
+  const rootExternalDeps = new Set(Object.keys(rootPkg.dependencies || {}));
+  const missingExternal = new Map();
+  for (const dep of bundled) {
+    if (!dep.startsWith('@gsd/')) continue;
+    const pkgName = dep.split('/')[1];
+    const pkgPath = join(ROOT, 'packages', pkgName, 'package.json');
+    if (!existsSync(pkgPath)) continue;
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    for (const [externalDep, version] of Object.entries(pkg.dependencies || {})) {
+      if (externalDep.startsWith('@gsd/') || externalDep.startsWith('@opengsd/') || externalDep.startsWith('@earendil-works/')) {
+        continue;
+      }
+      if (!rootExternalDeps.has(externalDep)) {
+        missingExternal.set(externalDep, version);
+      }
+    }
+  }
+  if (missingExternal.size > 0) {
+    console.log('ERROR: Bundled workspace packages depend on externals missing from root dependencies:');
+    for (const [dep, version] of [...missingExternal.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      console.log(`    ${dep}@${version}`);
+    }
+    console.log('    Add these to root package.json dependencies so tarball installs resolve them.');
+    process.exit(1);
+  }
+  console.log('    Bundled workspace external dependency coverage is complete.');
+
   // --- Pack tarball ---
   console.log('==> Packing tarball...');
   const packOutput = runNpm(['pack', '--json', '--ignore-scripts']);

@@ -4,6 +4,19 @@
 //   import { createTestContext } from './test-helpers.ts';
 //   const { assertEq, assertTrue, assertMatch, assertNoMatch, report } = createTestContext();
 
+import { realpathSync } from 'node:fs';
+
+function normalizeComparableValue(value: unknown): unknown {
+  if (typeof value !== 'string' || !value.startsWith('/')) {
+    return value;
+  }
+  try {
+    return realpathSync(value);
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Create an isolated set of assertion helpers with their own pass/fail counters.
  * Each test file gets its own context to avoid shared state across vitest workers.
@@ -13,7 +26,7 @@ export function createTestContext() {
   let failed = 0;
 
   function assertEq<T>(actual: T, expected: T, message: string): void {
-    if (JSON.stringify(actual) === JSON.stringify(expected)) {
+    if (JSON.stringify(normalizeComparableValue(actual)) === JSON.stringify(normalizeComparableValue(expected))) {
       passed++;
     } else {
       failed++;

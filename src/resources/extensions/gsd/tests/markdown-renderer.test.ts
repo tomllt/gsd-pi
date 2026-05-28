@@ -1,6 +1,14 @@
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
+
+function pathsEqual(a: string, b: string): boolean {
+  try {
+    return fs.realpathSync(a) === fs.realpathSync(b);
+  } catch {
+    return a === b;
+  }
+}
 import {
   openDatabase,
   closeDatabase,
@@ -1141,11 +1149,11 @@ test('── markdown-renderer: repairStaleRenders reads worktree roadmap projec
 
     const staleBefore = detectStaleRenders(worktreeDir);
     assert.ok(
-      staleBefore.some(s => s.path === projectionRoadmapPath && s.reason.includes('S01')),
+      staleBefore.some(s => pathsEqual(s.path, projectionRoadmapPath) && s.reason.includes('S01')),
       'worktree projection roadmap should be detected as stale',
     );
     assert.ok(
-      staleBefore.every(s => s.path !== projectRoadmapPath),
+      staleBefore.every(s => !pathsEqual(s.path, projectRoadmapPath)),
       'project mirror roadmap should not be used for worktree stale detection',
     );
 
@@ -1189,7 +1197,7 @@ test('── markdown-renderer: repairStaleRenders handles descriptor roadmap pr
 
     const staleBefore = detectStaleRenders(worktreeDir);
     assert.ok(
-      staleBefore.some(s => s.path === descriptorRoadmapPath && s.reason.includes('S01')),
+      staleBefore.some(s => pathsEqual(s.path, descriptorRoadmapPath) && s.reason.includes('S01')),
       'descriptor worktree projection roadmap should be detected as stale',
     );
 
@@ -1230,7 +1238,7 @@ test('── markdown-renderer: repairStaleRenders handles legacy descriptor roa
 
     const staleBefore = detectStaleRenders(tmpDir);
     assert.ok(
-      staleBefore.some(s => s.path === legacyRoadmapPath && s.reason.includes('S01')),
+      staleBefore.some(s => pathsEqual(s.path, legacyRoadmapPath) && s.reason.includes('S01')),
       'legacy descriptor roadmap filename should be detected as stale',
     );
 
