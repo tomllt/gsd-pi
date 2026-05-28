@@ -76,18 +76,23 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: bash scripts/ci-classify-changes.sh
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
           GSD_SKIP_RTK_INSTALL: '1'
-        run: npm ci --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run fast gates
         env:
@@ -118,26 +123,28 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build core
-        run: npm run build:core
-
-      - name: Install web host dependencies
-        run: npm --prefix web ci
+        run: pnpm run build:core
 
       - uses: ./.github/actions/cache-nextjs
 
       # validate-pack requires dist/web/standalone/server.js in the tarball (package.json files).
       - name: Build web host
-        run: npm run build:web-host
+        run: pnpm run build:web-host
 
       - name: Pack build artifacts
         run: bash scripts/ci-pack-build-artifacts.sh
@@ -150,13 +157,13 @@ jobs:
           retention-days: 1
 
       - name: Typecheck extensions
-        run: npm run typecheck:extensions
+        run: pnpm run typecheck:extensions
 
       - name: Validate package is installable
-        run: npm run validate-pack
+        run: pnpm run validate-pack
 
       - name: Verify workspace coverage (every linkable package has tests)
-        run: npm run verify:workspace-coverage
+        run: pnpm run verify:workspace-coverage
 
   test-unit:
     name: test-unit
@@ -181,21 +188,26 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - name: Run unit tests
         run: |
-          npm run test:compile
-          npm run test:unit:compiled
+          pnpm run test:compile
+          pnpm run test:unit:compiled
 
   test-packages:
     name: test-packages
@@ -220,19 +232,24 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - name: Run package tests
-        run: npm run test:packages:compiled
+        run: pnpm run test:packages:compiled
 
   test-coverage:
     name: test-coverage
@@ -263,19 +280,24 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - name: Check test coverage thresholds
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
   coverage-report:
     name: coverage-report
@@ -305,21 +327,24 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
-      - name: Install web host dependencies
-        run: npm --prefix web ci
-
       - name: Generate merged coverage report (report-only)
-        run: npm run test:coverage:full
+        run: pnpm run test:coverage:full
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v5
@@ -354,24 +379,26 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
-
-      - name: Install web host dependencies
-        run: npm --prefix web ci
 
       - uses: ./.github/actions/cache-nextjs
 
       - name: Run integration tests
-        run: npm run test:integration
+        run: pnpm run test:integration
 
   e2e:
     name: e2e
@@ -396,14 +423,19 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
@@ -411,7 +443,7 @@ jobs:
         run: |
           chmod +x dist/loader.js
           export GSD_SMOKE_BINARY="$(pwd)/dist/loader.js"
-          npm run test:e2e
+          pnpm run test:e2e
 
       - name: Upload e2e artifacts on failure
         if: failure()
@@ -447,19 +479,24 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - name: Run docker e2e suite
-        run: npm run test:e2e:docker
+        run: pnpm run test:e2e:docker
 
   windows-portability:
     name: windows-portability
@@ -487,28 +524,33 @@ jobs:
             "+${GITHUB_REF}:refs/checkout-ref"
           git checkout --force --detach "$GITHUB_SHA"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
           GSD_SKIP_RTK_INSTALL: '1'
-        run: npm ci --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - name: Typecheck extensions
         if: needs.fast-gates.outputs.portability-changed == 'true'
-        run: npm run typecheck:extensions
+        run: pnpm run typecheck:extensions
 
       - name: Run package tests
         if: needs.fast-gates.outputs.portability-changed == 'true'
-        run: npm run test:packages
+        run: pnpm run test:packages
 
       - name: Run Windows portability tests
         if: needs.fast-gates.outputs.portability-changed == 'true'
@@ -527,7 +569,7 @@ jobs:
         continue-on-error: true
         run: |
           export GSD_SMOKE_BINARY="$(pwd)/dist/loader.js"
-          npm run test:e2e:windows-smoke
+          pnpm run test:e2e:windows-smoke
 
       - name: Upload Windows e2e artifacts on failure
         if: steps.windows-smoke-e2e.outcome == 'failure'

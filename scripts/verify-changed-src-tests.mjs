@@ -159,7 +159,7 @@ function main() {
   }
 
   const distTests = selection.tests.map(toDistTestPath);
-  const compile = spawnSync('npm', ['run', 'test:compile'], {
+  const compile = spawnSync('pnpm', ['run', 'test:compile'], {
     cwd: ROOT,
     stdio: 'inherit',
     shell: process.platform === 'win32',

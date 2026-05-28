@@ -55,6 +55,6 @@ echo "── test matrix strict ──"
 node scripts/audit-test-matrix.mjs --strict
 
 echo "── pi boundary ──"
-npm run verify:pi-boundary
+pnpm run verify:pi-boundary
 
 echo "ci-fast-gates: all checks passed ✓"

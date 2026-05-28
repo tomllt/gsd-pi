@@ -6,7 +6,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const lockfile = JSON.parse(readFileSync("package-lock.json", "utf8"));
 
 /** External deps that must ship inside the tarball for --ignore-scripts global installs. */
 const REQUIRED_BUNDLED_EXTERNALS = [
@@ -30,10 +29,6 @@ test("installer tarball bundles extension-critical externals at the package root
     assert.ok(
       pkg.bundledDependencies.includes(dep),
       `root bundledDependencies must include ${dep}`,
-    );
-    assert.ok(
-      lockfile.packages[""].bundleDependencies.includes(dep),
-      `lockfile root bundleDependencies must include ${dep}`,
     );
   }
 });

@@ -69,7 +69,7 @@ for (const file of SHIMS) {
 }
 
 try {
-  execSync('npm run build -w @gsd/pi-coding-agent', { cwd: ROOT, stdio: 'inherit' })
+  execSync('pnpm --filter @gsd/pi-coding-agent run build', { cwd: ROOT, stdio: 'inherit' })
 } finally {
   for (const file of SHIMS) {
     writeFileSync(join(PI_CORE, file), readFileSync(join(BACKUP, file), 'utf8'))

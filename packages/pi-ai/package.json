@@ -67,9 +67,9 @@
     "clean": "shx rm -rf dist",
     "generate-models": "node scripts/generate-models.ts",
     "generate-image-models": "node scripts/generate-image-models.ts",
-    "build": "npm run generate-models && npm run generate-image-models && tsc -p tsconfig.json --incremental false",
+    "build": "node scripts/generate-models.ts && node scripts/generate-image-models.ts && tsc -p tsconfig.json --incremental false",
     "test": "vitest --run",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "pnpm run clean && pnpm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.91.1",

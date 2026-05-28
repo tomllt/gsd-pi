@@ -84,7 +84,7 @@ function ensureWebBuildDependencies() {
   }
 
   console.log('[gsd] Web build dependencies are missing or incomplete — running npm --prefix web ci...')
-  execSync('npm --prefix web ci', { cwd: root, stdio: 'inherit' })
+  execSync('pnpm install --frozen-lockfile', { cwd: root, stdio: 'inherit' })
 }
 
 const sourceMtime = Math.max(newestMtime(webRoot), newestMtime(srcRoot))
@@ -103,7 +103,7 @@ if (builtMtime === 0) {
 
 try {
   ensureWebBuildDependencies()
-  execSync('npm run build:web-host', { cwd: root, stdio: 'inherit' })
+  execSync('pnpm run build:web-host', { cwd: root, stdio: 'inherit' })
 } catch (err) {
   console.error('[gsd] Web build failed:', err.message)
   process.exit(1)

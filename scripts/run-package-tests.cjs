@@ -6,8 +6,8 @@ const { existsSync, readdirSync } = require('fs')
 const { join, relative } = require('path')
 const { getLinkablePackages, REPO_ROOT } = require('./lib/workspace-manifest.cjs')
 
-function getNpmCommand() {
-	return process.platform === 'win32' ? 'npm.cmd' : 'npm'
+function getPnpmCommand() {
+	return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 }
 
 function findTestFiles(dir) {
@@ -183,7 +183,7 @@ function main() {
 			}
 			process.stderr.write(`\nRunning ${pkg.packageName} package tests via workspace script...\n`)
 			if (
-				runPackageScript(getNpmCommand(), ['run', 'test', '-w', pkg.packageName], REPO_ROOT, pkg.packageName) !==
+				runPackageScript(getPnpmCommand(), ['--filter', pkg.packageName, 'run', 'test'], REPO_ROOT, pkg.packageName) !==
 				0
 			) {
 				failureCount += 1

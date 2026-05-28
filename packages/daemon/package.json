@@ -31,9 +31,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
-    "@opengsd/contracts": "^1.0.2",
-    "@opengsd/mcp-server": "^1.0.2",
-    "@opengsd/rpc-client": "^1.0.2",
+    "@opengsd/contracts": "workspace:*",
+    "@opengsd/mcp-server": "workspace:*",
+    "@opengsd/rpc-client": "workspace:*",
     "discord.js": "^14.25.1",
     "ws": "^8.20.0",
     "yaml": "^2.8.0",

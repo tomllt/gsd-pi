@@ -7,7 +7,7 @@ import test from "node:test";
 test("verify:merge and verify:full alias stay aligned with CI PR blocking parity", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   assert.match(pkg.scripts["verify:merge"], /verify-merge\.sh/);
-  assert.equal(pkg.scripts["verify:full"], "npm run verify:merge");
+  assert.match(pkg.scripts["verify:full"], /run verify:merge$/);
   assert.match(pkg.scripts["audit:test-confidence"], /audit-test-confidence\.mjs/);
 });
 

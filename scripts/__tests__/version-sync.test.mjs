@@ -62,7 +62,7 @@ test("syncVersionSurfaces rewrites internal deps to the stamped prerelease versi
 
     assert.equal(mcpServer.version, devVersion);
     assert.equal(gateway.version, devVersion);
-    assert.equal(gateway.dependencies["@opengsd/mcp-server"], `^${devVersion}`);
+    assert.equal(gateway.dependencies["@opengsd/mcp-server"], "workspace:*");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

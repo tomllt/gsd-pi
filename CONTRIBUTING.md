@@ -22,38 +22,38 @@ Once you have one merged PR, this requirement no longer applies to you.
 ### One-time setup (after cloning)
 
 ```bash
-npm ci                              # Install dependencies — MUST run first
-npm run secret-scan:install-hook    # Install git hooks — run once
+pnpm install --frozen-lockfile      # Install dependencies — MUST run first
+pnpm run secret-scan:install-hook   # Install git hooks — run once
 ```
 
-`npm ci` creates workspace symlinks in `node_modules/@gsd/*` and `node_modules/@opengsd/*` pointing to `packages/`. These are required for builds and tests to resolve packages correctly.
+`pnpm install` creates workspace symlinks in `node_modules/@gsd/*` and `node_modules/@opengsd/*` pointing to `packages/`. These are required for builds and tests to resolve packages correctly.
 
-Run `npm run secret-scan:install-hook` once after cloning. It installs a pre-commit hook that blocks commits containing hardcoded secrets or credentials. Conventional Commits format is validated by CI on push.
+Run `pnpm run secret-scan:install-hook` once after cloning. It installs a pre-commit hook that blocks commits containing hardcoded secrets or credentials. Conventional Commits format is validated by CI on push.
 
 ### Day-to-day development
 
 ```bash
-npm run build    # Build
-npm test         # Run tests
+pnpm run build    # Build
+pnpm test         # Run tests
 ```
 
-If `npm run build` fails after running tests (e.g. `Cannot find module '@gsd/*'` errors), run `npm ci` first to restore workspace symlinks, then try again.
+If `pnpm run build` fails after running tests (e.g. `Cannot find module '@gsd/*'` errors), run `pnpm install --frozen-lockfile` first to restore workspace symlinks, then try again.
 
 ### Before pushing
 
 CI is tiered to match local scripts. See [Test confidence stack](docs/dev/test-confidence-stack.md) for the full map.
 
 ```bash
-npm run verify:fast    # ~1–3 min: same scans as CI fast-gates (secrets, docs injection, skill refs)
-npm run verify:pr      # ~5–15 min: fast inner loop — build:core → typecheck:extensions → test:unit
-npm run verify:merge   # ~20–40 min: CI PR blocking parity (build, all test jobs, validate-pack)
-npm run verify:full    # Alias for verify:merge
-npm run audit:test-confidence   # Inventory report: runners, tiers, thin areas
+pnpm run verify:fast    # ~1–3 min: same scans as CI fast-gates (secrets, docs injection, skill refs)
+pnpm run verify:pr      # ~5–15 min: fast inner loop — build:core → typecheck:extensions → test:unit
+pnpm run verify:merge   # ~20–40 min: CI PR blocking parity (build, all test jobs, validate-pack)
+pnpm run verify:full    # Alias for verify:merge
+pnpm run audit:test-confidence   # Inventory report: runners, tiers, thin areas
 ```
 
 Run `verify:fast` on every push. While iterating, `verify:pr` is enough for a quick check. **Before requesting review** on a PR that touches `src/`, `packages/`, or tests, run **`verify:merge`** — a passing `verify:pr` alone does not match what CI requires to merge.
 
-If `verify:pr` fails after running tests (e.g. `Cannot find module '@gsd/*'` errors), run `npm ci` first to restore workspace symlinks, then try again.
+If `verify:pr` fails after running tests (e.g. `Cannot find module '@gsd/*'` errors), run `pnpm install --frozen-lockfile` first to restore workspace symlinks, then try again.
 
 ### Cross-platform note
 
@@ -99,7 +99,7 @@ git fetch origin
 git rebase origin/main
 ```
 
-CI must pass before your PR will be reviewed. Run `npm run verify:fast` on every push and `npm run verify:merge` before requesting review on code changes.
+CI must pass before your PR will be reviewed. Run `pnpm run verify:fast` on every push and `pnpm run verify:merge` before requesting review on code changes.
 
 ## Working with GSD (team workflow)
 
@@ -148,7 +148,7 @@ If this is a non-trivial change, explain the design and any alternatives you con
 ### Requirements
 
 - **CI must pass.** If your PR breaks tests, fix them before requesting review.
-- **Run `npm run verify:merge` locally before requesting review.** Use `verify:pr` only as a fast inner loop. See [Local development](#local-development) and [Test confidence stack](docs/dev/test-confidence-stack.md).
+- **Run `pnpm run verify:merge` locally before requesting review.** Use `verify:pr` only as a fast inner loop. See [Local development](#local-development) and [Test confidence stack](docs/dev/test-confidence-stack.md).
 - **One concern per PR.** A bug fix is a bug fix. A feature is a feature. Don't bundle unrelated changes.
 - **No drive-by formatting.** Don't reformat code you didn't change. Don't reorder imports in files you're not modifying.
 - **Link issues when relevant.** Not mandatory for every PR, but if an issue exists, reference it.
@@ -268,7 +268,7 @@ Reading a diff is not the same as verifying a change. Our review standard is exe
 **What reviewers do:**
 
 1. **Check out the branch** — check out the PR branch locally (or in a worktree). Don't review from the diff view alone.
-2. **Build the branch** — run `npm run build`. A diff that doesn't compile is not reviewable.
+2. **Build the branch** — run `pnpm run build`. A diff that doesn't compile is not reviewable.
 3. **Run the test suite** — run `npm test`. CI status is a signal, not a substitute for local verification.
 4. **Trace root cause for bug fixes** — confirm the diff addresses the root cause described in the issue, not just the symptom.
 5. **Check for a regression test** — bug fixes must include a test that would have caught the original bug. If it's absent, the fix is incomplete.

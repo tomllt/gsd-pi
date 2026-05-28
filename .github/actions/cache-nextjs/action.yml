@@ -8,7 +8,7 @@ runs:
       uses: actions/cache@v5
       with:
         path: web/.next/cache
-        key: nextjs-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}-${{ hashFiles('web/app/**', 'web/components/**', 'web/lib/**', 'web/hooks/**') }}
+        key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('web/app/**', 'web/components/**', 'web/lib/**', 'web/hooks/**') }}
         restore-keys: |
-          nextjs-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}-
+          nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
           nextjs-${{ runner.os }}-

@@ -65,16 +65,22 @@ jobs:
       - name: Mark workspace safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          cache: pnpm
           package-manager-cache: false
         env:
           NODE_AUTH_TOKEN: ${{ github.event.inputs.publish_auth == 'token' && secrets.NPM_TOKEN || '' }}
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Verify npm publish toolchain
         run: |
@@ -92,24 +98,21 @@ jobs:
           fi
           npm whoami
 
-      - name: Install web host dependencies
-        run: npm --prefix web ci
-
       - uses: ./.github/actions/cache-nextjs
 
       - name: Build core
-        run: npm run build:core
+        run: pnpm run build:core
 
       - name: Build web host
-        run: npm run build:web-host
+        run: pnpm run build:web-host
 
       - name: Stamp prerelease version and sync platform packages
         id: stamp
         env:
           VERSION_CHANNEL: ${{ github.event.inputs.channel }}
         run: |
-          npm run pipeline:version-stamp
-          npm run sync-platform-versions
+          pnpm run pipeline:version-stamp
+          pnpm run sync-platform-versions
           echo "version=$(node -e 'process.stdout.write(require("./package.json").version)')" >> "$GITHUB_OUTPUT"
 
       - name: Smoke test
@@ -117,10 +120,10 @@ jobs:
           chmod +x dist/loader.js
           GSD_SMOKE_BINARY="$(pwd)/dist/loader.js"
           export GSD_SMOKE_BINARY
-          npm run test:smoke
+          pnpm run test:smoke
 
       - name: Verify native platform packages exist
-        run: npm run verify:native-platform-packages
+        run: pnpm run verify:native-platform-packages
 
       - name: Publish @${{ github.event.inputs.channel }}
         env:
@@ -178,20 +181,25 @@ jobs:
           echo "::error::Recommended actions: (1) investigate the failing step above, (2) if the version exists on npm, deprecate it with 'npm deprecate @opengsd/gsd-pi@${PUBLISH_VERSION} \"broken ${CHANNEL} build; see Actions run\"', (3) cut a fix and re-run NPM Publish."
           exit 1
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - name: Install repo dependencies (for regression harness)
+        run: pnpm install --frozen-lockfile
+
       - name: Run smoke tests (against installed binary)
         run: |
           GSD_SMOKE_BINARY=$(which gsd)
           export GSD_SMOKE_BINARY
-          npm run test:smoke
-
-      - name: Install repo dependencies (for regression harness)
-        run: npm ci
+          pnpm run test:smoke
 
       - name: Run live regression tests (against installed binary)
         run: |
           GSD_SMOKE_BINARY=$(which gsd)
           export GSD_SMOKE_BINARY
-          npm run test:live-regression
+          pnpm run test:live-regression
 
       - name: Warn on verify failure
         if: failure()
@@ -216,14 +224,20 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          cache: pnpm
           package-manager-cache: false
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Verify trusted publishing toolchain
         run: |
@@ -234,7 +248,7 @@ jobs:
 
       - name: Run live LLM tests (optional)
         continue-on-error: true
-        run: npm run test:live || echo "::warning::Live LLM tests failed - non-blocking, but worth investigating"
+        run: pnpm run test:live || echo "::warning::Live LLM tests failed - non-blocking, but worth investigating"
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -259,7 +273,7 @@ jobs:
           node -e "require('./package.json')" && \
           node -e "require('./packages/pi-coding-agent/package.json')" && \
           node -e "require('./pkg/package.json')" && \
-          npm run verify:version-sync && \
+          pnpm run verify:version-sync && \
           echo "All package.json files are valid"
 
       - name: Update CHANGELOG.md
@@ -271,23 +285,23 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json web/package-lock.json CHANGELOG.md native/Cargo.toml native/Cargo.lock native/npm/*/package.json pkg/package.json packages/*/package.json extensions/google-search/package.json
+          git add package.json pnpm-lock.yaml CHANGELOG.md native/Cargo.toml native/Cargo.lock native/npm/*/package.json pkg/package.json packages/*/package.json extensions/google-search/package.json
           git commit -m "release: v${RELEASE_VERSION}"
           git pull --rebase origin main
           git tag "v${RELEASE_VERSION}"
 
       - name: Build release
-        run: npm run build
+        run: pnpm run build
 
       - name: Run live regression tests (against release build)
         run: |
           chmod +x dist/loader.js
           GSD_SMOKE_BINARY="$(pwd)/dist/loader.js"
           export GSD_SMOKE_BINARY
-          npm run test:live-regression
+          pnpm run test:live-regression
 
       - name: Verify native platform packages for release version
-        run: npm run verify:native-platform-packages
+        run: pnpm run verify:native-platform-packages
 
       - name: Publish release to npm @latest
         env:

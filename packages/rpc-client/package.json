@@ -34,7 +34,7 @@
     "test": "node --test dist/rpc-client.test.js"
   },
   "dependencies": {
-    "@opengsd/contracts": "^1.0.2"
+    "@opengsd/contracts": "workspace:*"
   },
   "engines": {
     "node": ">=22.0.0"

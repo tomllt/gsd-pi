@@ -129,11 +129,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
+          cache: pnpm
 
       - name: Verify npm publish toolchain
         run: |
@@ -287,12 +291,12 @@ jobs:
       - name: Install dependencies
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
         run: |
-          npm install --package-lock-only --ignore-scripts
-          npm ci --omit=optional
+          pnpm install --lockfile-only
+          pnpm install --frozen-lockfile --omit=optional
 
       - name: Build
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
-        run: npm run build
+        run: pnpm run build
 
       - name: Verify dist exists
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
@@ -300,7 +304,7 @@ jobs:
 
       - name: Validate package is installable
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
-        run: npm run validate-pack
+        run: pnpm run validate-pack
 
       - name: Publish workspace packages
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'

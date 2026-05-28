@@ -1,0 +1,23 @@
+packages:
+  - 'packages/*'
+  - 'extensions/*'
+  - 'web'
+
+autoInstallPeers: true
+strictPeerDependencies: false
+engineStrict: true
+
+# Keep dist-test and compiled workspace imports resolvable from the repo root.
+publicHoistPattern:
+  - '*'
+
+# Allow lifecycle scripts for native/tooling deps (replaces package.json#pnpm.onlyBuiltDependencies).
+onlyBuiltDependencies:
+  - '@google/genai'
+  - canvas
+  - esbuild
+  - koffi
+  - node-pty
+  - protobufjs
+  - sharp
+  - unrs-resolver

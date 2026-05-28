@@ -31,7 +31,7 @@ const scripts = rootPackage.scripts as Record<string, string>;
 function assertContractsBefore(scriptName: string, laterCommand: string): void {
 	const script = scripts[scriptName];
 	assert.ok(script, `${scriptName} script must exist`);
-	const contractsIndex = script.indexOf("npm run build:contracts");
+	const contractsIndex = script.indexOf("pnpm run build:contracts");
 	const laterIndex = script.indexOf(laterCommand);
 	assert.ok(contractsIndex >= 0, `${scriptName} must build @opengsd/contracts`);
 	assert.ok(laterIndex >= 0, `${scriptName} must include ${laterCommand}`);
@@ -42,9 +42,9 @@ function assertContractsBefore(scriptName: string, laterCommand: string): void {
 }
 
 test("pi build scripts compile contracts before pi-coding-agent", () => {
-	assertContractsBefore("build:pi", "npm run build:pi-coding-agent");
-	assertContractsBefore("build:pi-coding-agent", "npm run build -w @gsd/pi-coding-agent");
-	assertContractsBefore("gsd:web", "npm run copy-resources");
+	assertContractsBefore("build:pi", "pnpm run build:pi-coding-agent");
+	assertContractsBefore("build:pi-coding-agent", "pnpm --filter @gsd/pi-coding-agent run build");
+	assertContractsBefore("gsd:web", "pnpm run copy-resources");
 });
 
 test("contracts build emits dist even when incremental metadata is stale", () => {

@@ -9,36 +9,36 @@ cd "$ROOT"
 echo "── verify:merge (CI PR blocking parity) ──"
 
 echo "── build:core ──"
-npm run build:core
+pnpm run build:core
 
 echo "── web host (required by validate-pack) ──"
-npm --prefix web ci
-npm run build:web-host
+pnpm install --frozen-lockfile
+pnpm run build:web-host
 
 echo "── typecheck:extensions ──"
-npm run typecheck:extensions
+pnpm run typecheck:extensions
 
 echo "── validate-pack ──"
-npm run validate-pack
+pnpm run validate-pack
 
 echo "── verify:workspace-coverage ──"
-npm run verify:workspace-coverage
+pnpm run verify:workspace-coverage
 
 echo "── verify:extension-coverage ──"
-npm run verify:extension-coverage
+pnpm run verify:extension-coverage
 
 echo "── test:unit ──"
-npm run test:unit
+pnpm run test:unit
 
 echo "── test:packages ──"
-npm run test:packages
+pnpm run test:packages
 
 echo "── test:integration ──"
-npm run test:integration
+pnpm run test:integration
 
 echo "── test:e2e ──"
 chmod +x dist/loader.js
 export GSD_SMOKE_BINARY="${ROOT}/dist/loader.js"
-npm run test:e2e
+pnpm run test:e2e
 
 echo "verify:merge: all checks passed ✓"

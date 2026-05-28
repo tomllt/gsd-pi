@@ -32,15 +32,11 @@ function writeText(root: string, relativePath: string, value: string): void {
 function createFixture(): string {
   const root = mkdtempSync(join(tmpdir(), "open-gsd-version-sync-"));
   writeJson(root, "package.json", { name: "@opengsd/gsd-pi", version: "1.0.0" });
-  writeJson(root, "package-lock.json", {
-    name: "@opengsd/gsd-pi",
-    version: "1.0.0",
-    packages: {
-      "": { name: "@opengsd/gsd-pi", version: "1.0.0" },
-      "extensions/google-search": { name: "@gsd-extensions/google-search", version: "1.0.0" },
-      "packages/pi-coding-agent": { name: "@gsd/pi-coding-agent", version: "1.0.0" },
-    },
-  });
+  writeText(
+    root,
+    "pnpm-lock.yaml",
+    "lockfileVersion: '9.0'\nimporters:\n  .: {}\npackages:\n  /@opengsd/gsd-pi@1.0.0:\n    resolution: {integrity: sha512-test}\n",
+  );
   writeJson(root, "extensions/google-search/package.json", {
     name: "@gsd-extensions/google-search",
     version: "1.0.0",
@@ -108,7 +104,7 @@ test("verifyVersionSync reports every release-owned surface that drifts from roo
   assert.match(issues.join("\n"), /packages\/pi-coding-agent\/package\.json version is 1\.0\.0, expected 2\.0\.0/);
   assert.match(
     issues.join("\n"),
-    /packages\/pi-coding-agent\/package\.json dependencies\.@opengsd\/contracts is \^1\.0\.0, expected \^2\.0\.0/,
+    /packages\/pi-coding-agent\/package\.json dependencies\.@opengsd\/contracts is \^1\.0\.0, expected workspace:\*/,
   );
   assert.match(issues.join("\n"), /native\/Cargo\.toml workspace package version is 1\.0\.0, expected 2\.0\.0/);
   assert.match(issues.join("\n"), /native\/Cargo\.lock gsd-engine version is 1\.0\.0, expected 2\.0\.0/);
@@ -127,7 +123,7 @@ test("syncVersionSurfaces updates package, native, and bridge versions together"
     readJson<{ dependencies: Record<string, string> }>(root, "packages/pi-coding-agent/package.json").dependencies[
       "@opengsd/contracts"
     ],
-    "^2.1.0-dev.abc123",
+    "workspace:*",
   );
   assert.deepEqual(readJson<{ peerDependencies: Record<string, string> }>(root, "extensions/google-search/package.json").peerDependencies, {
     "@gsd/pi-coding-agent": "*",

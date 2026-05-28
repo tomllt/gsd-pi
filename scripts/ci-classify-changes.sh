@@ -21,7 +21,7 @@ echo "$FILES"
 
 is_core_file() {
   case "$1" in
-    src/*|packages/*|native/*|scripts/*|web/*|extensions/*|tests/*|docker/*|Dockerfile|package.json|package-lock.json|tsconfig*.json) return 0 ;;
+    src/*|packages/*|native/*|scripts/*|web/*|extensions/*|tests/*|docker/*|Dockerfile|package.json|pnpm-lock.yaml|tsconfig*.json) return 0 ;;
     packages/*/tsconfig.json) return 0 ;;
     *) return 1 ;;
   esac
@@ -29,14 +29,14 @@ is_core_file() {
 
 is_web_file() {
   case "$1" in
-    web/*|web/package.json|web/package-lock.json) return 0 ;;
+    web/*|web/package.json|pnpm-lock.yaml) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 is_portability_file() {
   case "$1" in
-    src/*|packages/*|native/*|scripts/*|web/*|package.json|package-lock.json|web/package-lock.json|tsconfig*.json) return 0 ;;
+    src/*|packages/*|native/*|scripts/*|web/*|package.json|pnpm-lock.yaml|tsconfig*.json) return 0 ;;
     packages/*/tsconfig.json) return 0 ;;
     *) return 1 ;;
   esac
@@ -44,7 +44,7 @@ is_portability_file() {
 
 is_windows_e2e_file() {
   case "$1" in
-    tests/e2e/*|src/loader*|src/rtk*|src/native*|src/resources/extensions/gsd/gsd-db*|src/resources/extensions/gsd/extension-host*|src/resources/extensions/gsd/auto-worktree*|src/resources/extensions/gsd/workflow-mcp*|packages/pi-coding-agent/*|packages/pi-ai/*|packages/pi-agent-core/*|packages/native/*|packages/mcp-server/*|packages/rpc-client/*|native/*|package.json|package-lock.json|tsconfig*.json) return 0 ;;
+    tests/e2e/*|src/loader*|src/rtk*|src/native*|src/resources/extensions/gsd/gsd-db*|src/resources/extensions/gsd/extension-host*|src/resources/extensions/gsd/auto-worktree*|src/resources/extensions/gsd/workflow-mcp*|packages/pi-coding-agent/*|packages/pi-ai/*|packages/pi-agent-core/*|packages/native/*|packages/mcp-server/*|packages/rpc-client/*|native/*|package.json|pnpm-lock.yaml|tsconfig*.json) return 0 ;;
     packages/*/tsconfig.json) return 0 ;;
     *) return 1 ;;
   esac
@@ -52,7 +52,7 @@ is_windows_e2e_file() {
 
 is_docker_file() {
   case "$1" in
-    Dockerfile|docker/*|scripts/install.js|scripts/*.cjs|scripts/*.mjs|package.json|package-lock.json|src/*|packages/*|tests/e2e/docker/*) return 0 ;;
+    Dockerfile|docker/*|scripts/install.js|scripts/*.cjs|scripts/*.mjs|package.json|pnpm-lock.yaml|src/*|packages/*|tests/e2e/docker/*) return 0 ;;
     *) return 1 ;;
   esac
 }

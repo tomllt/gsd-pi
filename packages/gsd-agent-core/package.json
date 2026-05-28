@@ -25,9 +25,9 @@
     "test": "node --import ../../src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --test src/**/*.test.ts"
   },
   "dependencies": {
-    "@gsd/native": "^1.0.2",
-    "@gsd/pi-agent-core": "^1.0.2",
-    "@gsd/pi-ai": "^1.0.2",
-    "@gsd/pi-coding-agent": "^1.0.2"
+    "@gsd/native": "workspace:*",
+    "@gsd/pi-agent-core": "workspace:*",
+    "@gsd/pi-ai": "workspace:*",
+    "@gsd/pi-coding-agent": "workspace:*"
   }
 }

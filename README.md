@@ -146,17 +146,17 @@ Then use slash commands inside the GSD session:
 ## Development
 
 ```bash
-npm ci
-npm run build
-npm test
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm test
 ```
 
 Before opening a pull request, run:
 
 ```bash
-npm run verify:fast    # CI fast-gates locally (scans + policy)
-npm run verify:pr      # Fast loop: build + typecheck + unit tests
-npm run verify:merge   # Before PR review: full CI blocking parity
+pnpm run verify:fast    # CI fast-gates locally (scans + policy)
+pnpm run verify:pr      # Fast loop: build + typecheck + unit tests
+pnpm run verify:merge   # Before PR review: full CI blocking parity
 ```
 
 ## Versioning

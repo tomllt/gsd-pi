@@ -17,7 +17,7 @@ const ROOT = join(__dirname, '..');
 const REPORT_DIR = join(ROOT, 'coverage/packages');
 
 function main() {
-  const compile = spawnSync('npm', ['run', 'test:compile'], {
+  const compile = spawnSync('pnpm', ['run', 'test:compile'], {
     cwd: ROOT,
     stdio: 'inherit',
     shell: process.platform === 'win32',

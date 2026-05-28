@@ -25,11 +25,11 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test dist/*.test.js"
+    "test": "pnpm run build && node --test dist/*.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "@opengsd/mcp-server": "^1.0.2",
+    "@opengsd/mcp-server": "workspace:*",
     "ws": "^8.20.0",
     "zod": "^4.0.0"
   },

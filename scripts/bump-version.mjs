@@ -37,14 +37,6 @@ console.log(`[bump-version] release version surfaces synced to ${newVersion}`);
 execSync("node native/scripts/sync-platform-versions.cjs", { cwd: root, stdio: "inherit" });
 console.log(`[bump-version] optionalDependencies pinned to ${newVersion}`);
 
-// 3. Regenerate root package-lock.json to match the new version.
-//    --package-lock-only updates the lockfile in-place without touching node_modules.
-execSync("npm install --package-lock-only --ignore-scripts", { cwd: root, stdio: "inherit" });
-console.log(`[bump-version] package-lock.json regenerated at ${newVersion}`);
-
-// 4. Regenerate web/package-lock.json if the web app is present.
-const webDir = resolve(root, "web");
-if (existsSync(webDir)) {
-  execSync("npm install --package-lock-only --ignore-scripts", { cwd: webDir, stdio: "inherit" });
-  console.log(`[bump-version] web/package-lock.json regenerated`);
-}
+// 3. Regenerate pnpm-lock.yaml to match the new version.
+execSync("pnpm install --lockfile-only", { cwd: root, stdio: "inherit" });
+console.log(`[bump-version] pnpm-lock.yaml regenerated at ${newVersion}`);

@@ -3,6 +3,7 @@ name: Security audit
 on:
   pull_request:
     paths:
+      - "pnpm-lock.yaml"
       - "package-lock.json"
       - "web/package-lock.json"
       - "vscode-extension/package-lock.json"

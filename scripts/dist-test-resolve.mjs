@@ -10,7 +10,7 @@
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { registerHooks } from 'node:module';
+import { createRequire, registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -26,6 +26,7 @@ process.env.GIT_TEMPLATE_DIR = gitTemplateDir;
 
 // dist-test root — everything compiled lands here
 const DIST_TEST = new URL('../dist-test/', import.meta.url).href;
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 // ESM import hook: compiled .js mirrors for workspace packages (jiti uses alias map instead).
 const WORKSPACE_ENTRIES = {
@@ -51,11 +52,39 @@ function isJitiCjsParent(context) {
   return parent.includes('/node_modules/@mariozechner/jiti/');
 }
 
+function resolveFromSourcePackage(parentURL, specifier) {
+  if (!parentURL?.includes('/dist-test/packages/')) {
+    return null;
+  }
+  if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || specifier.startsWith('file:')) {
+    return null;
+  }
+
+  const parentPath = fileURLToPath(parentURL);
+  const match = parentPath.match(/[/\\]dist-test[/\\]packages[/\\]([^/\\]+)[/\\]/);
+  if (!match) {
+    return null;
+  }
+
+  const pkgDir = join(REPO_ROOT, 'packages', match[1]);
+  const pkgJson = join(pkgDir, 'package.json');
+  if (!existsSync(pkgJson)) {
+    return null;
+  }
+
+  try {
+    const require = createRequire(pkgJson);
+    return pathToFileURL(require.resolve(specifier)).href;
+  } catch {
+    return null;
+  }
+}
+
 function resolveWorkspaceSubpath(specifier) {
   for (const scope of WORKSPACE_SCOPES) {
     const piCodingPrefix = `${scope}/pi-coding-agent/`;
     if (specifier.startsWith(piCodingPrefix)) {
-      const subpath = specifier.slice(piCodingPrefix.length).replace(/\.js$/, '.js');
+      const subpath = specifier.slice(piCodingPrefix.length);
       return new URL(`../dist-test/packages/pi-coding-agent/src/${subpath}`, import.meta.url).href;
     }
     const nativePrefix = `${scope}/native/`;
@@ -68,19 +97,22 @@ function resolveWorkspaceSubpath(specifier) {
 }
 
 export function resolve(specifier, context, nextResolve) {
-  // 1. Workspace bare + subpath imports → compiled dist-test counterparts (skip for jiti CJS)
-  if (!isJitiCjsParent(context)) {
-    if (specifier in GSD_ALIASES) {
-      return nextResolve(GSD_ALIASES[specifier], context);
-    }
-    const subpathTarget = resolveWorkspaceSubpath(specifier);
-    if (subpathTarget) {
-      return nextResolve(subpathTarget, context);
-    }
+  const sourcePackageTarget = resolveFromSourcePackage(context.parentURL, specifier);
+  if (sourcePackageTarget) {
+    return nextResolve(sourcePackageTarget, context);
   }
 
-  // 2. .ts imports inside dist-test → .js, preserving query/hash
-  // cache busters used by dynamic import tests.
+  const subpathTarget = resolveWorkspaceSubpath(specifier);
+  if (subpathTarget) {
+    return nextResolve(subpathTarget, context);
+  }
+
+  // Bare workspace imports → compiled dist-test counterparts (skip for jiti CJS).
+  if (!isJitiCjsParent(context) && specifier in GSD_ALIASES) {
+    return nextResolve(GSD_ALIASES[specifier], context);
+  }
+
+  // .ts imports inside dist-test → .js, preserving query/hash cache busters.
   if (specifier.startsWith('file:') && specifier.startsWith(DIST_TEST) && isTsSpecifier(specifier)) {
     return nextResolve(rewriteTsSpecifierToJs(specifier), context);
   }

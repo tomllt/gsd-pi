@@ -114,7 +114,7 @@ if (require.main === module) {
     const distIndex = join(pkgDir, 'dist', 'index.js')
     try {
       // execSync is safe here: the command is a hardcoded string, not user input
-      execSync('npm run build', { cwd: pkgDir, stdio: 'pipe' })
+      execSync('pnpm run build', { cwd: pkgDir, stdio: 'pipe' })
       if (!existsSync(distIndex)) {
         throw new Error('build finished but dist/index.js is missing (stale TypeScript incremental cache?)')
       }

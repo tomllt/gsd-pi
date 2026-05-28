@@ -77,8 +77,8 @@ function setPackageVersion(root, packageDir, version) {
   for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
     if (!pkg[field]) continue;
     for (const dep of Object.keys(pkg[field])) {
-      if (INTERNAL_PACKAGE_NAMES.has(dep) && pkg[field][dep] !== "*" && pkg[field][dep] !== `^${version}`) {
-        pkg[field][dep] = `^${version}`;
+      if (INTERNAL_PACKAGE_NAMES.has(dep) && pkg[field][dep] !== "*" && pkg[field][dep] !== "workspace:*") {
+        pkg[field][dep] = "workspace:*";
         changed = true;
       }
     }
@@ -172,32 +172,23 @@ function verifyPackage(root, packageDir, expectedVersion, issues) {
   for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
     if (!pkg[field]) continue;
     for (const [dep, range] of Object.entries(pkg[field])) {
-      if (INTERNAL_PACKAGE_NAMES.has(dep) && range !== "*" && range !== `^${expectedVersion}`) {
-        issues.push(`${packageDir}/package.json ${field}.${dep} is ${range}, expected ^${expectedVersion}`);
+      if (INTERNAL_PACKAGE_NAMES.has(dep) && range !== "*" && range !== "workspace:*") {
+        issues.push(`${packageDir}/package.json ${field}.${dep} is ${range}, expected workspace:*`);
       }
     }
   }
 }
 
 function verifyLockfile(root, expectedVersion, issues) {
-  const lockPath = path.join(root, "package-lock.json");
+  const lockPath = path.join(root, "pnpm-lock.yaml");
   if (!fs.existsSync(lockPath)) {
-    issues.push("package-lock.json is missing");
+    issues.push("pnpm-lock.yaml is missing");
     return;
   }
 
-  const lock = readJson(lockPath);
-  if (lock.version !== expectedVersion) {
-    issues.push(`package-lock.json version is ${lock.version}, expected ${expectedVersion}`);
-  }
-  if (lock.packages?.[""]?.version !== expectedVersion) {
-    issues.push(`package-lock.json root package version is ${lock.packages?.[""]?.version}, expected ${expectedVersion}`);
-  }
-  for (const packageDir of RELEASE_WORKSPACE_PACKAGE_DIRS) {
-    const version = lock.packages?.[packageDir]?.version;
-    if (version !== undefined && version !== expectedVersion) {
-      issues.push(`package-lock.json ${packageDir} version is ${version}, expected ${expectedVersion}`);
-    }
+  const lock = fs.readFileSync(lockPath, "utf8");
+  if (!lock.includes("lockfileVersion:")) {
+    issues.push("pnpm-lock.yaml is invalid or empty");
   }
 }
 

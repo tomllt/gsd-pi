@@ -24,7 +24,6 @@ console.log(`Stamped version: ${devVersion}`);
 syncVersionSurfaces(root, devVersion, { updateRoot: false });
 console.log(`[version-stamp] release version surfaces synced to ${devVersion}`);
 
-// Regenerate package-lock.json to reflect the stamped dev version.
-// --package-lock-only updates the lockfile in-place without touching node_modules.
-execSync("npm install --package-lock-only --ignore-scripts", { cwd: root, stdio: "inherit" });
-console.log(`[version-stamp] package-lock.json regenerated at ${devVersion}`);
+// Regenerate pnpm-lock.yaml to reflect the stamped dev version.
+execSync("pnpm install --lockfile-only", { cwd: root, stdio: "inherit" });
+console.log(`[version-stamp] pnpm-lock.yaml regenerated at ${devVersion}`);

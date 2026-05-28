@@ -181,7 +181,7 @@ function verifyMergeScriptExists(scripts) {
   if (!scripts['verify:merge']) {
     issues.push('package.json missing scripts.verify:merge');
   }
-  if (scripts['verify:full'] && scripts['verify:full'] !== 'npm run verify:merge') {
+  if (scripts['verify:full'] && !/run verify:merge$/.test(scripts['verify:full'])) {
     issues.push('verify:full should alias verify:merge for backward compatibility');
   }
   if (!existsSync(join(ROOT, 'scripts/verify-merge.sh'))) {

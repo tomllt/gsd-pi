@@ -29,11 +29,11 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.json --incremental false && npm run copy-assets",
+    "build": "rm -rf dist && tsc -p tsconfig.json --incremental false && node scripts/copy-assets.cjs",
     "copy-assets": "node scripts/copy-assets.cjs"
   },
   "dependencies": {
-    "@opengsd/contracts": "^1.0.2",
+    "@opengsd/contracts": "workspace:*",
     "@mariozechner/jiti": "^2.6.2",
     "@silvia-odwyer/photon-node": "0.3.4",
     "chalk": "5.6.2",
@@ -53,11 +53,11 @@
     "typebox": "1.1.38",
     "undici": "8.3.0",
     "yaml": "2.9.0",
-    "@gsd/agent-core": "^1.0.2",
-    "@gsd/native": "^1.0.2",
-    "@gsd/pi-agent-core": "^1.0.2",
-    "@gsd/pi-ai": "^1.0.2",
-    "@gsd/pi-tui": "^1.0.2",
+    "@gsd/agent-core": "workspace:*",
+    "@gsd/native": "workspace:*",
+    "@gsd/pi-agent-core": "workspace:*",
+    "@gsd/pi-ai": "workspace:*",
+    "@gsd/pi-tui": "workspace:*",
     "@sinclair/typebox": "^0.34.41"
   },
   "devDependencies": {

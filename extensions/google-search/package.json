@@ -16,8 +16,8 @@
     ]
   },
   "peerDependencies": {
-    "@gsd/pi-coding-agent": "*",
-    "@gsd/pi-tui": "*"
+    "@gsd/pi-coding-agent": "workspace:*",
+    "@gsd/pi-tui": "workspace:*"
   },
   "dependencies": {
     "@google/genai": "^1.40.0",
