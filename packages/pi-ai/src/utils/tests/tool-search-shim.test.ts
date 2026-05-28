@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
 import {
 	createToolSearchShimResult,
 	isToolSearchToolName,
@@ -7,7 +8,8 @@ import {
 
 describe("tool-search-shim", () => {
 	test("parseToolSearchSelectQuery extracts MCP tool name", () => {
-		expect(parseToolSearchSelectQuery("select:mcp__gsd-workflow__gsd_milestone_status")).toBe(
+		assert.equal(
+			parseToolSearchSelectQuery("select:mcp__gsd-workflow__gsd_milestone_status"),
 			"mcp__gsd-workflow__gsd_milestone_status",
 		);
 	});
@@ -16,13 +18,13 @@ describe("tool-search-shim", () => {
 		const result = createToolSearchShimResult({
 			query: "select:mcp__gsd-workflow__gsd_milestone_status",
 		});
-		expect(result.content[0]?.text).toContain("mcp__gsd-workflow__gsd_milestone_status");
-		expect(result.details.resolvedTool).toBe("mcp__gsd-workflow__gsd_milestone_status");
+		assert.ok(result.content[0]?.text.includes("mcp__gsd-workflow__gsd_milestone_status"));
+		assert.equal(result.details.resolvedTool, "mcp__gsd-workflow__gsd_milestone_status");
 	});
 
 	test("isToolSearchToolName is case insensitive", () => {
-		expect(isToolSearchToolName("ToolSearch")).toBe(true);
-		expect(isToolSearchToolName("toolsearch")).toBe(true);
-		expect(isToolSearchToolName("Read")).toBe(false);
+		assert.equal(isToolSearchToolName("ToolSearch"), true);
+		assert.equal(isToolSearchToolName("toolsearch"), true);
+		assert.equal(isToolSearchToolName("Read"), false);
 	});
 });

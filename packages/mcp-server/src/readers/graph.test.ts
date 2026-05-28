@@ -16,6 +16,7 @@ import {
   graphDiff,
 } from './graph.js';
 import type { KnowledgeGraph } from './graph.js';
+import { _resetReaderCaches } from './paths.js';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -442,7 +443,11 @@ describe('graphStatus', () => {
   let projectDir: string;
 
   beforeEach(() => {
+    _resetReaderCaches();
     projectDir = tmpProject();
+    // Empty project-local .gsd prevents resolveGsdRoot from falling back to
+    // the checkout's .gsd when tmpdir lives inside the CI workspace.
+    mkdirSync(join(projectDir, '.gsd', 'graphs'), { recursive: true });
   });
 
   afterEach(() => rmSync(projectDir, { recursive: true, force: true }));

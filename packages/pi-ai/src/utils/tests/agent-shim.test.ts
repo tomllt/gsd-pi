@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
 import {
 	createAgentShimResult,
 	extractNormalizedSubagentCall,
@@ -9,20 +10,20 @@ import {
 
 describe("isAgentToolName", () => {
 	test("matches Agent case-insensitively", () => {
-		expect(isAgentToolName("Agent")).toBe(true);
-		expect(isAgentToolName("agent")).toBe(true);
-		expect(isAgentToolName("subagent")).toBe(false);
+		assert.equal(isAgentToolName("Agent"), true);
+		assert.equal(isAgentToolName("agent"), true);
+		assert.equal(isAgentToolName("subagent"), false);
 	});
 });
 
 describe("mapSubagentTypeToGsdAgent", () => {
 	test("maps Claude Code Explore to scout", () => {
-		expect(mapSubagentTypeToGsdAgent("Explore")).toBe("scout");
+		assert.equal(mapSubagentTypeToGsdAgent("Explore"), "scout");
 	});
 
 	test("maps general-purpose variants to worker", () => {
-		expect(mapSubagentTypeToGsdAgent("general-purpose")).toBe("worker");
-		expect(mapSubagentTypeToGsdAgent("generalPurpose")).toBe("worker");
+		assert.equal(mapSubagentTypeToGsdAgent("general-purpose"), "worker");
+		assert.equal(mapSubagentTypeToGsdAgent("generalPurpose"), "worker");
 	});
 });
 
@@ -34,7 +35,7 @@ describe("normalizeClaudeCodeAgentArguments", () => {
 			prompt: "Read key files and summarize.",
 		};
 		normalizeClaudeCodeAgentArguments(args);
-		expect(args).toEqual({
+		assert.deepEqual(args, {
 			agent: "scout",
 			task: "Scout current project state\n\nRead key files and summarize.",
 		});
@@ -47,7 +48,7 @@ describe("normalizeClaudeCodeAgentArguments", () => {
 			prompt: "Ignored",
 		};
 		normalizeClaudeCodeAgentArguments(args);
-		expect(args).toEqual({
+		assert.deepEqual(args, {
 			agent: "scout",
 			task: "Existing task",
 		});
@@ -61,7 +62,7 @@ describe("normalizeClaudeCodeAgentArguments", () => {
 
 		normalizeClaudeCodeAgentArguments(args);
 
-		expect(args).toEqual({
+		assert.deepEqual(args, {
 			agent: "scout",
 			task: "Inspect repository",
 		});
@@ -70,13 +71,14 @@ describe("normalizeClaudeCodeAgentArguments", () => {
 
 describe("extractNormalizedSubagentCall", () => {
 	test("returns mapped agent and task", () => {
-		expect(
+		assert.deepEqual(
 			extractNormalizedSubagentCall({
 				subagent_type: "Explore",
 				description: "Scout",
 				prompt: "Go",
 			}),
-		).toEqual({ agent: "scout", task: "Scout\n\nGo" });
+			{ agent: "scout", task: "Scout\n\nGo" },
+		);
 	});
 });
 
@@ -87,8 +89,8 @@ describe("createAgentShimResult", () => {
 			description: "Scout codebase",
 			prompt: "Map modules",
 		});
-		expect(result.content[0]?.text).toContain("inline");
-		expect(result.details.agent).toBe("scout");
-		expect(result.details.task).toContain("Scout codebase");
+		assert.ok(result.content[0]?.text.includes("inline"));
+		assert.equal(result.details.agent, "scout");
+		assert.ok(result.details.task?.includes("Scout codebase"));
 	});
 });

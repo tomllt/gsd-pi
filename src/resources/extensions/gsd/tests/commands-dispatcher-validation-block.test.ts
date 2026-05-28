@@ -131,6 +131,7 @@ test("dispatcher blocks workflow-advancing aliases while validation is blocked",
     "do mark all complete",
     "dispatch complete",
     "workflow resume",
+    "workflow release-checklist",
   ];
 
   for (const command of blockedCommands) {
@@ -165,6 +166,27 @@ test("dispatcher still allows recovery commands while validation is blocked", as
     assert.equal(calls.length, 1);
     assert.equal(calls[0].kind, "info");
     assert.match(calls[0].message, /GSD/);
+    assert.doesNotMatch(calls[0].message, /cannot run/);
+  } finally {
+    closeDatabase();
+    invalidateStateCache();
+    cleanup(base);
+  }
+});
+
+test("dispatcher allows diagnostic and knowledge commands while validation is blocked", async () => {
+  const base = makeBase();
+  try {
+    seedValidationBlockedMilestone(base);
+    const { ctx, calls } = makeMockCtx(base);
+    const { pi, messages } = makeMockPi();
+
+    await handleGSDCommand("capture investigating validation false positive", ctx, pi);
+
+    assert.equal(messages.length, 0);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].kind, "info");
+    assert.match(calls[0].message, /Captured:/);
     assert.doesNotMatch(calls[0].message, /cannot run/);
   } finally {
     closeDatabase();

@@ -46,7 +46,7 @@ test("validation block detection only matches validation blockers", () => {
   }), false);
 });
 
-test("validation block allows only recovery and inspection commands", () => {
+test("validation block allows recovery, diagnostics, and unrelated commands", () => {
   const allowed = [
     "help",
     "h",
@@ -61,6 +61,23 @@ test("validation block allows only recovery and inspection commands", () => {
     "notifications",
     "inspect",
     "doctor audit",
+    "forensics",
+    "capture validation false-positive on Android",
+    "knowledge lesson browser gate needs Android evidence",
+    "codebase update",
+    "prefs status",
+    "config",
+    "discuss M006",
+    "queue",
+    "quick fix docs typo",
+    "new-milestone",
+    "new-project",
+    "workflow list",
+    "workflow validate release-checklist",
+    "parallel status",
+    "parallel stop M007",
+    "parallel pause M007",
+    "parallel watch",
   ];
 
   for (const command of allowed) {
@@ -77,14 +94,17 @@ test("validation block rejects workflow-start and advancing commands", () => {
     "next M006",
     "do mark all complete",
     "start bugfix",
-    "quick fix button",
-    "new-milestone",
     "workflow resume",
+    "workflow run release-checklist",
+    "workflow release-checklist",
+    "workflow release-checklist env=prod",
     "parallel start",
     "parallel resume",
+    "parallel merge",
     "dispatch complete",
     "dispatch uat",
     "complete-milestone",
+    "ship",
   ];
 
   for (const command of blocked) {

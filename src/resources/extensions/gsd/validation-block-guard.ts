@@ -13,18 +13,36 @@ import { detectWorktreeName } from "./worktree.js";
 const VALIDATION_BLOCK_RE =
   /milestone validation returned needs-(?:attention|remediation)|validation verdict is needs-(?:attention|remediation)/i;
 
-const ALLOWED_COMMANDS = new Set([
-  "help",
-  "h",
-  "?",
-  "status",
-  "verdict",
+const VALIDATION_SAFE_DISPATCH_COMMANDS = new Set([
+  "validate",
   "validate-milestone",
-  "park",
-  "logs",
-  "notifications",
-  "inspect",
-  "doctor",
+]);
+
+const VALIDATION_BLOCKED_COMMANDS = new Set([
+  "auto",
+  "next",
+  "start",
+  "ship",
+  "complete-milestone",
+  "do",
+]);
+
+const VALIDATION_BLOCKED_PARALLEL_SUBCOMMANDS = new Set([
+  "",
+  "start",
+  "resume",
+  "merge",
+]);
+
+const VALIDATION_SAFE_WORKFLOW_SUBCOMMANDS = new Set([
+  "",
+  "new",
+  "list",
+  "validate",
+  "pause",
+  "info",
+  "install",
+  "uninstall",
 ]);
 
 export function isValidationBlockedState(state: GSDState): boolean {
@@ -38,9 +56,15 @@ export function isValidationBlockAllowedCommand(trimmed: string): boolean {
 
   const [name, subcommand] = command.split(/\s+/, 2);
   if (name === "dispatch") {
-    return subcommand === "validate" || subcommand === "validate-milestone";
+    return VALIDATION_SAFE_DISPATCH_COMMANDS.has(subcommand ?? "");
   }
-  return ALLOWED_COMMANDS.has(name);
+  if (name === "parallel") {
+    return !VALIDATION_BLOCKED_PARALLEL_SUBCOMMANDS.has(subcommand ?? "");
+  }
+  if (name === "workflow") {
+    return VALIDATION_SAFE_WORKFLOW_SUBCOMMANDS.has(subcommand ?? "");
+  }
+  return !VALIDATION_BLOCKED_COMMANDS.has(name);
 }
 
 export function formatValidationBlockedMessage(

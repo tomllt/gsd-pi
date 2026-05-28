@@ -1,38 +1,39 @@
-import { describe, expect, test } from "vitest";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
 import { parseMcpToolName, stripMcpToolPrefix } from "../mcp-tool-name.js";
 import { CLAUDE_CODE_TOOL_ALIASES, resolveAgentToolName } from "../tool-shims.js";
 
 describe("mcp-tool-name", () => {
 	test("parseMcpToolName splits server and tool", () => {
-		expect(parseMcpToolName("mcp__gsd-workflow__gsd_plan_milestone")).toEqual({
+		assert.deepEqual(parseMcpToolName("mcp__gsd-workflow__gsd_plan_milestone"), {
 			server: "gsd-workflow",
 			tool: "gsd_plan_milestone",
 		});
 	});
 
 	test("stripMcpToolPrefix returns canonical tool name", () => {
-		expect(stripMcpToolPrefix("mcp__gsd-workflow__gsd_milestone_status")).toBe("gsd_milestone_status");
-		expect(stripMcpToolPrefix("read")).toBe("read");
+		assert.equal(stripMcpToolPrefix("mcp__gsd-workflow__gsd_milestone_status"), "gsd_milestone_status");
+		assert.equal(stripMcpToolPrefix("read"), "read");
 	});
 });
 
 describe("resolveAgentToolName", () => {
 	test("maps Claude Code Grep to Pi grep when registered", () => {
-		expect(CLAUDE_CODE_TOOL_ALIASES.grep).toBe("grep");
-		expect(resolveAgentToolName("Grep")).toBe("grep");
+		assert.equal(CLAUDE_CODE_TOOL_ALIASES.grep, "grep");
+		assert.equal(resolveAgentToolName("Grep"), "grep");
 	});
 
 	test("maps Claude Code Glob to Pi find", () => {
-		expect(CLAUDE_CODE_TOOL_ALIASES.glob).toBe("find");
-		expect(resolveAgentToolName("Glob")).toBe("find");
+		assert.equal(CLAUDE_CODE_TOOL_ALIASES.glob, "find");
+		assert.equal(resolveAgentToolName("Glob"), "find");
 	});
 
 	test("maps Claude Code WebFetch and WebSearch to Pi extensions", () => {
-		expect(resolveAgentToolName("WebFetch")).toBe("fetch_page");
-		expect(resolveAgentToolName("WebSearch")).toBe("search-the-web");
+		assert.equal(resolveAgentToolName("WebFetch"), "fetch_page");
+		assert.equal(resolveAgentToolName("WebSearch"), "search-the-web");
 	});
 
 	test("strips MCP prefixes", () => {
-		expect(resolveAgentToolName("mcp__gsd-workflow__gsd_exec")).toBe("gsd_exec");
+		assert.equal(resolveAgentToolName("mcp__gsd-workflow__gsd_exec"), "gsd_exec");
 	});
 });

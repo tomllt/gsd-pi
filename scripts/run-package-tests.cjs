@@ -163,27 +163,14 @@ function main() {
 	for (const pkg of packages) {
 		if (pkg.packageName === '@gsd/pi-ai') {
 			const files = findPiAiPackageTestFiles(pkg.path)
-			const vitestOnly = /(?:^|[\\/])(agent-shim|mcp-tool-name|tool-search-shim)\.test\.js$/i
-			const vitestFiles = files.filter((file) => vitestOnly.test(file))
-			const nodeTestFiles = files.filter((file) => !vitestOnly.test(file))
-			let ok = true
+			if (files.length === 0) {
+				process.stderr.write(`Skipping ${pkg.packageName}: no compiled test files found.\n`)
+				continue
+			}
 			process.stderr.write(`\nRunning ${pkg.packageName} package tests...\n`)
-			if (nodeTestFiles.length > 0) {
-				ok =
-					runCommand(process.execPath, ['--test', ...nodeTestFiles], REPO_ROOT, `${pkg.packageName} (node:test)`) ===
-					0 && ok
+			if (runCommand(process.execPath, ['--test', ...files], REPO_ROOT, pkg.packageName) !== 0) {
+				failureCount += 1
 			}
-			if (vitestFiles.length > 0) {
-				const vitestBin = join(REPO_ROOT, 'node_modules', 'vitest', 'vitest.mjs')
-				ok =
-					runCommand(
-						process.execPath,
-						[vitestBin, 'run', '--config', join(pkg.path, 'vitest.config.ts'), ...vitestFiles],
-						pkg.path,
-						`${pkg.packageName} (vitest)`,
-					) === 0 && ok
-			}
-			if (!ok) failureCount += 1
 			continue
 		}
 
