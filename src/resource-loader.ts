@@ -353,9 +353,8 @@ function copyDirRecursive(src: string, dest: string): void {
  *
  * Layout differences by install method:
  * - Source/monorepo: packageRoot/node_modules has everything → simple symlink
- * - npm/bun global: deps hoisted to dirname(packageRoot), including @gsd/* → simple symlink
- * - pnpm global: external deps hoisted, but GSD workspace scopes stay in packageRoot/node_modules
- *   → merged directory with symlinks from both roots (#3529, #3564)
+ * - Global install (npm/bun/pnpm): merge hoisted dirname(packageRoot)/node_modules with
+ *   packageRoot/node_modules so package-local deps like @sinclair/typebox resolve (#3529, #3564)
  */
 function ensureNodeModulesSymlink(agentDir: string): void {
   const agentNodeModules = join(agentDir, 'node_modules')
@@ -369,15 +368,9 @@ function ensureNodeModulesSymlink(agentDir: string): void {
     return
   }
 
-  // Global install: check if GSD workspace scopes are hoisted.
-  // npm/bun hoist everything; pnpm keeps workspace packages internal.
-  if (!hasMissingWorkspaceScopes(hoistedNodeModules, internalNodeModules)) {
-    // Everything is hoisted — simple symlink to parent node_modules
-    reconcileSymlink(agentNodeModules, hoistedNodeModules)
-    return
-  }
-
-  // pnpm-style layout: create a real directory merging both roots
+  // Global install: always merge hoisted + package-local node_modules.
+  // npm often keeps runtime deps (e.g. @sinclair/typebox) package-local even when
+  // @gsd/* scopes are hoisted — a hoisted-only symlink breaks extension imports.
   reconcileMergedNodeModules(agentNodeModules, hoistedNodeModules, internalNodeModules)
 }
 

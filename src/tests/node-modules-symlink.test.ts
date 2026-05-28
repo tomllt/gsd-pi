@@ -136,6 +136,33 @@ test("pnpm layout: merged node_modules contains entries from both hoisted and in
   assert.equal(gsdTarget, join(internal, "@gsd"), "@gsd should point to internal node_modules");
 });
 
+test("npm global layout: internal-only @sinclair/typebox is included in merged agent node_modules", (t) => {
+  // Regression: npm global installs hoist @gsd/* but keep @sinclair/typebox
+  // package-local. A hoisted-only symlink made extension imports fail with
+  // "Cannot find package '@sinclair/typebox'".
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-npm-global-sinclair-"));
+  t.after(() => rmSync(tmp, { recursive: true, force: true }));
+
+  const hoisted = join(tmp, "node_modules");
+  const pkgRoot = join(hoisted, realPackageRootBasename);
+  const internal = join(pkgRoot, "node_modules");
+  const agentNodeModules = join(tmp, "agent", "node_modules");
+
+  mkdirSync(join(hoisted, "yaml"), { recursive: true });
+  mkdirSync(join(hoisted, "@gsd", "pi-coding-agent"), { recursive: true });
+  mkdirSync(pkgRoot, { recursive: true });
+  mkdirSync(join(internal, "@sinclair", "typebox"), { recursive: true });
+
+  reconcileMergedNodeModules(agentNodeModules, hoisted, internal);
+
+  assert.ok(
+    existsSync(join(agentNodeModules, "@sinclair", "typebox")),
+    "@sinclair/typebox should resolve from internal node_modules",
+  );
+  assert.ok(existsSync(join(agentNodeModules, "yaml")), "hoisted yaml should resolve");
+  assert.ok(existsSync(join(agentNodeModules, "@gsd")), "hoisted @gsd should resolve");
+});
+
 test("pnpm layout: non-@gsd internal deps (e.g. @anthropic-ai) are included in merged dir", (t) => {
   // Regression: PR #3564 narrowed the internal overlay to @gsd* only,
   // dropping optionalDependencies like @anthropic-ai/claude-agent-sdk

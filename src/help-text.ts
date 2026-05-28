@@ -1,3 +1,10 @@
+import { GSD_WEBSITE } from './logo.js'
+
+function writeHelpHeader(version: string): void {
+  process.stdout.write(`GSD v${version} — Git Ship Done\n`)
+  process.stdout.write(`${GSD_WEBSITE}\n\n`)
+}
+
 const SUBCOMMAND_HELP: Record<string, string> = {
   config: [
     'Usage: gsd config',
@@ -182,7 +189,7 @@ const SUBCOMMAND_HELP: Record<string, string> = {
 SUBCOMMAND_HELP['wt'] = SUBCOMMAND_HELP['worktree']
 
 export function printHelp(version: string): void {
-  process.stdout.write(`GSD v${version} — Git Ship Done\n\n`)
+  writeHelpHeader(version)
   process.stdout.write('Usage: gsd [options] [message...]\n\n')
   process.stdout.write('Options:\n')
   process.stdout.write('  --mode <text|json|rpc|mcp> Output mode (default: interactive)\n')
@@ -214,7 +221,7 @@ export function printHelp(version: string): void {
 export function printSubcommandHelp(subcommand: string, version: string): boolean {
   const help = SUBCOMMAND_HELP[subcommand]
   if (!help) return false
-  process.stdout.write(`GSD v${version} — Git Ship Done\n\n`)
+  writeHelpHeader(version)
   process.stdout.write(help + '\n')
   return true
 }
