@@ -22,8 +22,8 @@ const { getLinkablePackages, REPO_ROOT } = require('./lib/workspace-manifest.cjs
 
 /**
  * npm install -g --ignore-scripts can leave empty node_modules/* placeholders.
- * install/deps.js runs `npm install --ignore-scripts` in packageRoot after linking
- * to materialize hoisted deps (openai, partial-json, …). This helper still seeds
+ * install/deps.js may run `npm install --ignore-scripts` in packageRoot to
+ * materialize hoisted deps (openai, partial-json, …). This helper still seeds
  * root undici from packages/pi-coding-agent when that repair has not run yet.
  */
 function ensureRootUndici() {

@@ -167,7 +167,7 @@ export async function repairPackageDependencies(packageRoot, { ui, quiet = false
   const pkgJson = join(packageRoot, 'package.json')
   if (!existsSync(pkgJson)) return
 
-  const stop = ui?.start?.(quiet ? undefined : 'Installing dependencies...')
+  const stop = quiet ? undefined : ui?.start?.('Installing dependencies...')
   const result = await execCommand('npm install --ignore-scripts', { cwd: packageRoot })
   stop?.()
 
@@ -329,8 +329,8 @@ export async function installRtk({ skip, ui, verifyOnly = false }) {
 
 export async function runPostinstallDeps(packageRoot, { skipChromium, skipRtk, quiet = true }) {
   const ui = quiet ? null : createPlainUi()
-  linkWorkspacePackages(packageRoot, ui)
   await repairPackageDependencies(packageRoot, { ui, quiet })
+  linkWorkspacePackages(packageRoot, ui)
   await installChromium({ skip: skipChromium, ui })
   await installRtk({ skip: skipRtk, ui })
 }
@@ -343,8 +343,8 @@ export async function runInteractiveDeps(packageRoot, {
   promptChromium,
   promptRtk,
 }) {
-  linkWorkspacePackages(packageRoot, ui)
   await repairPackageDependencies(packageRoot, { ui, quiet: false })
+  linkWorkspacePackages(packageRoot, ui)
 
   let installChromiumFlag = skipChromium
   if (!skipChromium && promptChromium) {
