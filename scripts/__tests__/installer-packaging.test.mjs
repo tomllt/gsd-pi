@@ -19,9 +19,11 @@ const REQUIRED_BUNDLED_EXTERNALS = [
 ];
 
 test("installer deps module exposes postinstall orchestration", async () => {
-  const { runPostinstallDeps, linkWorkspacePackages } = await import("../install/deps.js");
+  const { runPostinstallDeps, linkWorkspacePackages, repairPackageDependencies } =
+    await import("../install/deps.js");
   assert.equal(typeof runPostinstallDeps, "function");
   assert.equal(typeof linkWorkspacePackages, "function");
+  assert.equal(typeof repairPackageDependencies, "function");
 });
 
 test("installer tarball bundles extension-critical externals at the package root", () => {
