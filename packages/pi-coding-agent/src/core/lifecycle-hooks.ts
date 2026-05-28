@@ -7,4 +7,4 @@ export {
 	verifyRuntimeDependencies,
 	resolveLocalSourcePath,
 	type PackageLifecycleHooksOptions,
-} from "../../../gsd-agent-core/dist/lifecycle-hooks.js";
+} from "@gsd/agent-core/lifecycle-hooks.js";
