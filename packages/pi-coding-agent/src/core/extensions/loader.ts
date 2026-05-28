@@ -19,6 +19,7 @@ import { createJiti } from "@mariozechner/jiti";
 import * as _bundledTypebox from "typebox";
 import * as _bundledTypeboxCompile from "typebox/compile";
 import * as _bundledTypeboxValue from "typebox/value";
+import * as _bundledSinclairTypeboxCompiler from "@sinclair/typebox/compiler";
 import { CONFIG_DIR_NAME, getAgentDir, isBunBinary } from "../../config.js";
 // NOTE: This import works because loader.ts exports are NOT re-exported from index.ts,
 // avoiding a circular dependency. Extensions can import from @gsd/pi-coding-agent.
@@ -49,6 +50,7 @@ const VIRTUAL_MODULES: Record<string, unknown> = {
 	"typebox/value": _bundledTypeboxValue,
 	"@sinclair/typebox": _bundledTypebox,
 	"@sinclair/typebox/compile": _bundledTypeboxCompile,
+	"@sinclair/typebox/compiler": _bundledSinclairTypeboxCompiler,
 	"@sinclair/typebox/value": _bundledTypeboxValue,
 	"@gsd/pi-agent-core": _bundledPiAgentCore,
 	"@gsd/pi-tui": _bundledPiTui,
@@ -74,6 +76,7 @@ function getAliases(): Record<string, string> {
 	const typeboxEntry = require.resolve("typebox");
 	const typeboxCompileEntry = require.resolve("typebox/compile");
 	const typeboxValueEntry = require.resolve("typebox/value");
+	const sinclairTypeboxCompilerEntry = require.resolve("@sinclair/typebox/compiler");
 
 	const packagesRoot = path.resolve(__dirname, "../../../../");
 	const resolveWorkspaceOrImport = (workspaceRelativePath: string, specifier: string): string => {
@@ -99,6 +102,7 @@ function getAliases(): Record<string, string> {
 		"typebox/value": typeboxValueEntry,
 		"@sinclair/typebox": typeboxEntry,
 		"@sinclair/typebox/compile": typeboxCompileEntry,
+		"@sinclair/typebox/compiler": sinclairTypeboxCompilerEntry,
 		"@sinclair/typebox/value": typeboxValueEntry,
 	};
 

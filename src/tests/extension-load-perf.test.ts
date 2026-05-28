@@ -14,22 +14,29 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-// Import loadExtensions from the compiled dist (it IS re-exported from the
-// core/extensions barrel but not from the top-level index).
-// Use process.cwd() rather than import.meta.url-relative navigation — the
-// compiled test lands in dist-test/src/tests/, so relative paths differ between
-// source and compiled contexts. process.cwd() is always the repo root in CI.
-const loaderPath = join(
-  process.cwd(),
-  "dist-test", "packages", "pi-coding-agent", "src", "core", "extensions", "loader.js",
-);
+// Import loadExtensions from compiled JS (not raw TS — pi-coding-agent uses TS
+// features unsupported by --experimental-strip-types). Prefer packages/dist
+// (available after build:core in CI test-coverage) over dist-test (test:compile).
+function resolveLoaderPath(): string {
+  const candidates = [
+    join(process.cwd(), "packages", "pi-coding-agent", "dist", "core", "extensions", "loader.js"),
+    join(
+      process.cwd(),
+      "dist-test", "packages", "pi-coding-agent", "src", "core", "extensions", "loader.js",
+    ),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error("loader.js not found — run npm run build:core or npm run test:compile");
+}
 
 test("loadExtensions shares module cache across extensions (perf regression #2108)", async () => {
-  const { loadExtensions } = await import(loaderPath);
+  const { loadExtensions } = await import(resolveLoaderPath());
 
   // Create a temp directory with two extensions that import a shared helper
   const tmp = mkdtempSync(join(tmpdir(), "gsd-perf-test-"));

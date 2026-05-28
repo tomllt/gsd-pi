@@ -12,7 +12,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { registerSearchTool, resetSearchLoopGuardState } from "../resources/extensions/search-the-web/tool-search.ts";
-import searchExtension from "../resources/extensions/search-the-web/index.ts";
 
 const ORIGINAL_ENV = {
   BRAVE_API_KEY: process.env.BRAVE_API_KEY,
@@ -169,7 +168,13 @@ test("search loop guard resets at session_start boundary", async (t) => {
     hasUI: false,
     ui: { notify() {} },
   };
-  searchExtension(pi as any);
+
+  // Mirror headless session_start from search-the-web/index.ts without jiti
+  // extension loading (which pulls pi-coding-agent theme deps unrelated to this guard).
+  pi.on("session_start", async () => {
+    registerSearchTool(pi as any);
+    resetSearchLoopGuardState();
+  });
   await pi.fire("session_start", {}, mockCtx);
 
   const tool = pi.getRegisteredTool();
