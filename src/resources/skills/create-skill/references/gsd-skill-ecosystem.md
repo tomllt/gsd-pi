@@ -31,7 +31,7 @@ GSD auto-discovers skills at session start and during auto-mode:
 
 **Session start:** All discovered skills are enumerated and their names + descriptions are injected into the system prompt as `<available_skills>`.
 
-**Auto-mode discovery:** `skill-discovery.ts` takes a snapshot of the skills directory at auto-mode start. On each unit boundary it diffs against the snapshot. Any new skills found are injected via a `<newly_discovered_skills>` XML block so the LLM sees them without requiring `/reload`.
+**Auto-mode discovery:** `skill-discovery.ts` snapshots installed skill names at auto-mode start. When new skills appear mid-run, GSD reloads the resource catalog so they appear in the standard `<available_skills>` block (no separate XML injection).
 
 **Manual reload:** Running `/reload` re-scans the skill directories and updates the available skills list mid-session.
 </skill_discovery>

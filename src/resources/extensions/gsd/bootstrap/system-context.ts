@@ -11,7 +11,6 @@ import { loadPrompt, getTemplatesDir } from "../prompt-loader.js";
 import { readForensicsMarker } from "../forensics.js";
 import { resolveAllSkillReferences, renderPreferencesForSystemPrompt, loadEffectiveGSDPreferences } from "../preferences.js";
 import { resolveModelWithFallbacksForUnit } from "../preferences-models.js";
-import { getInstalledSkills, normalizeSkillName, resolveInstalledSkill } from "../skills.js";
 import { resolveGsdRootFile, resolveSliceFile, resolveSlicePath, resolveTaskFile, resolveTaskFiles, resolveTasksDir, relSliceFile, relSlicePath, relTaskFile } from "../paths.js";
 import { extractIntroAndRules } from "../knowledge-parser.js";
 import { ensureCodebaseMapFresh, readCodebaseMap } from "../codebase-generator.js";
@@ -71,27 +70,6 @@ export const BUNDLED_SKILL_TRIGGERS: Array<{ trigger: string; skill: string }> =
   { trigger: "Deep code optimization audit — perf anti-patterns, memory leaks, algorithmic complexity, bundle size, I/O, caching, dead code (parallel pattern-based hunt)", skill: "code-optimizer" },
 ];
 
-function buildBundledSkillsTable(): string {
-  const cwd = process.cwd();
-  const installed = getInstalledSkills();
-  const installedByName = new Map(installed.map((skill) => [normalizeSkillName(skill.name), skill]));
-  const rows: string[] = [];
-  for (const { trigger, skill } of BUNDLED_SKILL_TRIGGERS) {
-    const match = installedByName.get(normalizeSkillName(skill));
-    if (match) {
-      rows.push(`| ${trigger} | \`${match.filePath}\` |`);
-      continue;
-    }
-    const resolution = resolveInstalledSkill(skill, cwd, installed);
-    if (resolution.method === "unresolved" || !resolution.resolvedPath) continue;
-    rows.push(`| ${trigger} | \`${resolution.resolvedPath}\` |`);
-  }
-  if (rows.length === 0) {
-    return "*No bundled skills found. Install or sync skills to `~/.gsd/agent/skills/`, `~/.agents/skills/`, or `~/.claude/skills/`.*";
-  }
-  return `| Trigger | Skill to load |\n|---|---|\n${rows.join("\n")}`;
-}
-
 function warnDeprecatedAgentInstructions(): void {
   const paths = [
     join(gsdHome(), "agent-instructions.md"),
@@ -116,7 +94,6 @@ export async function buildBeforeAgentStartResult(
 
   const stopContextTimer = debugTime("context-inject");
   const systemContent = loadPrompt("system", {
-    bundledSkillsTable: buildBundledSkillsTable(),
     templatesDir: getTemplatesDir(),
     shortcutDashboard: formatShortcut("Ctrl+Alt+G"),
     shortcutShell: formatShortcut("Ctrl+Alt+B"),
@@ -147,7 +124,7 @@ export async function buildBeforeAgentStartResult(
   if (loadedPreferences) {
     const cwd = basePath;
     const report = resolveAllSkillReferences(loadedPreferences.preferences, cwd);
-    preferenceBlock = `\n\n${renderPreferencesForSystemPrompt(loadedPreferences.preferences, report.resolutions)}`;
+    preferenceBlock = `\n\n${renderPreferencesForSystemPrompt(loadedPreferences.preferences, report.resolutions, { includeResolvedPaths: false })}`;
     if (report.warnings.length > 0) {
       ctx.ui.notify(
         `GSD skill preferences: ${report.warnings.length} unresolved skill${report.warnings.length === 1 ? "" : "s"}: ${report.warnings.join(", ")}`,

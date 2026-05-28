@@ -1184,7 +1184,7 @@ async function dispatchWorkflow(
 
     if (unitType) setGuidedUnitContext(projectRoot, unitType);
     try {
-      pi.sendMessage(
+      await pi.sendMessage(
         {
           customType,
           content: buildWorkflowDispatchContent({ workflow, workflowPath, task: note }),
@@ -1197,10 +1197,9 @@ async function dispatchWorkflow(
       throw err;
     }
   } finally {
-    // Restore full tool set after the message is queued. The LLM turn has
-    // already captured the scoped set — restoring prevents the narrowed
-    // tools from leaking into subsequent dispatches (#3628). The finally
-    // block ensures restoration even if sendMessage throws.
+    // Restore full tool/skill surface after the turn completes. Awaiting
+    // sendMessage ensures scoped skills stay in _baseSystemPrompt through
+    // before_agent_start (#3628, skill token savings).
     restoreGsdWorkflowTools(pi, savedTools);
   }
 }

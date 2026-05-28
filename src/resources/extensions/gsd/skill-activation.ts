@@ -239,15 +239,16 @@ export function buildSkillActivationBlock(params: {
     .sort();
   const activationBlock = formatSkillActivationBlock(ordered);
 
-  // Manifest-driven recommendations (additive, does not override explicit intent).
-  // Only surface skills the manifest declares for this unit type that are
-  // installed and not already in matched/avoided.
-  const matchedSet = new Set(ordered);
-  const manifestList = resolveSkillManifest(params.unitType);
-  const recommendations = (manifestList ?? [])
-    .filter(name => installedNames.has(name) && !avoided.has(name) && !matchedSet.has(name))
-    .sort();
-  const recommendationsBlock = formatSkillRecommendationsBlock(params.unitType, recommendations);
+  // Omit recommendations when the system catalog is manifest-scoped for this
+  // unit — skill names are already listed in <available_skills>.
+  let recommendationsBlock = "";
+  if (resolveSkillManifest(params.unitType) === null) {
+    const matchedSet = new Set(ordered);
+    const recommendations = (resolveSkillManifest(params.unitType) ?? [])
+      .filter(name => installedNames.has(name) && !avoided.has(name) && !matchedSet.has(name))
+      .sort();
+    recommendationsBlock = formatSkillRecommendationsBlock(params.unitType, recommendations);
+  }
 
   if (!activationBlock && !recommendationsBlock) return "";
   if (!activationBlock) return recommendationsBlock;
@@ -269,22 +270,20 @@ export function buildSkillDiscoveryVars(): { skillDiscoveryMode: string; skillDi
     };
   }
 
+  if (mode === "suggest") {
+    return {
+      skillDiscoveryMode: mode,
+      skillDiscoveryInstructions: `
+   Check \`<available_skills>\` for installed skills matching core technologies. For gaps, run \`npx skills find "<technology>"\` and note promising install commands in your research output — do NOT install.`,
+    };
+  }
+
   const autoInstall = mode === "auto";
-  const instructions = `
-   Identify the key technologies, frameworks, and services this work depends on (e.g. Stripe, Clerk, Supabase, JUCE, SwiftUI).
-   For each, check if a professional agent skill already exists:
-   - First check \`<available_skills>\` in your system prompt — a skill may already be installed.
-   - For technologies without an installed skill, run: \`npx skills find "<technology>"\`
-   - Only consider skills that are **directly relevant** to core technologies — not tangentially related.
-   - Evaluate results by install count and relevance to the actual work.${autoInstall
+  const instructions = autoInstall
     ? `
-   - Install relevant skills: \`npx skills add <owner/repo@skill> -g -y\`
-   - Record installed skills in the "Skills Discovered" section of your research output.
-   - Installed skills will automatically appear in subsequent units' system prompts — no manual steps needed.`
+   Check \`<available_skills>\` first. For missing core-technology skills, run \`npx skills find "<technology>"\`, install relevant matches with \`npx skills add <owner/repo@skill> -g -y\`, and record them in "Skills Discovered".`
     : `
-   - Note promising skills in your research output with their install commands, but do NOT install them.
-   - The user will decide which to install.`
-  }`;
+   Check \`<available_skills>\` first. For missing core-technology skills, run \`npx skills find "<technology>"\` and note install commands in your research output — do NOT install.`;
 
   return {
     skillDiscoveryMode: mode,

@@ -27,6 +27,7 @@ import { logWarning, logError } from "../workflow-logger.js";
 import { resolveAutoSupervisorConfig } from "../preferences.js";
 import { readUnitRuntimeRecord, type AutoUnitRuntimeRecord } from "../unit-runtime.js";
 import { consumeAutoWakeup } from "./schedule-wakeup.js";
+import { applyUnitSkillVisibility } from "../skill-scope.js";
 
 const UNIT_FAILSAFE_BUFFER_MS = 30_000;
 const UNIT_FAILSAFE_RECHECK_MS = 30_000;
@@ -163,6 +164,10 @@ export async function runUnit(
         },
       };
     }
+  }
+
+  if (typeof pi.setVisibleSkills === "function") {
+    applyUnitSkillVisibility(pi, unitType);
   }
 
   // ── Create the agent_end promise (per-unit one-shot) ──

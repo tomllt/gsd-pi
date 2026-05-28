@@ -33,7 +33,7 @@ Run 5 exposed the remaining workflow bucket:
 - GSD auto/workflow tool scoping: auto units, guided workflow dispatch, `gsd-run`, and `gsd-doctor-heal` use scoped tool surfaces with a full-tools escape hatch.
 - Prompt/context cuts: hidden GSD context defaults to a cap, `KNOWLEDGE.md` defaults to a 12k cap, auto preambles stay bounded, and malformed summaries no longer inline unbounded legacy bodies.
 - Workflow/doctor cuts: workflow dispatch uses a capped section-aware protocol excerpt, and doctor heal sends summary plus top actionable issues instead of duplicating the full report.
-- Skill prompt visibility: GSD narrows `<available_skills>` per unit using the existing `skillFilter` prompt seam while keeping skills loaded and invocable.
+- Skill prompt visibility: auto-mode and guided workflow dispatch call `setVisibleSkills()` per unit manifest so `<available_skills>` is narrowed via `skillFilter`; wildcard units (`execute-task`) keep the full catalog. Verified by `skill-scope-auto.test.ts` and `token-tool-gating.test.ts`.
 
 ## Local Verification
 

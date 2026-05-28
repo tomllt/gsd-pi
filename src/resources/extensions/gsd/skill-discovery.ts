@@ -86,32 +86,3 @@ export async function refreshCatalogForNewSkills(options?: {
   options?.notify?.(`GSD: loaded new skills: ${names}`, "info");
   return newSkills;
 }
-
-/**
- * Format discovered skills as an XML block matching pi's <available_skills> format.
- * Used for UI notifications; prefer reload into the standard catalog for prompts.
- */
-export function formatSkillsXml(skills: DiscoveredSkill[]): string {
-  if (skills.length === 0) return "";
-
-  const entries = skills.map(s => `  <skill>
-    <name>${escapeXml(s.name)}</name>
-    <description>${escapeXml(s.description)}</description>
-    <location>${escapeXml(s.location)}</location>
-  </skill>`).join("\n");
-
-  return `\n<newly_discovered_skills>
-The following skills were installed during this auto-mode session.
-Use the read tool to load a skill's file when the task matches its description.
-
-${entries}
-</newly_discovered_skills>`;
-}
-
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}

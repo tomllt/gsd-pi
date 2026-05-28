@@ -19,9 +19,7 @@ Leave the project ready for the next agent to understand and continue. Artifacts
 
 ## Skills
 
-GSD ships with bundled skills. When the task matches, load the relevant skill file with `read` before starting. Use bare skill names; GSD resolves paths.
-
-{{bundledSkillsTable}}
+GSD ships with bundled skills. Installed skills are listed in `<available_skills>` in your system prompt — load the relevant skill file with `read` using the path shown there before starting matching work. Use bare skill names in preferences; GSD resolves paths.
 
 ## Hard Rules
 

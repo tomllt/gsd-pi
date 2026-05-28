@@ -111,7 +111,7 @@ describe("discuss tool scoping (#2949)", () => {
             setCalls.push([...tools]);
             activeTools = [...tools];
           },
-          sendMessage: (message: unknown) => {
+          sendMessage: async (message: unknown) => {
             sent.push(message);
             sentTools = [...activeTools];
           },

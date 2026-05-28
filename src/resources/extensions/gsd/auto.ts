@@ -136,6 +136,7 @@ import {
   resetSkillTelemetry,
 } from "./skill-telemetry.js";
 import { getInstalledSkillNames } from "./skills.js";
+import { effectiveSkillNamesForUnit } from "./skill-scope.js";
 import { getRtkSessionSavings } from "../shared/rtk-session-stats.js";
 import { deactivateGSD } from "../shared/gsd-phase-state.js";
 import {
@@ -2563,7 +2564,10 @@ function buildLoopDeps(pi: ExtensionAPI): LoopDeps {
     autoCommitUnit,
     recordOutcome,
     writeLock,
-    captureAvailableSkills: () => captureAvailableSkills(getInstalledSkillNames()),
+    captureAvailableSkills: () => {
+      const unitType = s.currentUnit?.type;
+      captureAvailableSkills(effectiveSkillNamesForUnit(unitType, getInstalledSkillNames()));
+    },
     ensurePreconditions,
     updateSliceProgressCache,
 

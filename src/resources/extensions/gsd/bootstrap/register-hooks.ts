@@ -33,6 +33,7 @@ import { resolveWorktreeProjectRoot } from "../worktree-root.js";
 import { extractSubagentAgentClasses } from "./subagent-input.js";
 import { approvalGateIdForUnit, isExplicitApprovalResponse, shouldPauseForUserApprovalQuestion } from "../user-input-boundary.js";
 import { resolveSkillManifest } from "../skill-manifest.js";
+import { applyUnitSkillVisibility, unitHasSkillManifest } from "../skill-scope.js";
 import { getGuidedUnitContext } from "../guided-unit-context.js";
 import { registerPlanMilestoneSchemaRecovery } from "./plan-milestone-schema-recovery.js";
 
@@ -357,10 +358,7 @@ export function scopeGsdWorkflowToolsForDispatch(
     ? buildMinimalAutoGsdToolSet(current, unitType, registeredToolNames)
     : buildMinimalGsdWorkflowToolSet(current, registeredToolNames);
   const toolsChanged = !(scoped.length === current.length && scoped.every((name, index) => name === current[index]));
-  const skillManifest = resolveSkillManifest(unitType);
-  // skillManifest entries are normalized skill *names* (not paths); setVisibleSkills
-  // narrows the rendered <available_skills> catalog via rebuildSystemPrompt.
-  const canScopeSkills = skillManifest !== null && pi.getVisibleSkills && pi.setVisibleSkills;
+  const canScopeSkills = unitHasSkillManifest(unitType) && pi.getVisibleSkills && pi.setVisibleSkills;
   if (!toolsChanged && !canScopeSkills) {
     return null;
   }
@@ -369,7 +367,7 @@ export function scopeGsdWorkflowToolsForDispatch(
   }
   const visibleSkills = canScopeSkills ? pi.getVisibleSkills!() : undefined;
   if (canScopeSkills) {
-    pi.setVisibleSkills!(skillManifest);
+    applyUnitSkillVisibility(pi, unitType);
   }
   return {
     tools: toolsChanged ? current : null,

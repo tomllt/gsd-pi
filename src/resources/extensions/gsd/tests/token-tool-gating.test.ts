@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { DISCUSS_TOOLS_ALLOWLIST } from "../constants.ts";
 import { buildMinimalAutoGsdToolSet, buildMinimalGsdToolSet, buildMinimalGsdWorkflowToolSet, buildRequestScopedGsdToolSet, MINIMAL_AUTO_BASE_TOOL_NAMES, MINIMAL_GSD_TOOL_NAMES, restoreGsdWorkflowTools, scopeGsdWorkflowToolsForDispatch } from "../bootstrap/register-hooks.ts";
+import { applyUnitSkillVisibility } from "../skill-scope.ts";
 
 test("buildMinimalGsdToolSet preserves non-GSD tools and replaces broad GSD surface", () => {
   const result = buildMinimalGsdToolSet([
@@ -434,4 +435,22 @@ test("scopeGsdWorkflowToolsForDispatch applies and restores per-unit skill visib
   ]);
   assert.deepEqual(visibleSkills, ["previous-skill"]);
   assert.equal(calls.filter((call) => call.kind === "skills").length, 2);
+});
+
+test("applyUnitSkillVisibility sets manifest or clears for wildcard", () => {
+  const calls: Array<string[] | undefined> = [];
+  applyUnitSkillVisibility({
+    setVisibleSkills: (names) => {
+      calls.push(names);
+    },
+  }, "plan-milestone");
+  assert.ok(Array.isArray(calls[0]));
+  assert.ok(calls[0]!.includes("tdd"));
+
+  applyUnitSkillVisibility({
+    setVisibleSkills: (names) => {
+      calls.push(names);
+    },
+  }, "execute-task");
+  assert.equal(calls[1], undefined);
 });
