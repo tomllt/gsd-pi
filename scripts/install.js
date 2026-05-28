@@ -1,151 +1,43 @@
 #!/usr/bin/env node
 
 /**
- * GSD Interactive Installer
+ * GSD-Pi Installer — thin entry router.
  *
- * Entry point for `npx @opengsd/gsd-pi` or `npx @opengsd/gsd-pi@latest`.
- * When invoked directly (not as a postinstall hook), runs the visual
- * installer with full terminal access — banner, spinners, progress.
- *
- * If GSD is already installed and the user runs `gsd`, this script
- * is NOT invoked — the normal loader.js handles that via the "gsd" bin.
- * This script only fires for `npx @opengsd/gsd-pi` (the package name bin).
+ * Postinstall: silent deps on the installed package root.
+ * npx / gsd-pi bin: guided install to usable agent.
  */
 
-import { execSync, spawnSync, exec as execCb } from 'child_process'
-import { createHash, randomUUID } from 'crypto'
-import { chmodSync, copyFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs'
-import { arch, homedir, platform } from 'os'
-import { dirname, resolve, join } from 'path'
-import { Readable } from 'stream'
-import { finished } from 'stream/promises'
+import { readFileSync } from 'fs'
+import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
-import { createInterface } from 'readline'
+import * as p from '@clack/prompts'
+import { printBanner, createColors, createPrereqLog } from './install/banner.js'
+import { runPostinstallDeps, runInteractiveDeps, createClackUi } from './install/deps.js'
+import { checkPrereqs } from './install/prereqs.js'
+import { resolveInstallAction, detectInstalledVersion } from './install/detect-existing.js'
+import { installGlobalPackage, installLocalPackage } from './install/npm-global.js'
+import {
+  resolveGsdBin,
+  runConfigHandoff,
+  promptLaunch,
+  verifyInstall,
+} from './install/handoff.js'
+import {
+  assertInteractiveOrYes,
+  printNonInteractiveNextSteps,
+} from './install/non-tty.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-
-// packageRoot is always relative to this script — it's the @opengsd/gsd-pi package directory.
-// This is correct whether running as postinstall (inside node_modules/@opengsd/gsd-pi) or
-// via npx (inside a transient cache), since __dirname resolves to the script's location.
 const IS_POSTINSTALL =
   process.env.npm_lifecycle_event === 'postinstall' ||
   process.env.GSD_POSTINSTALL === '1'
-const packageRoot = resolve(__dirname, '..')
-
-// ── Feature flags ──────────────────────────────────────────────────────────
+const packageRoot = join(__dirname, '..')
 
 const args = process.argv.slice(2)
 const HAS_HELP = args.includes('--help') || args.includes('-h')
 const HAS_VERSION = args.includes('--version') || args.includes('-v')
-
-// ── Colors ─────────────────────────────────────────────────────────────────
-
-const supportsColor = process.stdout.isTTY && !process.env.NO_COLOR
-const c = supportsColor
-  ? { cyan: '\x1b[36m', green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', dim: '\x1b[2m', bold: '\x1b[1m', reset: '\x1b[0m' }
-  : { cyan: '', green: '', yellow: '', red: '', dim: '', bold: '', reset: '' }
-
-// ── Version ────────────────────────────────────────────────────────────────
-
-let gsdVersion = '0.0.0'
-try {
-  const pkg = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf-8'))
-  gsdVersion = pkg.version || '0.0.0'
-} catch { /* ignore */ }
-
-if (HAS_VERSION) {
-  process.stdout.write(gsdVersion + '\n')
-  process.exit(0)
-}
-
-if (HAS_HELP) {
-  process.stdout.write(`
-  ${c.bold}GSD Installer${c.reset} ${c.dim}v${gsdVersion}${c.reset}
-
-  ${c.yellow}Usage:${c.reset}
-    npx @opengsd/gsd-pi@latest          Install GSD globally (recommended)
-    npx @opengsd/gsd-pi@latest --local  Install GSD to current project
-
-  ${c.yellow}Options:${c.reset}
-    ${c.cyan}--local${c.reset}     Install to current directory instead of globally
-    ${c.cyan}--skip-chromium${c.reset}  Skip Chromium browser download
-    ${c.cyan}--skip-rtk${c.reset}      Skip RTK shell compression binary
-    ${c.cyan}-h, --help${c.reset}      Show this help
-    ${c.cyan}-v, --version${c.reset}   Show version
-
-  ${c.yellow}Environment:${c.reset}
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1  Skip Chromium
-    GSD_SKIP_RTK_INSTALL=1              Skip RTK
-    GSD_RTK_DISABLED=1                  Disable RTK integration
-
-`)
-  process.exit(0)
-}
-
-// ── Spinner ────────────────────────────────────────────────────────────────
-
-const SPINNER_FRAMES = ['◐', '◓', '◑', '◒']
-let spinnerInterval = null
-let spinnerFrame = 0
-
-function startSpinner(label) {
-  if (!process.stdout.isTTY) {
-    process.stdout.write(`  … ${label}\n`)
-    return
-  }
-  spinnerFrame = 0
-  process.stdout.write(`  ${c.cyan}${SPINNER_FRAMES[0]}${c.reset} ${label}`)
-  spinnerInterval = setInterval(() => {
-    spinnerFrame = (spinnerFrame + 1) % SPINNER_FRAMES.length
-    process.stdout.write(`\r  ${c.cyan}${SPINNER_FRAMES[spinnerFrame]}${c.reset} ${label}`)
-  }, 100)
-}
-
-function stopSpinner() {
-  if (spinnerInterval) {
-    clearInterval(spinnerInterval)
-    spinnerInterval = null
-  }
-  if (process.stdout.isTTY) {
-    process.stdout.write('\r\x1b[2K')
-  }
-}
-
-// ── Output helpers ─────────────────────────────────────────────────────────
-
-function printBanner() {
-  process.stdout.write(`
-${c.cyan}   ██████╗ ███████╗██████╗
-  ██╔════╝ ██╔════╝██╔══██╗
-  ██║  ███╗███████╗██║  ██║
-  ██║   ██║╚════██║██║  ██║
-  ╚██████╔╝███████║██████╔╝
-   ╚═════╝ ╚══════╝╚═════╝${c.reset}
-
-  ${c.bold}Git Ship Done${c.reset} ${c.dim}v${gsdVersion}${c.reset}
-`)
-}
-
-function printStep(label, detail) {
-  const detailStr = detail ? ` ${c.dim}${detail}${c.reset}` : ''
-  process.stdout.write(`  ${c.green}✓${c.reset} ${label}${detailStr}\n`)
-}
-
-function printSkip(label, reason) {
-  process.stdout.write(`  ${c.dim}–${c.reset} ${label} ${c.dim}(${reason})${c.reset}\n`)
-}
-
-function printWarn(label, detail) {
-  const detailStr = detail ? `: ${detail}` : ''
-  process.stdout.write(`  ${c.yellow}⚠${c.reset} ${label}${detailStr}\n`)
-}
-
-function printFail(label, detail) {
-  const detailStr = detail ? `: ${detail}` : ''
-  process.stdout.write(`  ${c.red}✗${c.reset} ${label}${detailStr}\n`)
-}
-
-// ── Install logic ──────────────────────────────────────────────────────────
+const YES_FLAG = args.includes('--yes') || args.includes('-y')
+const isLocal = args.includes('--local') || args.includes('-l')
 
 const PLAYWRIGHT_SKIP =
   process.env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD === '1' ||
@@ -159,403 +51,155 @@ const RTK_SKIP =
   process.env.GSD_RTK_DISABLED === 'true' ||
   args.includes('--skip-rtk')
 
-const RTK_VERSION = '0.33.1'
-const RTK_REPO = 'rtk-ai/rtk'
-const RTK_ENV = { ...process.env, RTK_TELEMETRY_DISABLED: '1' }
-const managedBinDir = join(process.env.GSD_HOME || join(homedir(), '.gsd'), 'agent', 'bin')
-const managedBinaryPath = join(managedBinDir, platform() === 'win32' ? 'rtk.exe' : 'rtk')
+let gsdVersion = '0.0.0'
+try {
+  const pkg = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf-8'))
+  gsdVersion = pkg.version || '0.0.0'
+} catch { /* ignore */ }
 
-// ── Step: npm install -g ───────────────────────────────────────────────────
+const colors = createColors()
 
-async function installGlobally() {
-  startSpinner('Installing @opengsd/gsd-pi globally...             ')
-  try {
-    const result = await new Promise((res) => {
-      execCb(
-        `npm install -g @opengsd/gsd-pi@${gsdVersion}`,
-        { timeout: 300_000 },
-        (error, stdout, stderr) => {
-          res({ ok: !error, stdout: stdout || '', stderr: stderr || '', error })
-        }
+if (HAS_VERSION) {
+  process.stdout.write(`${gsdVersion}\n`)
+  process.exit(0)
+}
+
+if (HAS_HELP) {
+  process.stdout.write(`
+  ${colors.bold}GSD-Pi Installer${colors.reset} ${colors.dim}v${gsdVersion}${colors.reset}
+  ${colors.dim}https://opengsd.net${colors.reset}
+
+  ${colors.yellow}Usage:${colors.reset}
+    npx @opengsd/gsd-pi@latest              Install GSD-Pi globally (recommended)
+    npx @opengsd/gsd-pi@latest --local      Install to current project (advanced)
+
+  ${colors.yellow}Options:${colors.reset}
+    ${colors.cyan}--yes, -y${colors.reset}           Non-interactive install (required without TTY)
+    ${colors.cyan}--local, -l${colors.reset}         Install to current directory instead of globally
+    ${colors.cyan}--skip-chromium${colors.reset}      Skip Chromium browser download
+    ${colors.cyan}--skip-rtk${colors.reset}          Skip RTK shell compression binary
+    ${colors.cyan}-h, --help${colors.reset}          Show this help
+    ${colors.cyan}-v, --version${colors.reset}       Show version
+
+  ${colors.yellow}Environment:${colors.reset}
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1  Skip Chromium
+    GSD_SKIP_RTK_INSTALL=1              Skip RTK
+    GSD_RTK_DISABLED=1                  Disable RTK integration
+
+`)
+  process.exit(0)
+}
+
+async function runNpxInstaller() {
+  const nonInteractive = YES_FLAG || !process.stdin.isTTY
+  assertInteractiveOrYes({ isTTY: process.stdin.isTTY, yesFlag: YES_FLAG })
+
+  if (!nonInteractive) {
+    printBanner({ version: gsdVersion, colors })
+  }
+
+  const ui = createClackUi(p)
+  const prereqLog = nonInteractive
+    ? { step() {}, warn(label, detail) { p.log.warn(detail || label) }, fail() {} }
+    : createPrereqLog(colors)
+
+  checkPrereqs({ isLocal, log: prereqLog })
+
+  let action = 'fresh'
+  if (nonInteractive) {
+    const installedVersion = await detectInstalledVersion()
+    action = installedVersion ? 'upgrade' : 'fresh'
+  } else {
+    const resolved = await resolveInstallAction({
+      targetVersion: gsdVersion,
+      yesMode: YES_FLAG,
+      clack: p,
+    })
+    action = resolved.action
+  }
+
+  if (action === 'cancel') {
+    p.outro('Cancelled.')
+    process.exit(0)
+  }
+
+  if (action === 'reconfigure') {
+    const bin = resolveGsdBin({ isLocal })
+    runConfigHandoff({ bin, nonInteractive: false })
+    await promptLaunch({ bin, clack: p, nonInteractive: false })
+    p.outro('Ready.')
+    return
+  }
+
+  let targetPackageRoot = packageRoot
+  const verifyOnly = action === 'upgrade'
+
+  if (action === 'fresh' || action === 'upgrade') {
+    const spinner = p.spinner()
+    try {
+      spinner.start(
+        isLocal
+          ? 'Installing @opengsd/gsd-pi locally...'
+          : 'Installing @opengsd/gsd-pi globally...',
       )
-    })
-    stopSpinner()
-
-    if (!result.ok) {
-      const meaningful = (result.stderr || '')
-        .split('\n')
-        .filter(l => !l.includes('npm warn') && !l.includes('npm WARN') && l.trim())
-        .slice(-3)
-        .join('; ')
-      printFail('Global install failed', meaningful || 'run npm install -g @opengsd/gsd-pi manually')
-      return false
-    }
-
-    printStep('Installed globally', 'npm install -g @opengsd/gsd-pi')
-    return true
-  } catch (err) {
-    stopSpinner()
-    printFail('Global install failed', err.message)
-    return false
-  }
-}
-
-async function installLocally() {
-  startSpinner('Installing @opengsd/gsd-pi locally...              ')
-  try {
-    const result = await new Promise((res) => {
-      execCb(
-        `npm install @opengsd/gsd-pi@${gsdVersion}`,
-        { cwd: process.cwd(), timeout: 300_000 },
-        (error, stdout, stderr) => {
-          res({ ok: !error, stdout: stdout || '', stderr: stderr || '', error })
-        }
-      )
-    })
-    stopSpinner()
-
-    if (!result.ok) {
-      const meaningful = (result.stderr || '')
-        .split('\n')
-        .filter(l => !l.includes('npm warn') && !l.includes('npm WARN') && l.trim())
-        .slice(-3)
-        .join('; ')
-      printFail('Local install failed', meaningful || 'run npm install @opengsd/gsd-pi manually')
-      return false
-    }
-
-    printStep('Installed locally', 'npm install @opengsd/gsd-pi')
-    return true
-  } catch (err) {
-    stopSpinner()
-    printFail('Local install failed', err.message)
-    return false
-  }
-}
-
-// ── Step: Playwright Chromium ──────────────────────────────────────────────
-
-async function installChromium() {
-  if (PLAYWRIGHT_SKIP) {
-    printSkip('Chromium', 'skipped')
-    return
-  }
-
-  startSpinner('Installing Chromium...                    ')
-  try {
-    const result = await new Promise((res) => {
-      execCb('npx playwright install chromium', { timeout: 300_000 }, (error, stdout, stderr) => {
-        res({ ok: !error, stdout: stdout || '', stderr: stderr || '', error })
-      })
-    })
-    stopSpinner()
-
-    if (!result.ok) {
-      const output = (result.stderr + '\n' + result.stdout).trim()
-      const meaningful = output.split('\n')
-        .filter(l => !l.includes('npm warn') && !l.includes('npm WARN') && l.trim())
-        .slice(-3)
-        .join('; ')
-      printWarn('Chromium', meaningful || 'install failed — run npx playwright install chromium')
-      return
-    }
-
-    printStep('Chromium installed', 'Playwright')
-  } catch (err) {
-    stopSpinner()
-    printWarn('Chromium', err.message)
-  }
-}
-
-// ── Step: RTK ──────────────────────────────────────────────────────────────
-
-function resolveAssetName() {
-  const p = platform()
-  const a = arch()
-  if (p === 'darwin' && a === 'arm64') return 'rtk-aarch64-apple-darwin.tar.gz'
-  if (p === 'darwin' && a === 'x64') return 'rtk-x86_64-apple-darwin.tar.gz'
-  if (p === 'linux' && a === 'arm64') return 'rtk-aarch64-unknown-linux-gnu.tar.gz'
-  if (p === 'linux' && a === 'x64') return 'rtk-x86_64-unknown-linux-musl.tar.gz'
-  if (p === 'win32' && a === 'x64') return 'rtk-x86_64-pc-windows-msvc.zip'
-  return null
-}
-
-function parseChecksums(text) {
-  const checksums = new Map()
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line) continue
-    const match = line.match(/^([a-f0-9]{64})\s+(.+)$/i)
-    if (!match) continue
-    checksums.set(match[2], match[1].toLowerCase())
-  }
-  return checksums
-}
-
-function sha256File(filePath) {
-  const hash = createHash('sha256')
-  hash.update(readFileSync(filePath))
-  return hash.digest('hex')
-}
-
-async function downloadToFile(url, destination) {
-  const response = await fetch(url, { headers: { 'User-Agent': 'gsd-pi-installer' } })
-  if (!response.ok) throw new Error(`download failed (${response.status})`)
-  if (!response.body) throw new Error('no response body')
-  const output = createWriteStream(destination)
-  await finished(Readable.fromWeb(response.body).pipe(output))
-}
-
-function findBinaryRecursively(rootDir, binaryName) {
-  const stack = [rootDir]
-  while (stack.length > 0) {
-    const current = stack.pop()
-    if (!current) continue
-    const entries = readdirSync(current, { withFileTypes: true })
-    for (const entry of entries) {
-      const fullPath = join(current, entry.name)
-      if (entry.isFile() && entry.name === binaryName) return fullPath
-      if (entry.isDirectory()) stack.push(fullPath)
-    }
-  }
-  return null
-}
-
-function quotePowerShellLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`
-}
-
-function extractZipArchive(archivePath, extractDir) {
-  mkdirSync(extractDir, { recursive: true })
-
-  if (platform() === 'win32') {
-    const command = [
-      'Expand-Archive',
-      '-LiteralPath', quotePowerShellLiteral(archivePath),
-      '-DestinationPath', quotePowerShellLiteral(extractDir),
-      '-Force',
-    ].join(' ')
-    const result = spawnSync('powershell.exe', [
-      '-NoLogo',
-      '-NoProfile',
-      '-NonInteractive',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      command,
-    ], {
-      encoding: 'utf-8',
-      timeout: 30_000,
-    })
-    if (result.error || result.status !== 0) {
-      throw new Error(result.error?.message || result.stderr?.trim() || 'zip extraction failed')
-    }
-    return
-  }
-
-  return import('extract-zip').then(({ default: extractZip }) => extractZip(archivePath, { dir: extractDir }))
-}
-
-function validateRtkBinary(binaryPath) {
-  const result = spawnSync(binaryPath, ['rewrite', 'git status'], {
-    encoding: 'utf-8',
-    env: RTK_ENV,
-    stdio: ['ignore', 'pipe', 'ignore'],
-    timeout: 5000,
-  })
-  return !result.error && result.status === 0 && (result.stdout || '').trim() === 'rtk git status'
-}
-
-async function installRtk() {
-  if (RTK_SKIP) {
-    printSkip('RTK', 'disabled')
-    return
-  }
-
-  const assetName = resolveAssetName()
-  if (!assetName) {
-    printSkip('RTK', `unsupported platform ${platform()}-${arch()}`)
-    return
-  }
-
-  if (existsSync(managedBinaryPath) && validateRtkBinary(managedBinaryPath)) {
-    printStep('RTK', `v${RTK_VERSION} up to date`)
-    return
-  }
-
-  startSpinner('Installing RTK...                         ')
-
-  const tempRoot = join(managedBinDir, `.rtk-install-${randomUUID().slice(0, 8)}`)
-  const archivePath = join(tempRoot, assetName)
-  const extractDir = join(tempRoot, 'extract')
-  const releaseBase = `https://github.com/${RTK_REPO}/releases/download/v${RTK_VERSION}`
-
-  mkdirSync(tempRoot, { recursive: true })
-  mkdirSync(managedBinDir, { recursive: true })
-
-  try {
-    const checksumsResponse = await fetch(`${releaseBase}/checksums.txt`, {
-      headers: { 'User-Agent': 'gsd-pi-installer' },
-    })
-    if (!checksumsResponse.ok) throw new Error(`checksums fetch failed (${checksumsResponse.status})`)
-
-    const checksums = parseChecksums(await checksumsResponse.text())
-    const expectedSha = checksums.get(assetName)
-    if (!expectedSha) throw new Error(`missing checksum for ${assetName}`)
-
-    await downloadToFile(`${releaseBase}/${assetName}`, archivePath)
-    const actualSha = sha256File(archivePath)
-    if (actualSha !== expectedSha) throw new Error('checksum mismatch')
-
-    mkdirSync(extractDir, { recursive: true })
-    if (assetName.endsWith('.zip')) {
-      await extractZipArchive(archivePath, extractDir)
-    } else {
-      const extractResult = spawnSync('tar', ['xzf', archivePath, '-C', extractDir], {
-        encoding: 'utf-8',
-        timeout: 30000,
-      })
-      if (extractResult.error || extractResult.status !== 0) {
-        throw new Error(extractResult.error?.message || 'tar extraction failed')
-      }
-    }
-
-    const extractedBinary = findBinaryRecursively(extractDir, platform() === 'win32' ? 'rtk.exe' : 'rtk')
-    if (!extractedBinary) throw new Error('binary not found in archive')
-
-    copyFileSync(extractedBinary, managedBinaryPath)
-    if (platform() !== 'win32') chmodSync(managedBinaryPath, 0o755)
-
-    if (!validateRtkBinary(managedBinaryPath)) {
-      rmSync(managedBinaryPath, { force: true })
-      throw new Error('binary validation failed')
-    }
-
-    stopSpinner()
-    printStep('RTK installed', `v${RTK_VERSION}`)
-  } catch (err) {
-    stopSpinner()
-    printWarn('RTK', describeFetchError(err))
-  } finally {
-    rmSync(tempRoot, { recursive: true, force: true })
-  }
-}
-
-// Surface the underlying cause when Node's native fetch throws a generic
-// "fetch failed" for pre-response network errors (DNS, connect, TLS,
-// socket). Without this, CI logs show only the bare message and every
-// network-failure class collapses to a single indistinguishable line.
-function describeFetchError(err) {
-  const base = err?.message || String(err)
-  const cause = err?.cause
-  if (!cause) return base
-  const code = cause.code || cause.errno
-  const causeMsg = cause.message || ''
-  const detail = code ? `${code}${causeMsg && causeMsg !== code ? ` — ${causeMsg}` : ''}` : causeMsg
-  return detail ? `${base} (${detail})` : base
-}
-
-// ── Step: Link workspace packages (postinstall from tarball) ───────────────
-
-function linkWorkspacePackages() {
-  const scriptPath = join(packageRoot, 'scripts', 'link-workspace-packages.cjs')
-  if (!existsSync(scriptPath)) return
-
-  try {
-    const result = spawnSync(process.execPath, [scriptPath], {
-      cwd: packageRoot,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 30_000,
-    })
-
-    if (result.status === 0) {
-      const stderr = (result.stderr || '').toString()
-      const linked = stderr.match(/Linked (\d+)/)?.[1]
-      const copied = stderr.match(/Copied (\d+)/)?.[1]
-      if (linked || copied) {
-        const parts = []
-        if (linked) parts.push(`${linked} linked`)
-        if (copied) parts.push(`${copied} copied`)
-        printStep('Workspace packages', parts.join(', '))
-      } else {
-        printStep('Workspace packages', 'up to date')
-      }
-    }
-  } catch { /* non-fatal */ }
-}
-
-// ── Step: Verify installation ──────────────────────────────────────────────
-
-function verifyInstall(local) {
-  let bin = 'gsd'
-  if (local) {
-    const localBin = resolve(process.cwd(), 'node_modules', '.bin', 'gsd')
-    if (existsSync(localBin)) {
-      bin = localBin
-    } else if (platform() === 'win32' && existsSync(localBin + '.cmd')) {
-      bin = localBin + '.cmd'
+      targetPackageRoot = isLocal
+        ? await installLocalPackage(gsdVersion)
+        : await installGlobalPackage(gsdVersion)
+      spinner.stop(isLocal ? 'Installed locally' : 'Installed globally')
+    } catch (err) {
+      spinner.stop('Install failed')
+      p.log.error(err instanceof Error ? err.message : String(err))
+      process.exit(1)
     }
   }
 
-  const result = spawnSync(bin, ['--version'], {
-    encoding: 'utf-8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 10_000,
+  await runInteractiveDeps(targetPackageRoot, {
+    skipChromium: PLAYWRIGHT_SKIP,
+    skipRtk: RTK_SKIP,
+    ui,
+    verifyOnly,
+    promptChromium: nonInteractive || PLAYWRIGHT_SKIP
+      ? null
+      : async () => {
+        const answer = await p.confirm({
+          message: 'Install Chromium for browser automation?',
+          initialValue: true,
+        })
+        return !p.isCancel(answer) && answer
+      },
+    promptRtk: nonInteractive || RTK_SKIP
+      ? null
+      : async () => {
+        const answer = await p.confirm({
+          message: 'Install RTK for shell output compression?',
+          initialValue: true,
+        })
+        return !p.isCancel(answer) && answer
+      },
   })
 
-  if (!result.error && result.status === 0 && result.stdout.trim()) {
-    return result.stdout.trim()
+  const bin = resolveGsdBin({ isLocal })
+  const verified = verifyInstall(bin)
+  if (verified) {
+    p.log.success(`Verified gsd v${verified}`)
   }
-  return null
+
+  if (nonInteractive) {
+    printNonInteractiveNextSteps()
+    return
+  }
+
+  runConfigHandoff({ bin, nonInteractive: false })
+  await promptLaunch({ bin, clack: p, nonInteractive: false })
+  p.outro(`Ready. Run: gsd`)
 }
-
-// ── Prompt helper ──────────────────────────────────────────────────────────
-
-function prompt(question, defaultValue) {
-  return new Promise((resolve) => {
-    if (!process.stdin.isTTY) {
-      resolve(defaultValue)
-      return
-    }
-    const rl = createInterface({ input: process.stdin, output: process.stdout })
-    rl.question(question, (answer) => {
-      rl.close()
-      resolve(answer.trim() || defaultValue)
-    })
-  })
-}
-
-// ── Main ───────────────────────────────────────────────────────────────────
-
-printBanner()
-
-const isLocal = args.includes('--local') || args.includes('-l')
 
 if (IS_POSTINSTALL) {
-  // Running as npm postinstall hook — just do workspace linking + deps
-  linkWorkspacePackages()
-  await installChromium()
-  await installRtk()
+  await runPostinstallDeps(packageRoot, {
+    skipChromium: PLAYWRIGHT_SKIP,
+    skipRtk: RTK_SKIP,
+    quiet: true,
+  })
 } else {
-  // Running via npx — full interactive install
-  if (isLocal) {
-    const ok = await installLocally()
-    if (!ok) process.exit(1)
-  } else {
-    const ok = await installGlobally()
-    if (!ok) process.exit(1)
-  }
-
-  // Run postinstall steps that npm skipped
-  linkWorkspacePackages()
-  await installChromium()
-  await installRtk()
-
-  // Verify
-  const version = verifyInstall(isLocal)
-  if (version) {
-    printStep('Verified', `gsd v${version}`)
-  }
+  await runNpxInstaller()
 }
-
-process.stdout.write(`\n  ${c.green}Ready.${c.reset} Run: ${c.bold}gsd${c.reset}\n\n`)

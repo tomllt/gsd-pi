@@ -137,6 +137,8 @@ After that, routine upgrades use `gsd upgrade`, `gsd update`, or `/gsd update` i
 
 **Cause:** npm's global bin directory isn't in your shell's `$PATH`.
 
+**Prevention:** The guided installer (`npx @opengsd/gsd-pi@latest`) checks PATH during setup and warns before you hit this error.
+
 **Fix:**
 
 ```bash

@@ -21,10 +21,22 @@ Older release history has been archived outside the active changelog so new work
 
 ## Install
 
-Install from npm (not by cloning this repo):
+Recommended — guided installer:
+
+```bash
+npx @opengsd/gsd-pi@latest
+```
+
+Alternative — direct global install:
 
 ```bash
 npm install -g @opengsd/gsd-pi@latest
+```
+
+For CI or scripted installs:
+
+```bash
+npx @opengsd/gsd-pi@latest --yes
 ```
 
 Source: [`open-gsd/gsd-pi`](https://github.com/open-gsd/gsd-pi).
@@ -60,7 +72,7 @@ After migration, routine upgrades use:
 gsd upgrade
 ```
 
-You can also run `npx @opengsd/gsd-pi@latest` to launch the installer from the new package. For deeper recovery steps, see [Upgrade GSD Pi](./docs/user-docs/getting-started.md#upgrade-gsd-pi) and [Upgrade from older gsd-pi installs](./docs/user-docs/troubleshooting.md#upgrade-from-older-gsd-pi-installs).
+You can also run `npx @opengsd/gsd-pi@latest` to launch the guided installer (recommended for new installs). For deeper recovery steps, see [Upgrade GSD Pi](./docs/user-docs/getting-started.md#upgrade-gsd-pi) and [Upgrade from older gsd-pi installs](./docs/user-docs/troubleshooting.md#upgrade-from-older-gsd-pi-installs).
 
 ## Uninstall
 

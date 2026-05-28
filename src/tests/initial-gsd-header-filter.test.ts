@@ -1,16 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { GSD_PI_LOGO } from "../../dist/logo.js";
 
 const { filterInitialGsdHeader } = await import("../../web/lib/initial-gsd-header-filter.ts");
 
-const GSD_LOGO_LINES = [
-  "   ██████╗ ███████╗██████╗ ",
-  "  ██╔════╝ ██╔════╝██╔══██╗",
-  "  ██║  ███╗███████╗██║  ██║",
-  "  ██║   ██║╚════██║██║  ██║",
-  "  ╚██████╔╝███████║██████╔╝",
-  "   ╚═════╝ ╚══════╝╚═════╝ ",
-] as const;
+const GSD_LOGO_LINES = GSD_PI_LOGO;
 
 test("filterInitialGsdHeader strips a plain startup banner and keeps real terminal content", () => {
   const warning = "Warning: Google Search is not configured.";

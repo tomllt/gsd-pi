@@ -1,22 +1,40 @@
 # Installation
 
-## Install GSD
+Docs and community: [opengsd.net](https://opengsd.net)
+
+## Install GSD-Pi
+
+Recommended — guided installer (installs globally, configures provider):
+
+```bash
+npx @opengsd/gsd-pi@latest
+```
+
+Alternative — direct global install (provider setup runs on first `gsd` launch):
 
 ```bash
 npm install -g @opengsd/gsd-pi@latest
 ```
 
+For automated or non-interactive installs:
+
+```bash
+npx @opengsd/gsd-pi@latest --yes
+```
+
 Requires **Node.js 22.0.0 or later** (24 LTS recommended) and **Git**.
 
 {% hint style="info" %}
-**`command not found: gsd`?** Your shell may not have npm's global bin directory in `$PATH`. Run `npm prefix -g` to find it, then add `$(npm prefix -g)/bin` to your PATH. See [Troubleshooting](../reference/troubleshooting.md) for details.
+**`command not found: gsd`?** The guided installer warns if npm's global bin directory is not on `PATH`. Run `npm prefix -g` to find it, then add `$(npm prefix -g)/bin` to your PATH. See [Troubleshooting](../reference/troubleshooting.md) for details.
 {% endhint %}
 
 GSD checks for updates once every 24 hours. When a new version is available, you'll see a prompt at startup with the option to update immediately or skip. You can also update from within a session with `/gsd update`.
 
 ## Set Up Your LLM Provider
 
-Launch GSD for the first time:
+If you used `npx @opengsd/gsd-pi@latest`, the installer walks through provider setup automatically via `gsd config`.
+
+If you installed with `npm install -g`, launch GSD for the first time:
 
 ```bash
 gsd

@@ -27,10 +27,22 @@ git --version
 
 ## Install GSD Pi
 
-Install the CLI globally from the scoped npm package:
+Recommended — guided installer (installs globally and walks through provider setup):
+
+```bash
+npx @opengsd/gsd-pi@latest
+```
+
+Alternative — direct global install from the scoped npm package:
 
 ```bash
 npm install -g @opengsd/gsd-pi@latest
+```
+
+Non-interactive install (CI/scripts):
+
+```bash
+npx @opengsd/gsd-pi@latest --yes
 ```
 
 Confirm the command is available:
@@ -39,7 +51,7 @@ Confirm the command is available:
 gsd
 ```
 
-If `gsd` is not found, your npm global bin directory is probably not on `PATH`.
+If `gsd` is not found, your npm global bin directory is probably not on `PATH`. The guided installer warns about this during setup.
 
 ```bash
 npm prefix -g

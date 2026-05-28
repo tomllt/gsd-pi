@@ -11,7 +11,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -137,6 +137,7 @@ test("npm pack produces tarball with required files", async (t) => {
   assert.ok(files.some(f => f.includes("pkg/package.json")), "tarball contains pkg/package.json");
   assert.ok(files.some(f => f.includes("src/resources/extensions/gsd/index.ts")), "tarball contains bundled gsd extension");
   assert.ok(files.some(f => f.includes("scripts/postinstall.js")), "tarball contains postinstall script");
+  assert.ok(files.some(f => f.includes("scripts/install/deps.js")), "tarball contains modular installer deps");
 
   // pkg/package.json must have piConfig
   const pkgJson = readFileSync(join(projectRoot, "pkg", "package.json"), "utf-8");
@@ -287,4 +288,13 @@ test("gsd exits early with a clear message when synced resources are newer than 
   assert.match(result.stderr, /Version mismatch detected/, "prints a friendly skew header");
   assert.match(result.stderr, /npm install -g @opengsd\/gsd-pi@latest|gsd upgrade/, "prints upgrade guidance");
   assert.doesNotMatch(result.stderr, /\[gsd\] Extension load error/, "fails before extension loading");
+});
+
+test("installer help exits cleanly", () => {
+  const result = spawnSync("node", ["scripts/install.js", "--help"], {
+    cwd: projectRoot,
+    encoding: "utf-8",
+  });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /--yes/);
 });
