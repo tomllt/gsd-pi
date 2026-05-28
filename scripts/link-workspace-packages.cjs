@@ -16,9 +16,42 @@
  * (even NTFS junctions) can fail with EPERM. In that case we fall back to
  * cpSync (directory copy) which works universally.
  */
-const { existsSync, mkdirSync, symlinkSync, cpSync, lstatSync, readlinkSync, unlinkSync } = require('fs')
+const { existsSync, mkdirSync, symlinkSync, cpSync, lstatSync, readlinkSync, unlinkSync, rmSync } = require('fs')
 const { resolve, join } = require('path')
 const { getLinkablePackages, REPO_ROOT } = require('./lib/workspace-manifest.cjs')
+
+/**
+ * npm global installs can leave an empty node_modules/undici placeholder while the
+ * bundled @gsd/pi-coding-agent copy (without nested deps) still imports undici.
+ * Seed root undici from the shipped packages/pi-coding-agent copy when needed.
+ */
+function ensureRootUndici() {
+  const rootUndiciDir = join(REPO_ROOT, 'node_modules', 'undici')
+  const rootUndiciPkg = join(rootUndiciDir, 'package.json')
+  if (existsSync(rootUndiciPkg)) return false
+
+  const shippedUndiciDir = join(REPO_ROOT, 'packages', 'pi-coding-agent', 'node_modules', 'undici')
+  const shippedUndiciPkg = join(shippedUndiciDir, 'package.json')
+  if (!existsSync(shippedUndiciPkg)) return false
+
+  if (existsSync(rootUndiciDir)) {
+    rmSync(rootUndiciDir, { recursive: true, force: true })
+  }
+
+  mkdirSync(join(REPO_ROOT, 'node_modules'), { recursive: true })
+
+  try {
+    symlinkSync(shippedUndiciDir, rootUndiciDir, 'junction')
+    return true
+  } catch {
+    try {
+      cpSync(shippedUndiciDir, rootUndiciDir, { recursive: true })
+      return true
+    } catch {
+      return false
+    }
+  }
+}
 
 const scopeDirs = {
   '@gsd': join(REPO_ROOT, 'node_modules', '@gsd'),
@@ -98,6 +131,10 @@ for (const name of ['pi-agent-core', 'pi-ai', 'pi-tui', 'pi-coding-agent']) {
       // non-fatal
     }
   }
+}
+
+if (ensureRootUndici()) {
+  process.stderr.write('  Linked undici from shipped pi-coding-agent bundle\n')
 }
 
 if (linked > 0) process.stderr.write(`  Linked ${linked} workspace package${linked !== 1 ? 's' : ''}\n`)

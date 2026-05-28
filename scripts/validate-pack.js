@@ -214,6 +214,41 @@ try {
     process.exit(1);
   }
 
+  // --- Verify undici resolves for bundled pi-coding-agent (global install regression) ---
+  console.log('==> Verifying undici resolves for pi-coding-agent/http-dispatcher...');
+  const httpDispatcherPath = join(
+    installedRoot,
+    'node_modules',
+    '@gsd',
+    'pi-coding-agent',
+    'dist',
+    'core',
+    'http-dispatcher.js',
+  );
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `await import(${JSON.stringify('file://' + httpDispatcherPath.replace(/\\/g, '/'))});`,
+      ],
+      {
+        cwd: installDir,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15000,
+        maxBuffer: DEFAULT_MAX_BUFFER,
+      },
+    );
+    console.log('    pi-coding-agent/core/http-dispatcher resolves undici.');
+  } catch (err) {
+    console.log('ERROR: pi-coding-agent failed to resolve undici after install.');
+    if (err.stdout) console.log(err.stdout);
+    if (err.stderr) console.log(err.stderr);
+    process.exit(1);
+  }
+
   // --- Verify pi-coding-agent re-exports resolve bundled @gsd/agent-core ---
   // Relative ../../../gsd-agent-core paths break after npm install (folder is @gsd/agent-core).
   console.log('==> Verifying pi-coding-agent @gsd/agent-core re-exports...');
@@ -248,6 +283,52 @@ try {
     if (err.stdout) console.log(err.stdout);
     if (err.stderr) console.log(err.stderr);
     process.exit(1);
+  }
+
+  // --- Global install smoke (catches empty node_modules/undici placeholder on npm -g) ---
+  console.log('==> Testing global install (undici resolution)...');
+  const globalPrefix = mkdtempSync(join(tmpdir(), 'validate-pack-global-'));
+  try {
+    execFileSync(getNpmCommand(), ['install', '-g', tarball, '--prefix', globalPrefix], {
+      encoding: 'utf8',
+      shell: process.platform === 'win32',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: DEFAULT_MAX_BUFFER,
+      env: {
+        ...process.env,
+        npm_config_cache: npmCacheDir,
+      },
+    });
+    const globalRoot = join(globalPrefix, 'lib', 'node_modules', '@opengsd', 'gsd-pi');
+    const globalUndiciPkg = join(globalRoot, 'node_modules', 'undici', 'package.json');
+    if (!existsSync(globalUndiciPkg)) {
+      console.log('ERROR: Global install left node_modules/undici unresolved.');
+      console.log(`    Expected: ${globalUndiciPkg}`);
+      process.exit(1);
+    }
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `await import(${JSON.stringify('file://' + join(globalRoot, 'node_modules', '@gsd', 'pi-coding-agent', 'dist', 'core', 'http-dispatcher.js').replace(/\\/g, '/'))});`,
+      ],
+      {
+        cwd: globalPrefix,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15000,
+        maxBuffer: DEFAULT_MAX_BUFFER,
+      },
+    );
+    console.log('    Global install resolves undici for pi-coding-agent.');
+  } catch (err) {
+    console.log('ERROR: Global install smoke test failed.');
+    if (err.stdout) console.log(err.stdout);
+    if (err.stderr) console.log(err.stderr);
+    process.exit(1);
+  } finally {
+    rmSync(globalPrefix, { recursive: true, force: true });
   }
 
   console.log('');
