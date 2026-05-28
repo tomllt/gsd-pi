@@ -9,7 +9,7 @@ engineStrict: true
 
 # npm registry rejects tarballs containing hard-linked files (E415). pnpm hard-links
 # by default; copy mode breaks those links so bundledDependencies pack cleanly.
-package-import-method: copy
+packageImportMethod: copy
 
 # Keep dist-test and compiled workspace imports resolvable from the repo root.
 publicHoistPattern:
