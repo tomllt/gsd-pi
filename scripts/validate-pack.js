@@ -528,7 +528,7 @@ try {
       [
         '--input-type=module',
         '-e',
-        `await import(${JSON.stringify('@modelcontextprotocol/sdk/client/index.js')}); await import('yaml'); await import('minimatch');`,
+        `await import('yaml'); await import('minimatch');`,
       ],
       {
         cwd: globalRoot,
