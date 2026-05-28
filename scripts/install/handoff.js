@@ -3,6 +3,9 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { getGlobalPaths } from './npm-global.js'
 
+/** Set on `gsd config` spawned from the installer so loader/onboarding skip the wordmark. */
+export const GSD_SUPPRESS_LOGO_ENV = 'GSD_SUPPRESS_LOGO'
+
 export function resolveGsdBin({ isLocal, cwd = process.cwd() }) {
   if (isLocal) {
     const localBin = join(cwd, 'node_modules', '.bin', 'gsd')
@@ -25,6 +28,7 @@ export function runConfigHandoff({ bin, nonInteractive }) {
   const result = spawnSync(bin, ['config'], {
     stdio: 'inherit',
     timeout: 600_000,
+    env: { ...process.env, [GSD_SUPPRESS_LOGO_ENV]: '1' },
   })
 
   if (result.error || (result.status != null && result.status !== 0)) {

@@ -22,7 +22,7 @@ export function printBanner({ version, colors }) {
   }
 
   process.stdout.write(
-    `\n  ${c.bold}${logoModule?.GSD_PI_BRAND ?? 'GSD-Pi'}${c.reset}  ${c.dim}Git Ship Done · v${version}${c.reset}\n` +
+    `\n  ${c.dim}Git Ship Done · v${version}${c.reset}\n` +
     `  ${c.dim}${logoModule?.GSD_WEBSITE ?? 'https://opengsd.net'}${c.reset}\n\n`,
   )
 }

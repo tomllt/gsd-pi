@@ -298,9 +298,11 @@ export async function runOnboarding(
   }
 
   // ── Intro ─────────────────────────────────────────────────────────────────
-  if (opts.showIntro !== false) {
+  if (opts.showIntro !== false && process.env.GSD_SUPPRESS_LOGO !== '1') {
     process.stderr.write(renderGsdPiLogo(pc.cyan))
     process.stderr.write(`  ${pc.bold(GSD_PI_BRAND)}  ${pc.dim(GSD_WEBSITE)}\n\n`)
+    p.intro(pc.bold('Welcome to GSD — let\'s get you set up'))
+  } else if (opts.showIntro !== false) {
     p.intro(pc.bold('Welcome to GSD — let\'s get you set up'))
   }
 

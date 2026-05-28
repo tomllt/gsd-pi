@@ -92,7 +92,8 @@ process.title = 'gsd'
 
 // Print branded banner on first launch (before ~/.gsd/ exists).
 // Set GSD_FIRST_RUN_BANNER so cli.ts skips the duplicate welcome screen.
-if (!existsSync(appRoot)) {
+// GSD_SUPPRESS_LOGO is set when the npx installer already printed the wordmark.
+if (!existsSync(appRoot) && process.env.GSD_SUPPRESS_LOGO !== '1') {
   const cyan  = '\x1b[36m'
   const green = '\x1b[32m'
   const dim   = '\x1b[2m'
