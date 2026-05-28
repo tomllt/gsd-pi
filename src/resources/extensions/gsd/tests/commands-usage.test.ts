@@ -1,36 +1,50 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import type { SessionEntry } from "@gsd/pi-coding-agent";
+
 import {
   formatUsageReport,
   scanSessionTokenTotals,
   handleUsage,
 } from "../commands-usage.ts";
 
+const TS = 1;
+
+function sessionEntries(...messages: unknown[]): SessionEntry[] {
+  return messages.map((message, i) => ({
+    type: "message",
+    id: `entry-${i}`,
+    parentId: i > 0 ? `entry-${i - 1}` : null,
+    timestamp: new Date(TS).toISOString(),
+    message,
+  })) as unknown as SessionEntry[];
+}
+
 test("scanSessionTokenTotals aggregates assistant usage and tool calls", () => {
-  const totals = scanSessionTokenTotals([
+  const totals = scanSessionTokenTotals(sessionEntries(
     {
-      type: "message",
-      message: {
-        role: "user",
-      },
+      role: "user",
+      content: [{ type: "text", text: "hello" }],
+      timestamp: TS,
     },
     {
-      type: "message",
-      message: {
-        role: "assistant",
-        usage: {
-          input: 1000,
-          output: 200,
-          cacheRead: 500,
-          cacheWrite: 100,
-          totalTokens: 1800,
-          cost: { total: 0.05 },
-        },
-        content: [{ type: "toolCall" }, { type: "text" }],
+      role: "assistant",
+      usage: {
+        input: 1000,
+        output: 200,
+        cacheRead: 500,
+        cacheWrite: 100,
+        totalTokens: 1800,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.05 },
       },
+      content: [
+        { type: "toolCall", id: "tc-1", name: "read", arguments: {} },
+        { type: "text", text: "done" },
+      ],
+      timestamp: TS,
     },
-  ]);
+  ));
 
   assert.equal(totals.userMessages, 1);
   assert.equal(totals.assistantMessages, 1);

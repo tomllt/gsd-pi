@@ -4,6 +4,8 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { SessionEntry } from "@gsd/pi-coding-agent";
+
 import {
   analyzeSessionContext,
   buildContextBreakdown,
@@ -13,6 +15,17 @@ import {
 } from "../commands-context.ts";
 
 const PROVIDER = "openai" as const;
+const TS = 1;
+
+function sessionEntries(...messages: unknown[]): SessionEntry[] {
+  return messages.map((message, i) => ({
+    type: "message",
+    id: `entry-${i}`,
+    parentId: i > 0 ? `entry-${i - 1}` : null,
+    timestamp: new Date(TS).toISOString(),
+    message,
+  })) as unknown as SessionEntry[];
+}
 
 test("parseSystemPromptSections splits pi base, skills catalog, and GSD blocks", () => {
   const systemPrompt = [
@@ -46,41 +59,41 @@ test("parseSystemPromptSections splits pi base, skills catalog, and GSD blocks",
 });
 
 test("analyzeSessionContext buckets injections, tool results, and loaded skills", () => {
-  const result = analyzeSessionContext([
+  const result = analyzeSessionContext(sessionEntries(
     {
-      type: "message",
-      message: {
-        role: "custom",
-        customType: "gsd-memory",
-        content: "Memory block about auth patterns",
-      },
+      role: "custom",
+      customType: "gsd-memory",
+      content: "Memory block about auth patterns",
+      display: false,
+      timestamp: TS,
     },
     {
-      type: "message",
-      message: {
-        role: "assistant",
-        content: [
-          {
-            type: "toolCall",
-            name: "read",
-            arguments: { path: "/home/user/.agents/skills/tdd/SKILL.md" },
-          },
-          {
-            type: "toolCall",
-            name: "subagent",
-            arguments: { task: "scout the repo" },
-          },
-        ],
-      },
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall",
+          id: "tc-read",
+          name: "read",
+          arguments: { path: "/home/user/.agents/skills/tdd/SKILL.md" },
+        },
+        {
+          type: "toolCall",
+          id: "tc-subagent",
+          name: "subagent",
+          arguments: { task: "scout the repo" },
+        },
+      ],
+      timestamp: TS,
     },
     {
-      type: "message",
-      message: {
-        role: "toolResult",
-        content: "skill file contents here",
-      },
+      role: "toolResult",
+      toolCallId: "tc-read",
+      toolName: "read",
+      content: [{ type: "text", text: "skill file contents here" }],
+      isError: false,
+      timestamp: TS,
     },
-  ], PROVIDER);
+  ), PROVIDER);
 
   assert.ok(result.conversationSections.some((section) => section.label === "Memory injection"));
   assert.ok(result.conversationSections.some((section) => section.label === "Tool results"));
@@ -99,15 +112,11 @@ test("formatContextReport lists skills and subagents", () => {
       "[SYSTEM CONTEXT — GSD]",
       "core",
     ].join("\n"),
-    entries: [
-      {
-        type: "message",
-        message: {
-          role: "assistant",
-          content: [{ type: "toolCall", name: "subagent", arguments: {} }],
-        },
-      },
-    ],
+    entries: sessionEntries({
+      role: "assistant",
+      content: [{ type: "toolCall", id: "tc-subagent", name: "subagent", arguments: {} }],
+      timestamp: TS,
+    }),
   });
 
   const output = formatContextReport(report);

@@ -4,9 +4,23 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+import type { SessionEntry } from "@gsd/pi-coding-agent";
+
 import { buildContextChartHtml, writeContextChartHtml } from "../context-chart-html.ts";
 import { formatContextChartText, getContextChartTotals } from "../context-overlay.ts";
 import { buildContextBreakdown } from "../commands-context.ts";
+
+const TS = 1;
+
+function sessionEntries(...messages: unknown[]): SessionEntry[] {
+  return messages.map((message, i) => ({
+    type: "message",
+    id: `entry-${i}`,
+    parentId: i > 0 ? `entry-${i - 1}` : null,
+    timestamp: new Date(TS).toISOString(),
+    message,
+  })) as unknown as SessionEntry[];
+}
 
 const SAMPLE_REPORT = buildContextBreakdown({
   modelLabel: "claude-code/claude-sonnet-4-6",
@@ -20,23 +34,23 @@ const SAMPLE_REPORT = buildContextBreakdown({
     "[KNOWLEDGE — Rules]",
     "rule one",
   ].join("\n"),
-  entries: [
+  entries: sessionEntries(
     {
-      type: "message",
-      message: {
-        role: "custom",
-        customType: "gsd-memory",
-        content: "auth memory block",
-      },
+      role: "custom",
+      customType: "gsd-memory",
+      content: "auth memory block",
+      display: false,
+      timestamp: TS,
     },
     {
-      type: "message",
-      message: {
-        role: "toolResult",
-        content: "large tool output ".repeat(20),
-      },
+      role: "toolResult",
+      toolCallId: "tc-1",
+      toolName: "read",
+      content: [{ type: "text", text: "large tool output ".repeat(20) }],
+      isError: false,
+      timestamp: TS,
     },
-  ],
+  ),
 });
 
 test("getContextChartTotals aggregates system and conversation buckets", () => {
