@@ -11,6 +11,6 @@ export type {
 	ParsedSkillBlock,
 	PromptOptions,
 	SessionStats,
-} from "../../../gsd-agent-core/dist/agent-session.js";
+} from "@gsd/agent-core/agent-session.js";
 
-export { parseSkillBlock } from "../../../gsd-agent-core/dist/agent-session.js";
+export { parseSkillBlock } from "@gsd/agent-core/agent-session.js";

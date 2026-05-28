@@ -6,4 +6,4 @@ export {
 	parseBlobRef,
 	resolveImageData,
 	type BlobPutResult,
-} from "../../../gsd-agent-core/dist/blob-store.js";
+} from "@gsd/agent-core/blob-store.js";

@@ -214,6 +214,42 @@ try {
     process.exit(1);
   }
 
+  // --- Verify pi-coding-agent re-exports resolve bundled @gsd/agent-core ---
+  // Relative ../../../gsd-agent-core paths break after npm install (folder is @gsd/agent-core).
+  console.log('==> Verifying pi-coding-agent @gsd/agent-core re-exports...');
+  const lifecycleHooksPath = join(
+    installedRoot,
+    'node_modules',
+    '@gsd',
+    'pi-coding-agent',
+    'dist',
+    'core',
+    'lifecycle-hooks.js',
+  );
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `await import(${JSON.stringify('file://' + lifecycleHooksPath.replace(/\\/g, '/'))});`,
+      ],
+      {
+        cwd: installDir,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15000,
+        maxBuffer: DEFAULT_MAX_BUFFER,
+      },
+    );
+    console.log('    pi-coding-agent/core/lifecycle-hooks resolves @gsd/agent-core.');
+  } catch (err) {
+    console.log('ERROR: pi-coding-agent re-export failed to resolve @gsd/agent-core after install.');
+    if (err.stdout) console.log(err.stdout);
+    if (err.stderr) console.log(err.stderr);
+    process.exit(1);
+  }
+
   console.log('');
   console.log('Package is installable. Safe to publish.');
   process.exit(0);

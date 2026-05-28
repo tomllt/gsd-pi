@@ -4,4 +4,4 @@ export {
 	type AppAction,
 	type AppKeybinding,
 	KeybindingsManager,
-} from "../../../gsd-agent-core/dist/keybindings.js";
+} from "@gsd/agent-core/keybindings.js";
