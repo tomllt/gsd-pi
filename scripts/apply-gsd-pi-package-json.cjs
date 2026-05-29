@@ -14,7 +14,7 @@ const GSD_BASE = {
     name: '@gsd/pi-agent-core',
     description: 'General-purpose agent core (vendored from earendil-works/pi)',
     exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
-    build: 'tsc -p tsconfig.json --incremental false',
+    build: 'node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false',
   },
   'pi-ai': {
     name: '@gsd/pi-ai',
@@ -24,7 +24,7 @@ const GSD_BASE = {
       './oauth': { types: './dist/oauth.d.ts', import: './dist/oauth.js' },
       './bedrock-provider': { types: './bedrock-provider.d.ts', import: './bedrock-provider.js' },
     },
-    build: 'tsc -p tsconfig.json --incremental false',
+    build: 'node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false',
   },
   'pi-tui': {
     name: '@gsd/pi-tui',
@@ -32,7 +32,7 @@ const GSD_BASE = {
     exports: {
       '.': { types: './dist/index.d.ts', import: './dist/index.js', require: './dist/index.js' },
     },
-    build: 'tsc -p tsconfig.json --incremental false',
+    build: 'node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false',
   },
   'pi-coding-agent': {
     name: '@gsd/pi-coding-agent',
@@ -42,7 +42,7 @@ const GSD_BASE = {
       './*': { types: './dist/*.d.ts', import: './dist/*' },
       './hooks': { types: './dist/core/hooks/index.d.ts', import: './dist/core/hooks/index.js' },
     },
-    build: 'tsc -p tsconfig.json --incremental false && npm run copy-assets',
+    build: 'node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false && pnpm run copy-assets',
     extraScripts: { 'copy-assets': 'node scripts/copy-assets.cjs' },
     piConfig: { name: 'pi', configDir: '.pi' },
   },

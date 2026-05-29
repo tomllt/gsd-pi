@@ -21,12 +21,12 @@
     }
   },
   "bin": {
-    "gsd-daemon": "./dist/cli.js",
-    "gsd-mcp": "./dist/mcp-cli.js",
-    "gsd-mcp-runtime": "./dist/mcp-runtime-cli.js"
+    "gsd-daemon": "./bin/gsd-daemon.js",
+    "gsd-mcp": "./bin/gsd-mcp.js",
+    "gsd-mcp-runtime": "./bin/gsd-mcp-runtime.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/clean-package-dist.cjs && tsc",
     "test": "node --test dist/daemon.test.js dist/cloud-config.test.js dist/cloud-runtime.test.js dist/local-tool-executor.test.js dist/mcp-cli.test.js"
   },
   "dependencies": {
@@ -48,6 +48,7 @@
     "node": ">=22.0.0"
   },
   "files": [
+    "bin",
     "dist",
     "!dist/**/*.test.*"
   ]

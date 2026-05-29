@@ -29,7 +29,7 @@
     "gsd-mcp-server": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc --incremental false",
+    "build": "node ../../scripts/clean-package-dist.cjs && tsc --incremental false",
     "build:test": "tsc -p tsconfig.test.json",
     "test": "pnpm run build:test && node --test dist/mcp-server.test.js dist/remote-questions.test.js"
   },

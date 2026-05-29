@@ -38,14 +38,27 @@ test('selectPackageTestFiles prefers compiled src tests over copied package dist
   });
 });
 
-test('selectPackageTestFiles falls back to copied dist-test package files when no compiled src tests exist', () => {
+test('selectPackageTestFiles ignores compiled package test directory files', () => {
+  withTempPackage((root) => {
+    const distTestPkg = join(root, 'dist-test-package');
+    const pkgDist = join(root, 'package-dist');
+    const packageTest = join(distTestPkg, 'test', 'overlay.test.js');
+    const copiedDistTest = join(distTestPkg, 'dist', 'legacy.test.js');
+    touch(packageTest);
+    touch(copiedDistTest);
+
+    assert.deepEqual(selectPackageTestFiles(distTestPkg, pkgDist), []);
+  });
+});
+
+test('selectPackageTestFiles ignores copied dist-test package dist when no source tests exist', () => {
   withTempPackage((root) => {
     const distTestPkg = join(root, 'dist-test-package');
     const pkgDist = join(root, 'package-dist');
     const copiedDistTest = join(distTestPkg, 'dist', 'legacy.test.js');
     touch(copiedDistTest);
 
-    assert.deepEqual(selectPackageTestFiles(distTestPkg, pkgDist), [copiedDistTest]);
+    assert.deepEqual(selectPackageTestFiles(distTestPkg, pkgDist), []);
   });
 });
 

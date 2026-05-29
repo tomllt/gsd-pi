@@ -30,7 +30,7 @@
     "!dist/**/*.test.*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json --incremental false",
+    "build": "node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false",
     "test": "node --test dist/rpc.test.js"
   },
   "engines": {

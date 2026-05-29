@@ -9,7 +9,7 @@
  * Usage: node scripts/compile-tests.mjs
  */
 
-import { cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync, symlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -82,7 +82,8 @@ const ASSET_SKIP_DIRS = new Set(['node_modules', 'integration']);
  * esbuild compiled .js output already lands in dist-test, so we just
  * overlay the asset files on top.
  */
-async function copyAssets(srcDir, destDir) {
+async function copyAssets(srcDir, destDir, options = {}) {
+  const { skipFile } = options;
   let entries;
   try {
     entries = await readdir(srcDir, { withFileTypes: true });
@@ -94,8 +95,9 @@ async function copyAssets(srcDir, destDir) {
     const srcPath = join(srcDir, entry.name);
     const destPath = join(destDir, entry.name);
     if (entry.isDirectory()) {
-      await copyAssets(srcPath, destPath);
+      await copyAssets(srcPath, destPath, options);
     } else {
+      if (skipFile?.(srcPath, entry.name)) continue;
       if (entry.name.endsWith('.js')) {
         const tsSibling = srcPath.replace(/\.js$/, '.ts');
         if (existsSync(tsSibling)) continue;
@@ -139,6 +141,48 @@ async function removeStaleMirroredFiles(distDir, srcDir, options = {}) {
   }
 
   return staleCleaned;
+}
+
+function isCompiledTestArtifact(filePath) {
+  const normalized = filePath.replaceAll('\\', '/');
+  return (
+    normalized.includes('/__tests__/') ||
+    /\.test\.(?:c|m)?js(?:\.map)?$/.test(normalized) ||
+    /\.test\.d\.ts(?:\.map)?$/.test(normalized)
+  );
+}
+
+async function removePathIfExists(path) {
+  if (!existsSync(path)) return 0;
+  await rm(path, { recursive: true, force: true });
+  return 1;
+}
+
+async function removeCompiledTestArtifacts(dir) {
+  let removed = 0;
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return removed;
+  }
+
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === '__tests__') {
+        await rm(full, { recursive: true, force: true });
+        removed++;
+      } else {
+        removed += await removeCompiledTestArtifacts(full);
+      }
+    } else if (entry.isFile() && isCompiledTestArtifact(full)) {
+      await rm(full, { force: true });
+      removed++;
+    }
+  }
+
+  return removed;
 }
 
 /** @deprecated alias */
@@ -257,7 +301,13 @@ async function main() {
     ? await collectFiles(vscodeExtensionSrc)
     : [];
 
-  const entryPoints = [...srcFiles, ...packageFiles, ...webLibFiles, ...extensionFiles, ...vscodeExtensionFiles];
+  const entryPoints = [
+    ...srcFiles,
+    ...packageFiles,
+    ...webLibFiles,
+    ...extensionFiles,
+    ...vscodeExtensionFiles,
+  ];
 
   const inputFiles = [
     ...await collectAllFiles(join(ROOT, 'src')),
@@ -323,6 +373,7 @@ async function main() {
     await copyAssets(
       join(packagesDir, entry.name, 'dist'),
       join(DIST_TEST_DIR, 'packages', entry.name, 'dist'),
+      { skipFile: isCompiledTestArtifact },
     );
     const pkgJsonPath = join(packagesDir, entry.name, 'package.json');
     if (existsSync(pkgJsonPath)) {
@@ -410,6 +461,12 @@ async function main() {
     staleCleaned += await removeStaleMirroredFiles(
       join(DIST_TEST_DIR, 'packages', entry.name, 'src'),
       join(packagesDir, entry.name, 'src'),
+    );
+    staleCleaned += await removePathIfExists(
+      join(DIST_TEST_DIR, 'packages', entry.name, 'test'),
+    );
+    staleCleaned += await removeCompiledTestArtifacts(
+      join(DIST_TEST_DIR, 'packages', entry.name, 'dist'),
     );
   }
   if (staleCleaned > 0) {

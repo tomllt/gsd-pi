@@ -249,7 +249,7 @@ jobs:
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - name: Run package tests
-        run: pnpm run test:packages:compiled
+        run: pnpm run test:packages
 
   test-coverage:
     name: test-coverage

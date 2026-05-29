@@ -6,8 +6,8 @@
  * index.js) and that the build is not stale (no src/ file newer than dist/).
  * If any are missing or stale, runs the build for those packages.
  *
- * Designed for the postinstall hook so that `npm install` in a fresh clone
- * produces a working runtime without a manual `npm run build` step. Also
+ * Designed for the postinstall hook so that `pnpm install` in a fresh clone
+ * produces a working runtime without a manual `pnpm run build` step. Also
  * catches the common case where `git pull` updates package sources but the
  * old dist/ remains, causing TypeScript type errors.
  *
@@ -86,7 +86,7 @@ if (require.main === module) {
   // Skip if packages/ doesn't exist (published tarball / end-user install)
   if (!existsSync(packagesDir)) process.exit(0)
 
-  // Skip in CI — the pipeline runs `npm run build` explicitly
+  // Skip in CI — the pipeline runs `pnpm run build` explicitly
   if (process.env.CI === 'true' || process.env.CI === '1') process.exit(0)
 
   // Workspace packages that need dist/index.js at runtime.
@@ -121,7 +121,7 @@ if (require.main === module) {
       process.stderr.write(`  ✓ ${pkg}\n`)
     } catch (err) {
       process.stderr.write(`  ✗ ${pkg} build failed: ${err.message}\n`)
-      // Non-fatal — the user can run `npm run build` manually
+      // Non-fatal — the user can run `pnpm run build` manually
     }
   }
 }

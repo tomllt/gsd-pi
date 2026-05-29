@@ -34,7 +34,7 @@ if [ -f "dist/wizard.js" ] && [ -f "dist/cli.js" ] && [ -f "dist/loader.js" ]; t
   pass "1 — dist/wizard.js, dist/cli.js, dist/loader.js exist"
 else
   echo "  (building...)"
-  npm run build --silent 2>&1
+  pnpm run build --silent 2>&1
   if [ -f "dist/wizard.js" ] && [ -f "dist/cli.js" ] && [ -f "dist/loader.js" ]; then
     pass "1 — build succeeded"
   else

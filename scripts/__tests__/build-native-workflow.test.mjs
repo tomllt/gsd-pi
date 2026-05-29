@@ -92,7 +92,14 @@ test("build-native publishes MCP server workspace to npm before the main package
   assert.match(workspacePublish.run, /@opengsd\/contracts/);
   assert.match(workspacePublish.run, /@opengsd\/rpc-client/);
   assert.match(workspacePublish.run, /@opengsd\/mcp-server/);
+  assert.match(workspacePublish.run, /prepack-resolve-workspace\.cjs/);
+  assert.match(workspacePublish.run, /postpack-restore-workspace\.cjs/);
   assert.match(workspacePublish.run, /npm publish --workspace "\$\{workspace\}"/);
+
+  const mainPublish = steps.find((entry) => entry.name === "Publish main package");
+  assert.ok(mainPublish, "workflow must publish the main package");
+  assert.match(mainPublish.run, /prepack-resolve-workspace\.cjs/);
+  assert.match(mainPublish.run, /postpack-restore-workspace\.cjs/);
 
   assert.ok(smoke, "workflow must smoke-test the standalone MCP server package");
   assert.match(smoke.run, /npm install "@opengsd\/mcp-server@\$\{VERSION\}"/);

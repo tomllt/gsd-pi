@@ -1,6 +1,6 @@
 // validate-pack.js — Verify the npm tarball is installable before publishing.
 //
-// Usage: npm run validate-pack (or node scripts/validate-pack.js)
+// Usage: pnpm run validate-pack (or node scripts/validate-pack.js)
 // Exit 0 = safe to publish, Exit 1 = broken package.
 
 import { execFileSync } from 'node:child_process';
@@ -224,6 +224,8 @@ try {
   const requiredFiles = [
     'dist/loader.js',
     'packages/pi-coding-agent/dist/index.js',
+    'packages/daemon/bin/gsd-daemon.js',
+    'packages/daemon/dist/cli.js',
     'packages/rpc-client/dist/index.js',
     'packages/mcp-server/dist/cli.js',
     'scripts/link-workspace-packages.cjs',

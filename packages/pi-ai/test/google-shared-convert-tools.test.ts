@@ -521,7 +521,7 @@ describe("google-shared convertMessages", () => {
 		]);
 	});
 
-	it("drops user image parts for text-only models", () => {
+	it("replaces user image parts with placeholders for text-only models", () => {
 		const model = makeGoogleModel({
 			id: "text-only-model",
 			input: ["text"],
@@ -544,7 +544,10 @@ describe("google-shared convertMessages", () => {
 		expect(contents).toEqual([
 			{
 				role: "user",
-				parts: [{ text: "describe this" }],
+				parts: [
+					{ text: "describe this" },
+					{ text: "(image omitted: model does not support images)" },
+				],
 			},
 		]);
 	});

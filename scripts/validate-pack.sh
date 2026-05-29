@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # validate-pack.sh — Verify the npm tarball is installable before publishing.
 #
-# Usage: npm run validate-pack (or bash scripts/validate-pack.sh)
+# Usage: pnpm run validate-pack (or bash scripts/validate-pack.sh)
 # Exit 0 = safe to publish, Exit 1 = broken package.
 
 set -euo pipefail
@@ -9,6 +9,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
+
+INSTALL_DIR=""
+TARBALL=""
+cleanup() {
+  node scripts/postpack-restore-workspace.cjs
+  if [ -n "$INSTALL_DIR" ]; then rm -rf "$INSTALL_DIR"; fi
+  if [ -n "$TARBALL" ]; then rm -f "$TARBALL"; fi
+}
 
 # --- Guard: workspace packages must not have @gsd/* cross-deps ---
 echo "==> Checking workspace packages for @gsd/* cross-deps..."
@@ -33,6 +41,8 @@ echo "    No @gsd/* cross-dependencies."
 
 # --- Pack tarball ---
 echo "==> Packing tarball..."
+node scripts/prepack-resolve-workspace.cjs
+trap cleanup EXIT
 TARBALL_NAME=$(npm pack --ignore-scripts 2>/dev/null | tail -1)
 TARBALL="$ROOT/$TARBALL_NAME"
 
@@ -42,7 +52,7 @@ if [ ! -f "$TARBALL" ]; then
 fi
 
 INSTALL_DIR=$(mktemp -d)
-trap 'rm -rf "$INSTALL_DIR" "$TARBALL"' EXIT
+node scripts/postpack-restore-workspace.cjs
 
 echo "==> Tarball: $TARBALL_NAME ($(du -h "$TARBALL" | cut -f1) compressed)"
 

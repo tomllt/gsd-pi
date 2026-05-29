@@ -21,7 +21,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.json --incremental false && node scripts/copy-assets.cjs",
+    "build": "node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false && node scripts/copy-assets.cjs",
     "test": "node --import ../../src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --test src/**/*.test.ts"
   },
   "dependencies": {

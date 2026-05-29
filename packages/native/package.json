@@ -11,10 +11,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json --incremental false",
+    "build": "node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false",
     "build:native": "node ../../native/scripts/build.js",
     "build:native:dev": "node ../../native/scripts/build.js --dev",
-    "test": "npm run build && npm run build:native:dev && node --test src/__tests__/*.test.mjs"
+    "test": "pnpm run build && pnpm run build:native:dev && node --test src/__tests__/*.test.mjs"
   },
   "exports": {
     ".": {

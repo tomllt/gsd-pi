@@ -7,7 +7,7 @@ cd "$ROOT"
 OUT="${1:-ci-build-artifacts.tar.gz}"
 
 if [ ! -d dist ]; then
-  echo "::error::dist/ missing — run npm run build:core first"
+  echo "::error::dist/ missing — run pnpm run build:core first"
   exit 1
 fi
 

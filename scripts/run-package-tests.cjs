@@ -28,8 +28,7 @@ function findTestFiles(dir) {
 function selectPackageTestFiles(distTestPkg, pkgDist) {
 	const fromCompiledSrc = findTestFiles(join(distTestPkg, 'src'))
 	if (fromCompiledSrc.length > 0) return fromCompiledSrc
-	const fromDistTest = findTestFiles(distTestPkg)
-	if (fromDistTest.length > 0) return fromDistTest
+	if (existsSync(distTestPkg)) return []
 	// Fall back to package-local build outputs when test:compile does not cover a package yet.
 	return findTestFiles(pkgDist)
 }
@@ -37,12 +36,6 @@ function selectPackageTestFiles(distTestPkg, pkgDist) {
 function findDistTestFiles(pkgDir) {
 	const distTestPkg = join(REPO_ROOT, 'dist-test', 'packages', relative(join(REPO_ROOT, 'packages'), pkgDir))
 	return selectPackageTestFiles(distTestPkg, join(pkgDir, 'dist'))
-}
-
-function findPiAiPackageTestFiles(pkgDir) {
-	const fromPkgDist = findTestFiles(join(pkgDir, 'dist'))
-	if (fromPkgDist.length > 0) return fromPkgDist
-	return findDistTestFiles(pkgDir)
 }
 
 function commandExists(command, args = ['--version']) {
@@ -161,19 +154,6 @@ function main() {
 	let failureCount = 0
 
 	for (const pkg of packages) {
-		if (pkg.packageName === '@gsd/pi-ai') {
-			const files = findPiAiPackageTestFiles(pkg.path)
-			if (files.length === 0) {
-				process.stderr.write(`Skipping ${pkg.packageName}: no compiled test files found.\n`)
-				continue
-			}
-			process.stderr.write(`\nRunning ${pkg.packageName} package tests...\n`)
-			if (runCommand(process.execPath, ['--test', ...files], REPO_ROOT, pkg.packageName) !== 0) {
-				failureCount += 1
-			}
-			continue
-		}
-
 		if (pkg.packageName === '@gsd/native') {
 			if (!hasNativeAddon() && !commandExists('cargo')) {
 				process.stderr.write(

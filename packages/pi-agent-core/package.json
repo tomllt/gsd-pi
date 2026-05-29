@@ -26,12 +26,12 @@
     "README.md"
   ],
   "scripts": {
-    "clean": "shx rm -rf dist",
-    "build": "tsc -p tsconfig.json --incremental false",
+    "clean": "node ../../scripts/clean-package-dist.cjs",
+    "build": "node ../../scripts/clean-package-dist.cjs && tsc -p tsconfig.json --incremental false",
     "test": "vitest --run",
     "test:harness": "vitest --run --config vitest.harness.config.ts",
     "coverage:harness": "vitest --run --config vitest.harness.config.ts --coverage",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "pnpm run clean && pnpm run build"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.75.5",
