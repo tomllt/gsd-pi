@@ -160,6 +160,7 @@
     "chokidar": "^5.0.0",
     "cross-spawn": "^7.0.6",
     "diff": "^8.0.2",
+    "discord.js": "^14.26.4",
     "extract-zip": "^2.0.1",
     "file-type": "^21.1.1",
     "glob": "^13.0.1",
@@ -184,7 +185,8 @@
     "sql.js": "^1.14.1",
     "strip-ansi": "^7.1.0",
     "typebox": "1.1.38",
-    "undici": "^8.3.0",
+    "undici": "^7.26.0",
+    "ws": "^8.21.0",
     "yaml": "^2.8.2",
     "zod": "^4.0.0"
   },
@@ -199,6 +201,7 @@
     "typescript": "^5.9.3"
   },
   "optionalDependencies": {
+    "@mariozechner/clipboard": "0.3.6",
     "@opengsd/engine-darwin-arm64": "1.0.2",
     "@opengsd/engine-darwin-x64": "1.0.2",
     "@opengsd/engine-linux-arm64-gnu": "1.0.2",
