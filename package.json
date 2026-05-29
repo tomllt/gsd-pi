@@ -20,7 +20,9 @@
   "files": [
     "dist",
     "dist/web",
-    "packages",
+    "packages/*/dist/**",
+    "packages/*/package.json",
+    "packages/*/README.md",
     "pkg",
     "src/resources",
     "scripts/postinstall.js",
@@ -190,21 +192,6 @@
     "undici": "^8.3.0",
     "yaml": "^2.8.2"
   },
-  "bundledDependencies": [
-    "@gsd/agent-core",
-    "@gsd/agent-modes",
-    "@gsd/native",
-    "@gsd/pi-agent-core",
-    "@gsd/pi-ai",
-    "@gsd/pi-coding-agent",
-    "@gsd/pi-tui",
-    "@modelcontextprotocol/sdk",
-    "minimatch",
-    "picomatch",
-    "proper-lockfile",
-    "undici",
-    "yaml"
-  ],
   "devDependencies": {
     "@types/node": "^24.12.0",
     "@types/picomatch": "^4.0.2",
@@ -230,20 +217,5 @@
     "c8": {
       "yargs": "^18.0.0"
     }
-  },
-  "bundleDependencies": [
-    "@gsd/agent-core",
-    "@gsd/agent-modes",
-    "@gsd/native",
-    "@gsd/pi-agent-core",
-    "@gsd/pi-ai",
-    "@gsd/pi-coding-agent",
-    "@gsd/pi-tui",
-    "@modelcontextprotocol/sdk",
-    "minimatch",
-    "picomatch",
-    "proper-lockfile",
-    "undici",
-    "yaml"
-  ]
+  }
 }

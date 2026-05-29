@@ -93,103 +93,41 @@ try {
   npmCacheDir = mkdtempSync(join(tmpdir(), 'validate-pack-npm-cache-'));
   mkdirSync(npmCacheDir, { recursive: true });
 
-  // --- Guard: bundled @gsd/* workspace package graph must be fully covered ---
-  // Internal @gsd/* packages are shipped inside the main tarball rather than
-  // resolved from the public registry. Every @gsd/* dependency that appears in
-  // a shipped workspace package must therefore also be listed in the root
-  // package's bundledDependencies set.
-  console.log('==> Checking bundled workspace package coverage for @gsd/* cross-deps...');
+  // --- Guard: @gsd/* external dependencies must be declared on the root ---
+  // @gsd/* (and @opengsd/*) workspace packages are NOT published to the public
+  // registry. They ship inside this tarball under packages/*/dist and are symlinked
+  // into node_modules at postinstall (link-workspace-packages.cjs) — they are no
+  // longer bundled, and they are no longer listed in the root's dependencies
+  // (prepack-resolve-workspace.cjs strips them). Their EXTERNAL (registry) deps must
+  // therefore be declared on the root package so `npm install` and the installer's
+  // `npm install --ignore-scripts` repair materialize them; the linked @gsd packages
+  // then resolve those externals by walking up to the root node_modules.
+  console.log('==> Checking @gsd/* external dependency coverage on root...');
   const rootPkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-  const bundled = new Set(rootPkg.bundledDependencies || []);
-  let crossFailed = false;
-
-  for (const ws of getCorePackages()) {
-    const pkg = JSON.parse(readFileSync(ws.packageJsonPath, 'utf8'));
-    const deps = Object.keys(pkg.dependencies || {}).filter(d => d.startsWith('@gsd/'));
-    const uncovered = deps.filter((dep) => !bundled.has(dep));
-    if (uncovered.length) {
-      console.log(`    UNCOVERED in ${ws.dir}: ${uncovered.join(', ')}`);
-      crossFailed = true;
-    }
-  }
-
-  const rootInternalDeps = Object.keys(rootPkg.dependencies || {}).filter((dep) => dep.startsWith('@gsd/'));
-  const missingRootBundles = rootInternalDeps.filter((dep) => !bundled.has(dep));
-  if (missingRootBundles.length) {
-    console.log(`    ROOT bundledDependencies missing: ${missingRootBundles.join(', ')}`);
-    crossFailed = true;
-  }
-
-  if (crossFailed) {
-    console.log('ERROR: Internal @gsd/* dependencies are not fully bundled by the root package.');
-    console.log('    Add every shipped @gsd/* dependency to root dependencies + bundledDependencies.');
-    process.exit(1);
-  }
-  console.log('    Bundled dependency coverage is complete.');
-
   const rootExternalDeps = new Set(Object.keys(rootPkg.dependencies || {}));
-  const missingExternal = new Map();
-  const visitedBundled = new Set();
-  const bundledTransitiveRoots = new Set(['proper-lockfile', 'minimatch']);
 
   function isInternalWorkspaceDep(dep) {
     return dep.startsWith('@gsd/') || dep.startsWith('@opengsd/') || dep.startsWith('@earendil-works/');
   }
 
-  function readInstalledPackageJson(dep) {
-    const pkgPath = join(ROOT, 'node_modules', dep, 'package.json');
-    if (!existsSync(pkgPath)) return null;
-    return JSON.parse(readFileSync(pkgPath, 'utf8'));
-  }
-
-  // Small bundled packages ship without nested node_modules; their transitive
-  // externals must be declared on the root package for tarball installs.
-  function collectBundledSubtreeExternalDeps(dep, pkgJson) {
-    for (const [externalDep, version] of Object.entries(pkgJson.dependencies || {})) {
-      if (isInternalWorkspaceDep(externalDep)) continue;
-      if (!rootExternalDeps.has(externalDep)) {
-        missingExternal.set(externalDep, version);
-      }
-      if (visitedBundled.has(externalDep)) continue;
-      visitedBundled.add(externalDep);
-      const installed = readInstalledPackageJson(externalDep);
-      if (installed) collectBundledSubtreeExternalDeps(externalDep, installed);
-    }
-  }
-
-  for (const dep of bundled) {
-    if (dep.startsWith('@gsd/')) {
-      const ws = getCorePackages().find((entry) => entry.packageName === dep);
-      if (!ws) continue;
-      const pkg = JSON.parse(readFileSync(ws.packageJsonPath, 'utf8'));
-      for (const [externalDep, version] of Object.entries(pkg.dependencies || {})) {
-        if (isInternalWorkspaceDep(externalDep)) continue;
-        if (!rootExternalDeps.has(externalDep)) {
-          missingExternal.set(externalDep, version);
-        }
-      }
-      continue;
-    }
-
-    if (!bundledTransitiveRoots.has(dep)) continue;
-
-    const installed = readInstalledPackageJson(dep);
-    if (installed) {
-      collectBundledSubtreeExternalDeps(dep, installed);
-    } else if (!rootExternalDeps.has(dep)) {
-      missingExternal.set(dep, rootPkg.dependencies?.[dep] ?? 'unknown');
+  const missingExternal = new Map();
+  for (const ws of getCorePackages()) {
+    const pkg = JSON.parse(readFileSync(ws.packageJsonPath, 'utf8'));
+    for (const [dep, version] of Object.entries(pkg.dependencies || {})) {
+      if (isInternalWorkspaceDep(dep)) continue;
+      if (!rootExternalDeps.has(dep)) missingExternal.set(dep, version);
     }
   }
 
   if (missingExternal.size > 0) {
-    console.log('ERROR: Bundled packages depend on externals missing from root dependencies:');
+    console.log('ERROR: @gsd/* packages depend on externals missing from root dependencies:');
     for (const [dep, version] of [...missingExternal.entries()].sort(([a], [b]) => a.localeCompare(b))) {
       console.log(`    ${dep}@${version}`);
     }
-    console.log('    Add these to root package.json dependencies so tarball installs resolve them.');
+    console.log('    Add these to root package.json dependencies so installs resolve them at runtime.');
     process.exit(1);
   }
-  console.log('    Bundled workspace external dependency coverage is complete.');
+  console.log('    @gsd/* external dependency coverage is complete.');
 
   // --- Pack tarball ---
   // npm pack --ignore-scripts skips prepack; resolve workspace:* for publishable tarballs.
@@ -216,6 +154,42 @@ try {
 
   const stats = statSync(tarball);
   console.log(`==> Tarball: ${tarballName} (${formatBytes(stats.size)} compressed)`);
+
+  // --- Guard: fail loudly on tarball bloat ---
+  // The npm->pnpm migration repeatedly shipped a 537MB / 85k-file tarball because
+  // npm's bundle walker followed the pnpm virtual store (node_modules/.pnpm) and the
+  // nested packages/*/node_modules trees. These assertions turn that silent bloat
+  // into a hard failure before publish. Thresholds sit well above the legitimate
+  // bundled payload (~15k files / ~220MB unpacked) with headroom for growth.
+  const MAX_ENTRY_COUNT = 30000;
+  const MAX_UNPACKED_BYTES = 350 * 1024 * 1024;
+  const entryCount = packEntry?.entryCount ?? 0;
+  const unpackedSize = packEntry?.unpackedSize ?? 0;
+  const allPackedPaths = Array.isArray(packEntry?.files)
+    ? packEntry.files.map((entry) => entry?.path).filter(Boolean)
+    : [];
+  const pnpmStorePaths = allPackedPaths.filter((p) => p.startsWith('node_modules/.pnpm/'));
+  const nestedNmPaths = allPackedPaths.filter((p) => /^packages\/[^/]+\/node_modules\//.test(p));
+  const bloatErrors = [];
+  if (entryCount > MAX_ENTRY_COUNT) {
+    bloatErrors.push(`entry count ${entryCount} exceeds ${MAX_ENTRY_COUNT} (pnpm store or nested node_modules likely leaked)`);
+  }
+  if (unpackedSize > MAX_UNPACKED_BYTES) {
+    bloatErrors.push(`unpacked size ${formatBytes(unpackedSize)} exceeds ${formatBytes(MAX_UNPACKED_BYTES)}`);
+  }
+  if (pnpmStorePaths.length > 500) {
+    bloatErrors.push(`${pnpmStorePaths.length} node_modules/.pnpm/* entries packed (e.g. ${pnpmStorePaths[0]}) — bundled deps are dragging in the pnpm virtual store`);
+  }
+  if (nestedNmPaths.length > 0) {
+    bloatErrors.push(`${nestedNmPaths.length} packages/*/node_modules/* entries packed (e.g. ${nestedNmPaths[0]}) — files[] is shipping workspace node_modules`);
+  }
+  if (bloatErrors.length) {
+    console.log('ERROR: Tarball bloat guard tripped:');
+    for (const e of bloatErrors) console.log(`    ${e}`);
+    console.log('    See scripts/materialize-bundled-deps.cjs (@gsd flatten) and package.json "files".');
+    process.exit(1);
+  }
+  console.log(`    Size guard OK: ${entryCount} entries, ${formatBytes(unpackedSize)} unpacked, ${pnpmStorePaths.length} .pnpm entries.`);
 
   // npm install can consume/delete a cwd-local tarball; keep a temp copy for later smoke tests.
   const packedTarballPath = tarball;
@@ -477,23 +451,9 @@ try {
     }).trim();
     const globalRoot = join(globalNodeModules, '@opengsd', 'gsd-pi');
 
-    const bundledExternalDeps = [
-      '@modelcontextprotocol/sdk',
-      'minimatch',
-      'picomatch',
-      'proper-lockfile',
-      'undici',
-      'yaml',
-    ];
-    for (const dep of bundledExternalDeps) {
-      const pkgJsonPath = resolveBundledDepPkgJson(globalRoot, globalNodeModules, dep);
-      if (!pkgJsonPath) {
-        console.log(`ERROR: Global --ignore-scripts install left bundled dep unresolved: ${dep}`);
-        console.log(`    Checked nested and hoisted node_modules under ${globalRoot}`);
-        process.exit(1);
-      }
-    }
-
+    // Workspace packages ship under packages/*/dist and are symlinked into
+    // node_modules by the postinstall script, which `--ignore-scripts` skipped.
+    // Run it explicitly to mirror what the real installer does first.
     const linkScript = join(globalRoot, 'scripts', 'link-workspace-packages.cjs');
     execFileSync(process.execPath, [linkScript], {
       cwd: globalRoot,
@@ -502,8 +462,10 @@ try {
       timeout: 30000,
       maxBuffer: DEFAULT_MAX_BUFFER,
     });
-    // Seed runtime deps from the local tarball install instead of npm install in
-    // the global package tree, which OOMs resolving the full dependency graph.
+    // External (registry) deps are no longer bundled. In a real `--ignore-scripts`
+    // install the installer's `npm install --ignore-scripts` repair materializes
+    // them from the registry; here we seed them from the local tarball install
+    // instead, which avoids OOM resolving the full dependency graph in the global tree.
     const localNodeModules = join(installDir, 'node_modules');
     for (const dep of Object.keys(rootPkg.dependencies || {})) {
       if (dep.startsWith('@gsd/') || dep.startsWith('@opengsd/') || dep.startsWith('@earendil-works/')) {
@@ -512,10 +474,23 @@ try {
       seedGlobalDependencyFromLocal(globalRoot, globalNodeModules, installedRoot, localNodeModules, dep);
     }
 
-    if (!resolveBundledDepPkgJson(globalRoot, globalNodeModules, 'openai')) {
-      console.log('ERROR: Global install left node_modules/openai unresolved after repair.');
-      console.log(`    Checked nested and hoisted node_modules under ${globalRoot}`);
-      process.exit(1);
+    // After repair, the externals the @gsd packages need at runtime must resolve
+    // from the global root node_modules (previously these were bundled).
+    const requiredExternalDeps = [
+      '@modelcontextprotocol/sdk',
+      'minimatch',
+      'picomatch',
+      'proper-lockfile',
+      'undici',
+      'yaml',
+      'openai',
+    ];
+    for (const dep of requiredExternalDeps) {
+      if (!resolveBundledDepPkgJson(globalRoot, globalNodeModules, dep)) {
+        console.log(`ERROR: Global install left ${dep} unresolved after repair.`);
+        console.log(`    Checked nested and hoisted node_modules under ${globalRoot}`);
+        process.exit(1);
+      }
     }
 
     execFileSync(
@@ -563,7 +538,7 @@ try {
         maxBuffer: DEFAULT_MAX_BUFFER,
       },
     );
-    console.log('    Global --ignore-scripts install keeps bundled deps and repair resolves openai/pi-ai.');
+    console.log('    Global --ignore-scripts install + repair resolves externals and pi-ai/pi-coding-agent.');
   } catch (err) {
     console.log('ERROR: Global install smoke test failed.');
     if (err.stdout) console.log(err.stdout);
