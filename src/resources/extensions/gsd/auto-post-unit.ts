@@ -94,7 +94,7 @@ import {
 import { validateArtifact } from "./schemas/validate.js";
 import { verificationRetryKey } from "./auto/verification-retry-policy.js";
 import { getLedger } from "./metrics.js";
-import { getUnitCostSpikeAction } from "./auto-budget.js";
+import { getUnitCostSpikeAction, resolveUnitCostSpikeMultiplier } from "./auto-budget.js";
 import { resolveCanonicalMilestoneRoot } from "./worktree-manager.js";
 
 // ─── Path Comparison Helper ───────────────────────────────────────────────
@@ -1835,7 +1835,7 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
             await pauseAuto(ctx, pi);
             return "dispatched";
           }
-          if (getUnitCostSpikeAction(unitCostUsd, rollingAvgUsd, 3.0) === "pause") {
+          if (getUnitCostSpikeAction(unitCostUsd, rollingAvgUsd, resolveUnitCostSpikeMultiplier(prefs)) === "pause") {
             s.pendingVerificationRetry = null;
             s.verificationRetryCount.delete(retryKey);
             s.verificationRetryFailureHashes.delete(retryKey);
