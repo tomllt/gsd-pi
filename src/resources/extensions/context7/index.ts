@@ -132,6 +132,19 @@ function formatLibraryList(libs: C7Library[], query: string): string {
 	return lines.join("\n");
 }
 
+function getFirstTextContent(result: { content?: unknown }): string | undefined {
+	const content = result.content;
+	if (!Array.isArray(content)) return undefined;
+	const textBlock = content.find(
+		(block: unknown) =>
+			typeof block === "object" &&
+			block !== null &&
+			(block as { type?: unknown }).type === "text" &&
+			typeof (block as { text?: unknown }).text === "string",
+	) as { text: string } | undefined;
+	return textBlock?.text.trim() || undefined;
+}
+
 // ─── Tool details types ───────────────────────────────────────────────────────
 
 interface ResolveDetails {
@@ -234,7 +247,7 @@ export default function (pi: ExtensionAPI) {
 			const d = result.details as ResolveDetails | undefined;
 			if (isPartial) return new Text(theme.fg("warning", "Searching Context7..."), 0, 0);
 			if ((result as any).isError || d?.error) {
-				return new Text(theme.fg("error", `Error: ${d?.error ?? "unknown"}`), 0, 0);
+				return new Text(theme.fg("error", `Error: ${d?.error ?? getFirstTextContent(result) ?? "unknown"}`), 0, 0);
 			}
 			let text = theme.fg("success", `${d?.resultCount ?? 0} ${d?.resultCount === 1 ? "library" : "libraries"} found`);
 			if (d?.cached) text += theme.fg("dim", " (cached)");
@@ -389,7 +402,7 @@ export default function (pi: ExtensionAPI) {
 
 			if (isPartial) return new Text(theme.fg("warning", "Fetching documentation..."), 0, 0);
 			if ((result as any).isError || d?.error) {
-				return new Text(theme.fg("error", `Error: ${d?.error ?? "unknown"}`), 0, 0);
+				return new Text(theme.fg("error", `Error: ${d?.error ?? getFirstTextContent(result) ?? "unknown"}`), 0, 0);
 			}
 
 			let text = theme.fg("success", `${(d?.charCount ?? 0).toLocaleString()} chars`);

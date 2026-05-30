@@ -148,6 +148,36 @@ test("before_provider_request does NOT inject for non-claude models", async () =
   assert.equal(tools.length, 1, "Should not add tools to non-claude payload");
 });
 
+test("before_provider_request does NOT inject stale Anthropic state into OpenAI payloads", async () => {
+  const pi = createMockPI();
+  registerNativeSearchHooks(pi);
+
+  await pi.fire("model_select", {
+    type: "model_select",
+    model: { provider: "anthropic", api: "anthropic-messages", name: "claude-sonnet-4-6" },
+    previousModel: undefined,
+    source: "set",
+  });
+
+  const payload: Record<string, unknown> = {
+    model: "gpt-5.4",
+    tools: [{ name: "bash", type: "function" }],
+  };
+
+  const result = await pi.fire("before_provider_request", {
+    type: "before_provider_request",
+    payload,
+  });
+
+  assert.equal(result, undefined, "Should not modify OpenAI payload with stale Anthropic state");
+  const tools = payload.tools as any[];
+  assert.equal(tools.length, 1, "Should not inject web_search for OpenAI payload");
+  assert.ok(
+    !tools.some((t: any) => t.type === "web_search_20250305"),
+    "web_search_20250305 must NOT be present in OpenAI Responses requests"
+  );
+});
+
 test("before_provider_request does NOT inject for claude model on non-Anthropic provider", async () => {
   const pi = createMockPI();
   registerNativeSearchHooks(pi);

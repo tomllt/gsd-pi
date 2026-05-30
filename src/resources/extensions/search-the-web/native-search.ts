@@ -36,6 +36,11 @@ const NATIVE_WEB_SEARCH_PROVIDERS = new Set([
   "vercel-ai-gateway",
 ]);
 
+function looksLikeAnthropicModelName(modelName: string): boolean {
+  const normalized = modelName.trim().toLowerCase();
+  return normalized.startsWith("claude-") || normalized.startsWith("anthropic/claude-");
+}
+
 /**
  * True when the model is an Anthropic-shaped transport AND the provider is
  * known to accept the native `web_search_20250305` tool. Gate both on api
@@ -180,6 +185,8 @@ export function registerNativeSearchHooks(pi: NativeSearchPI): { getIsAnthropic:
     // The model name heuristic is needed for session restores where
     // modelsAreEqual suppresses model_select AND the SDK doesn't pass model.
     const eventModel = event.model as { provider?: string; api?: string } | undefined;
+    const payloadModelName = typeof payload.model === "string" ? payload.model : "";
+    const payloadLooksAnthropic = payloadModelName ? looksLikeAnthropicModelName(payloadModelName) : undefined;
     let isAnthropic: boolean;
     if (eventModel?.api || eventModel?.provider) {
       // Preferred path: gate on api shape + provider allowlist. Both fields
@@ -188,12 +195,14 @@ export function registerNativeSearchHooks(pi: NativeSearchPI): { getIsAnthropic:
       // (#444 regression) or minimax-served Claude-compat as Anthropic (#4492).
       isAnthropic = supportsNativeWebSearch(eventModel);
     } else if (modelSelectFired) {
-      isAnthropic = isAnthropicProvider;
+      // The model_select flag can be stale if the next request omits event.model
+      // after a provider switch. A concrete non-Claude payload must win so an
+      // Anthropic-only tool never leaks into OpenAI Responses requests.
+      isAnthropic = isAnthropicProvider && payloadLooksAnthropic !== false;
     } else {
       // Last resort: session-restore paths where the SDK doesn't pass model.
       // The model-name prefix is best-effort and assumes direct Anthropic.
-      const modelName = typeof payload.model === "string" ? payload.model : "";
-      isAnthropic = modelName.startsWith("claude-");
+      isAnthropic = payloadLooksAnthropic === true;
     }
     if (!isAnthropic) return;
 
