@@ -17,6 +17,7 @@ Simplified Chinese translation: [`zh-CN/`](./zh-CN/).
 | [Cloud MCP Gateway](./user-docs/cloud-mcp-gateway.md) | Run a gateway, pair a local runtime, and connect remote MCP clients |
 | [Configuration](./user-docs/configuration.md) | Preferences, model selection, git settings, and token profiles |
 | [Provider Setup](./user-docs/providers.md) | Step-by-step setup for OpenRouter, Ollama, LM Studio, vLLM, and all supported providers |
+| [Claude Code Subscription Setup](./user-docs/claude-code-subscription.md) | Install Claude Code, sign in with `/login`, and use a Claude subscription with GSD |
 | [Custom Models](./user-docs/custom-models.md) | Advanced model configuration — models.json schema, compat flags, overrides |
 | [Token Optimization](./user-docs/token-optimization.md) | Token profiles, context compression, complexity routing, and adaptive learning (v2.17) |
 | [Dynamic Model Routing](./user-docs/dynamic-model-routing.md) | Complexity-based model selection, cost tables, escalation, and budget pressure (v2.19) |
