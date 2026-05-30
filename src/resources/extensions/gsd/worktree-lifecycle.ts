@@ -216,6 +216,10 @@ export type EnterResult =
       cause?: unknown;
     };
 
+export interface StrandedMilestoneAdoptionOptions {
+  mode: "worktree" | "branch";
+}
+
 export type ExitResult =
   | { ok: true; merged: boolean; codeFilesChanged: boolean }
   | { ok: false; reason: "merge-conflict" | "teardown-failed"; cause?: unknown };
@@ -237,6 +241,8 @@ export interface MergeContext {
    */
   worktreeBasePath: string;
   milestoneId: string;
+  /** Temporary override used while recovering stranded work. */
+  isolationModeOverride?: "worktree" | "branch" | "none";
   /**
    * When true, `mergeMilestoneStandalone` returns `{ merged: false,
    * mode: "skipped" }` immediately (mirrors the single-loop guard). Default
@@ -533,6 +539,7 @@ export function _enterMilestoneCore(
   deps: WorktreeLifecycleDeps,
   milestoneId: string,
   ctx: NotifyCtx,
+  opts: { modeOverride?: "worktree" | "branch" } = {},
 ): EnterResult {
   if (!isValidMilestoneId(milestoneId)) {
     debugLog("WorktreeLifecycle", {
@@ -653,7 +660,7 @@ export function _enterMilestoneCore(
   // Handles the case where originalBasePath is falsy and basePath is itself
   // a worktree path — prevents double-nested worktree paths (#3729).
   const basePath = resolveWorktreeProjectRoot(s.basePath, s.originalBasePath);
-  const mode = getIsolationMode(basePath);
+  const mode = opts.modeOverride ?? getIsolationMode(basePath);
 
   if (s.isolationDegraded) {
     if (mode === "worktree") {
@@ -1298,7 +1305,9 @@ export function mergeMilestoneStandalone(
     };
   }
 
-  const mode = getIsolationMode(originalBasePath || worktreeBasePath);
+  const mode =
+    mctx.isolationModeOverride ??
+    getIsolationMode(originalBasePath || worktreeBasePath);
   debugLog("WorktreeLifecycle", {
     action: "mergeAndExit",
     milestoneId,
@@ -1637,6 +1646,7 @@ export class WorktreeLifecycle {
         originalBasePath: this.s.originalBasePath,
         worktreeBasePath: this.s.basePath,
         milestoneId,
+        isolationModeOverride: this.s.strandedRecoveryIsolationMode ?? undefined,
         isolationDegraded: this.s.isolationDegraded,
         notify: ctx.notify,
       });
@@ -1740,6 +1750,7 @@ export class WorktreeLifecycle {
       // Rebuild GitService after merge (branch HEAD changed)
       rebuildGitService(this.s, this.deps);
     }
+    this.s.strandedRecoveryIsolationMode = null;
     return result;
   }
 
@@ -1874,6 +1885,30 @@ export class WorktreeLifecycle {
     persistedWorktreePath: string | null,
   ): void {
     this.s.basePath = resolvePausedResumeBasePath(base, persistedWorktreePath);
+  }
+
+  /**
+   * Adopt in-progress stranded work during bootstrap.
+   *
+   * Unlike completed-orphan recovery, this does not merge, delete, or commit.
+   * It only moves the live session onto the branch/worktree proven by the
+   * audit evidence, while preserving that mode for the eventual merge.
+   */
+  adoptStrandedMilestone(
+    milestoneId: string,
+    base: string,
+    ctx: NotifyCtx,
+    opts: StrandedMilestoneAdoptionOptions,
+  ): EnterResult {
+    this.adoptSessionRoot(base);
+    this.s.strandedRecoveryIsolationMode = opts.mode;
+    const result = _enterMilestoneCore(this.s, this.deps, milestoneId, ctx, {
+      modeOverride: opts.mode,
+    });
+    if (!result.ok) {
+      this.s.strandedRecoveryIsolationMode = null;
+    }
+    return result;
   }
 
   /**

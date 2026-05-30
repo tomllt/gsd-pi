@@ -48,20 +48,27 @@ describe("auditOrphanedMilestoneBranches", () => {
     const result = auditOrphanedMilestoneBranches(dir, "worktree");
     assert.deepStrictEqual(result.recovered, []);
     assert.deepStrictEqual(result.warnings, []);
+    assert.deepStrictEqual(result.actions, []);
+    assert.equal(result.blockingStrandedWork, null);
   });
 
-  test("skips in none isolation mode", () => {
-    // Create a milestone branch that would otherwise be detected
+  test("runs in none isolation mode and cleans safe completed residue", () => {
     run("git branch milestone/M001", dir);
     insertMilestone({ id: "M001", title: "Test", status: "complete" });
 
     const result = auditOrphanedMilestoneBranches(dir, "none");
-    assert.deepStrictEqual(result.recovered, []);
+    assert.ok(
+      result.recovered.some((r) => r.includes("Deleted merged branch milestone/M001")),
+      `should clean merged completed residue even in none mode; got: ${JSON.stringify(result.recovered)}`,
+    );
     assert.deepStrictEqual(result.warnings, []);
+    assert.ok(
+      result.actions.some((action) => action.kind === "complete-merged-branch"),
+      "should record structured cleanup action",
+    );
 
-    // Branch should still exist
     const branches = run("git branch --list milestone/M001", dir);
-    assert.ok(branches.includes("milestone/M001"), "branch should be preserved in none mode");
+    assert.equal(branches, "", "safe completed branch should be cleaned in none mode");
   });
 
   test("deletes merged branch for completed milestone", () => {
@@ -149,9 +156,12 @@ describe("auditOrphanedMilestoneBranches", () => {
     // Must surface a warning so the user knows the worktree holds uncollapsed work
     assert.ok(result.warnings.length > 0, "should warn about in-progress orphan");
     assert.ok(
-      result.warnings.some(w => w.includes("milestone/M001") && w.includes("in-progress")),
-      `warning should mention milestone/M001 and in-progress state; got: ${JSON.stringify(result.warnings)}`,
+      result.warnings.some(w => w.includes("Stranded work") && w.includes("milestone/M001") && w.includes("in-progress")),
+      `warning should mention stranded milestone/M001 and in-progress state; got: ${JSON.stringify(result.warnings)}`,
     );
+    assert.equal(result.blockingStrandedWork?.milestoneId, "M001");
+    assert.equal(result.blockingStrandedWork?.recoveryMode, "branch");
+    assert.equal(result.blockingStrandedWork?.commitsAhead, 1);
 
     // Branch must still exist
     const branches = run("git branch --list milestone/M001", dir);
@@ -184,6 +194,53 @@ describe("auditOrphanedMilestoneBranches", () => {
       result.warnings.some(w => w.includes(".gsd/worktrees/M001") || w.includes("worktree")),
       `warning should reference the worktree location; got: ${JSON.stringify(result.warnings)}`,
     );
+    assert.equal(result.blockingStrandedWork?.recoveryMode, "worktree");
+  });
+
+  test("detects dirty in-progress worktree even when branch has no commits ahead", () => {
+    run("git branch milestone/M001", dir);
+
+    const wtDir = join(dir, ".gsd", "worktrees", "M001");
+    mkdirSync(wtDir, { recursive: true });
+    writeFileSync(join(wtDir, ".git"), `gitdir: ${join(dir, ".git", "worktrees", "M001")}\n`);
+    writeFileSync(join(wtDir, "dirty.txt"), "uncommitted work\n");
+
+    insertMilestone({ id: "M001", title: "Test", status: "active" });
+
+    const result = auditOrphanedMilestoneBranches(dir, "worktree", {
+      hasChanges: (basePath) => basePath === wtDir,
+    });
+
+    assert.deepStrictEqual(result.recovered, []);
+    assert.ok(
+      result.warnings.some((w) => w.includes("uncommitted changes")),
+      `dirty worktree should be treated as stranded work; got: ${JSON.stringify(result.warnings)}`,
+    );
+    assert.equal(result.blockingStrandedWork?.milestoneId, "M001");
+    assert.equal(result.blockingStrandedWork?.dirtyWorktree, true);
+    assert.equal(result.blockingStrandedWork?.recoveryMode, "worktree");
+  });
+
+  test("detects dirty in-progress worktree even when milestone branch is absent", () => {
+    const wtDir = join(dir, ".gsd", "worktrees", "M001");
+    mkdirSync(wtDir, { recursive: true });
+    writeFileSync(join(wtDir, ".git"), `gitdir: ${join(dir, ".git", "worktrees", "M001")}\n`);
+    writeFileSync(join(wtDir, "dirty.txt"), "branchless work\n");
+
+    insertMilestone({ id: "M001", title: "Test", status: "active" });
+
+    const result = auditOrphanedMilestoneBranches(dir, "none", {
+      hasChanges: (basePath) => basePath === wtDir,
+    });
+
+    assert.deepStrictEqual(result.recovered, []);
+    assert.ok(
+      result.warnings.some((w) => w.includes("Stranded work") && w.includes("M001")),
+      `branchless dirty worktree should block; got: ${JSON.stringify(result.warnings)}`,
+    );
+    assert.equal(result.blockingStrandedWork?.branch, undefined);
+    assert.equal(result.blockingStrandedWork?.dirtyWorktree, true);
+    assert.equal(result.blockingStrandedWork?.recoveryMode, "worktree");
   });
 
   test("cleans up orphaned worktree directory for merged milestone", () => {
@@ -359,7 +416,7 @@ describe("auditOrphanedMilestoneBranches", () => {
     assert.ok(existsSync(wtDir), "active milestone worktree dir must be preserved");
   });
 
-  test("#5879 — skips branch-less orphan in 'none' isolation mode", () => {
+  test("#5879 — cleans branch-less complete orphan in 'none' isolation mode", () => {
     insertMilestone({ id: "M001", title: "Test", status: "complete" });
 
     const wtDir = join(dir, ".gsd", "worktrees", "M001");
@@ -368,7 +425,10 @@ describe("auditOrphanedMilestoneBranches", () => {
 
     const result = auditOrphanedMilestoneBranches(dir, "none");
 
-    assert.deepStrictEqual(result.recovered, []);
-    assert.ok(existsSync(wtDir), "'none' mode must not touch worktree dirs");
+    assert.ok(
+      result.recovered.some((r) => r.includes("M001") && r.includes("branch already deleted")),
+      `none mode should still clean safe completed residue; got: ${JSON.stringify(result.recovered)}`,
+    );
+    assert.ok(!existsSync(wtDir), "completed orphan worktree dir should be cleaned in none mode");
   });
 });

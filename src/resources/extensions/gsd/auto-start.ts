@@ -48,6 +48,7 @@ import {
   nativeBranchDelete,
   nativeWorktreeRemove,
   nativeCommitCountBetween,
+  nativeHasChanges,
 } from "./native-git-bridge.js";
 import { GitServiceImpl } from "./git-service.js";
 import {
@@ -242,24 +243,126 @@ export function resolveSurvivorRecoveryIsolationMode(
   return isolationMode;
 }
 
+export type StrandedWorkRecoveryMode = "worktree" | "branch";
+
+export type OrphanAuditActionKind =
+  | "in-progress-stranded-work"
+  | "complete-merged-branch"
+  | "complete-merged-worktree"
+  | "complete-unmerged-branch"
+  | "complete-branchless-worktree";
+
+export interface OrphanAuditAction {
+  kind: OrphanAuditActionKind;
+  milestoneId: string;
+  message: string;
+  severity: "info" | "warning";
+  branch?: string;
+  commitsAhead?: number;
+  dirtyWorktree?: boolean;
+  worktreeDirExists?: boolean;
+  recoveryMode?: StrandedWorkRecoveryMode;
+  blocksAuto: boolean;
+}
+
+export interface OrphanAuditResult {
+  recovered: string[];
+  warnings: string[];
+  actions: OrphanAuditAction[];
+  blockingStrandedWork: OrphanAuditAction | null;
+}
+
+function isBlockingStrandedWorkAction(action: OrphanAuditAction): boolean {
+  return action.kind === "in-progress-stranded-work" && action.blocksAuto;
+}
+
+function detectWorktreeEvidence(
+  basePath: string,
+  milestoneId: string,
+  hasChanges: typeof nativeHasChanges,
+): { path: string | null; dirExists: boolean; dirty: boolean } {
+  const wtDir = getWorktreeDir(basePath, milestoneId);
+  const wtPath = getAutoWorktreePath(basePath, milestoneId);
+  let dirty = false;
+  if (wtPath) {
+    try {
+      dirty = hasChanges(wtPath);
+    } catch {
+      dirty = false;
+    }
+  }
+  return {
+    path: wtPath,
+    dirExists: existsSync(wtDir),
+    dirty,
+  };
+}
+
+function strandedWorkMessage(args: {
+  milestoneId: string;
+  branch?: string;
+  commitsAhead: number;
+  mainBranch: string;
+  dirtyWorktree: boolean;
+  worktreeDirExists: boolean;
+  recoveryMode: StrandedWorkRecoveryMode;
+}): string {
+  const evidence: string[] = [];
+  if (args.branch && args.commitsAhead > 0) {
+    evidence.push(
+      `branch ${args.branch} has ${args.commitsAhead} commit(s) ahead of ${args.mainBranch}`,
+    );
+  }
+  if (args.dirtyWorktree) {
+    evidence.push("the worktree has uncommitted changes");
+  }
+  if (evidence.length === 0) {
+    evidence.push("physical git evidence exists");
+  }
+
+  const wtSuffix = args.worktreeDirExists
+    ? ` Worktree directory at .gsd/worktrees/${args.milestoneId}/ holds live work.`
+    : "";
+  const recovery = args.recoveryMode === "worktree"
+    ? "Recovering will adopt the existing worktree."
+    : "Recovering will adopt the milestone branch.";
+
+  return (
+    `Stranded work for in-progress milestone ${args.milestoneId}: ${evidence.join("; ")}.` +
+    wtSuffix +
+    ` ${recovery} Park or discard explicitly if abandoning.`
+  );
+}
+
 export function auditOrphanedMilestoneBranches(
   basePath: string,
-  isolationMode: "worktree" | "branch" | "none",
+  _isolationMode: "worktree" | "branch" | "none",
   gitDeps: {
     branchList?: typeof nativeBranchList;
     branchExists?: typeof nativeBranchExists;
+    hasChanges?: typeof nativeHasChanges;
   } = {},
-): { recovered: string[]; warnings: string[] } {
+): OrphanAuditResult {
   const recovered: string[] = [];
   const warnings: string[] = [];
+  const actions: OrphanAuditAction[] = [];
   const branchList = gitDeps.branchList ?? nativeBranchList;
   const branchExists = gitDeps.branchExists ?? nativeBranchExists;
+  const hasChanges = gitDeps.hasChanges ?? nativeHasChanges;
 
-  // Skip in none mode — no milestone branches are created
-  if (isolationMode === "none") return { recovered, warnings };
+  const pushAction = (action: OrphanAuditAction): void => {
+    actions.push(action);
+    if (action.severity === "info") {
+      recovered.push(action.message);
+    } else {
+      warnings.push(action.message);
+    }
+  };
 
   // Skip if DB not available — can't determine completion status
-  if (!isDbAvailable()) return { recovered, warnings };
+  if (!isDbAvailable()) {
+    return { recovered, warnings, actions, blockingStrandedWork: null };
+  }
 
   let milestoneBranches: string[];
   let milestoneBranchListAvailable = true;
@@ -295,6 +398,7 @@ export function auditOrphanedMilestoneBranches(
     if (!milestone) continue;
 
     const isMerged = mergedBranches.has(branch);
+    const worktreeEvidence = detectWorktreeEvidence(basePath, milestoneId, hasChanges);
 
     // #4762 — in-progress milestone branch with unmerged commits ahead of
     // main. This is the pre-completion orphan case: auto-mode exited without
@@ -307,33 +411,45 @@ export function auditOrphanedMilestoneBranches(
     // Parked/other closed statuses go through the legacy complete/unmerged
     // path below where appropriate.
     if (!isClosedStatus(milestone.status)) {
-      if (isMerged) continue; // nothing to recover
       let commitsAhead = 0;
       try {
         commitsAhead = nativeCommitCountBetween(basePath, mainBranch, branch);
       } catch {
-        // Rev-walk failure — skip rather than noise
-        continue;
+        commitsAhead = 0;
       }
-      if (commitsAhead === 0) continue;
+      if ((isMerged || commitsAhead === 0) && !worktreeEvidence.dirty) continue;
 
-      const wtDir = getWorktreeDir(basePath, milestoneId);
-      const wtDirExists = existsSync(wtDir);
-      const wtSuffix = wtDirExists
-        ? ` Worktree directory at .gsd/worktrees/${milestoneId}/ holds the live work.`
-        : "";
-      warnings.push(
-        `Branch ${branch} has ${commitsAhead} commit(s) ahead of ${mainBranch} for in-progress milestone ${milestoneId}.` +
-        wtSuffix +
-        ` Run \`/gsd auto\` to resume, or merge manually if abandoning.`,
-      );
+      const recoveryMode: StrandedWorkRecoveryMode = worktreeEvidence.path
+        ? "worktree"
+        : "branch";
+      const message = strandedWorkMessage({
+        milestoneId,
+        branch,
+        commitsAhead,
+        mainBranch,
+        dirtyWorktree: worktreeEvidence.dirty,
+        worktreeDirExists: worktreeEvidence.dirExists,
+        recoveryMode,
+      });
+      pushAction({
+        kind: "in-progress-stranded-work",
+        milestoneId,
+        branch,
+        commitsAhead,
+        dirtyWorktree: worktreeEvidence.dirty,
+        worktreeDirExists: worktreeEvidence.dirExists,
+        recoveryMode,
+        message,
+        severity: "warning",
+        blocksAuto: true,
+      });
 
       // #4764 telemetry
       try {
         emitWorktreeOrphaned(basePath, milestoneId, {
           reason: "in-progress-unmerged",
           commitsAhead,
-          worktreeDirExists: wtDirExists,
+          worktreeDirExists: worktreeEvidence.dirExists,
         });
       } catch (err) {
         logWarning("engine", `worktree-orphaned telemetry failed for ${milestoneId}: ${err instanceof Error ? err.message : String(err)}`);
@@ -351,7 +467,14 @@ export function auditOrphanedMilestoneBranches(
       // Branch is merged — safe to delete branch and clean up worktree dir
       try {
         nativeBranchDelete(basePath, branch, true);
-        recovered.push(`Deleted merged branch ${branch} for completed milestone ${milestoneId}.`);
+        pushAction({
+          kind: "complete-merged-branch",
+          milestoneId,
+          branch,
+          message: `Deleted merged branch ${branch} for completed milestone ${milestoneId}.`,
+          severity: "info",
+          blocksAuto: false,
+        });
       } catch (err) {
         warnings.push(`Failed to delete merged branch ${branch}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -374,7 +497,15 @@ export function auditOrphanedMilestoneBranches(
           if (isInsideWorktreesDir(basePath, wtDir)) {
             try {
               rmSync(wtDir, { recursive: true, force: true });
-              recovered.push(`Removed orphaned worktree directory for ${milestoneId}.`);
+              pushAction({
+                kind: "complete-merged-worktree",
+                milestoneId,
+                branch,
+                worktreeDirExists: true,
+                message: `Removed orphaned worktree directory for ${milestoneId}.`,
+                severity: "info",
+                blocksAuto: false,
+              });
             } catch (err2) {
               warnings.push(`Failed to remove worktree directory for ${milestoneId}: ${err2 instanceof Error ? err2.message : String(err2)}`);
             }
@@ -382,15 +513,30 @@ export function auditOrphanedMilestoneBranches(
             warnings.push(`Orphaned worktree directory for ${milestoneId} is outside .gsd/worktrees/ — skipping removal for safety.`);
           }
         } else {
-          recovered.push(`Removed orphaned worktree directory for ${milestoneId}.`);
+          pushAction({
+            kind: "complete-merged-worktree",
+            milestoneId,
+            branch,
+            worktreeDirExists: true,
+            message: `Removed orphaned worktree directory for ${milestoneId}.`,
+            severity: "info",
+            blocksAuto: false,
+          });
         }
       }
     } else {
       // Branch is NOT merged — preserve for safety, warn the user
-      warnings.push(
-        `Branch ${branch} exists for completed milestone ${milestoneId} but is NOT merged into ${mainBranch}. ` +
-        `This may contain unmerged work. Merge manually or run \`/gsd doctor fix\` to resolve.`,
-      );
+      pushAction({
+        kind: "complete-unmerged-branch",
+        milestoneId,
+        branch,
+        worktreeDirExists: worktreeEvidence.dirExists,
+        message:
+          `Branch ${branch} exists for completed milestone ${milestoneId} but is NOT merged into ${mainBranch}. ` +
+          `This may contain unmerged work. Merge manually or run \`/gsd doctor fix\` to resolve.`,
+        severity: "warning",
+        blocksAuto: false,
+      });
 
       // #4764 telemetry
       try {
@@ -428,6 +574,41 @@ export function auditOrphanedMilestoneBranches(
     completedMilestones = [];
   }
   for (const m of completedMilestones) {
+    if (!isClosedStatus(m.status)) {
+      if (seenMilestoneIds.has(m.id)) continue;
+      const worktreeEvidence = detectWorktreeEvidence(basePath, m.id, hasChanges);
+      if (!worktreeEvidence.dirty) continue;
+      const message = strandedWorkMessage({
+        milestoneId: m.id,
+        commitsAhead: 0,
+        mainBranch,
+        dirtyWorktree: true,
+        worktreeDirExists: worktreeEvidence.dirExists,
+        recoveryMode: "worktree",
+      });
+      pushAction({
+        kind: "in-progress-stranded-work",
+        milestoneId: m.id,
+        commitsAhead: 0,
+        dirtyWorktree: true,
+        worktreeDirExists: worktreeEvidence.dirExists,
+        recoveryMode: "worktree",
+        message,
+        severity: "warning",
+        blocksAuto: true,
+      });
+      try {
+        emitWorktreeOrphaned(basePath, m.id, {
+          reason: "in-progress-unmerged",
+          commitsAhead: 0,
+          worktreeDirExists: worktreeEvidence.dirExists,
+        });
+      } catch (err) {
+        logWarning("engine", `worktree-orphaned telemetry failed for ${m.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      continue;
+    }
+
     if (m.status !== "complete") continue;
     if (seenMilestoneIds.has(m.id)) continue; // already processed in the branch loop
     if (!milestoneBranchListAvailable) {
@@ -461,18 +642,37 @@ export function auditOrphanedMilestoneBranches(
     if (existsSync(wtDir)) {
       try {
         rmSync(wtDir, { recursive: true, force: true });
-        recovered.push(`Removed orphaned worktree directory for ${m.id} (branch already deleted).`);
+        pushAction({
+          kind: "complete-branchless-worktree",
+          milestoneId: m.id,
+          worktreeDirExists: true,
+          message: `Removed orphaned worktree directory for ${m.id} (branch already deleted).`,
+          severity: "info",
+          blocksAuto: false,
+        });
       } catch (err) {
         warnings.push(
           `Failed to remove orphaned worktree directory for ${m.id}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     } else {
-      recovered.push(`Removed orphaned worktree directory for ${m.id} (branch already deleted).`);
+      pushAction({
+        kind: "complete-branchless-worktree",
+        milestoneId: m.id,
+        worktreeDirExists: true,
+        message: `Removed orphaned worktree directory for ${m.id} (branch already deleted).`,
+        severity: "info",
+        blocksAuto: false,
+      });
     }
   }
 
-  return { recovered, warnings };
+  return {
+    recovered,
+    warnings,
+    actions,
+    blockingStrandedWork: actions.find(isBlockingStrandedWorkAction) ?? null,
+  };
 }
 
 /**
@@ -894,17 +1094,27 @@ export async function bootstrapAutoSession(
     // was lost due to session ending between completion and teardown.
     // Must run after DB open and before worktree entry.
     let orphanAuditRecovered = false;
+    let strandedRecoveryActions: OrphanAuditAction[] = [];
+    let strandedRecoveryAction: OrphanAuditAction | null = null;
     try {
       const auditResult = auditOrphanedMilestoneBranches(base, getIsolationMode(base));
+      strandedRecoveryActions = auditResult.actions.filter(isBlockingStrandedWorkAction);
+      strandedRecoveryAction = strandedRecoveryActions[0] ?? null;
       for (const msg of auditResult.recovered) {
         ctx.ui.notify(`Orphan audit: ${msg}`, "info");
       }
       for (const msg of auditResult.warnings) {
-        ctx.ui.notify(`Orphan audit: ${msg}`, "warning");
+        const prefix = msg.startsWith("Stranded work") ? "" : "Orphan audit: ";
+        ctx.ui.notify(`${prefix}${msg}`, "warning");
       }
       if (auditResult.recovered.length > 0) {
         orphanAuditRecovered = true;
-        debugLog("orphan-audit", { recovered: auditResult.recovered, warnings: auditResult.warnings });
+        debugLog("orphan-audit", {
+          recovered: auditResult.recovered,
+          warnings: auditResult.warnings,
+          strandedRecoveryAction,
+          strandedRecoveryActions,
+        });
       }
     } catch (err) {
       // Non-fatal — the audit is defensive, never block bootstrap
@@ -946,6 +1156,46 @@ export async function bootstrapAutoSession(
 
     let state = await deriveState(base);
 
+    // Stale worktree state recovery (#654)
+    if (
+      state.activeMilestone &&
+      shouldUseWorktreeIsolation(base) &&
+      !detectWorktreeName(base)
+    ) {
+      const wtPath = getAutoWorktreePath(base, state.activeMilestone.id);
+      if (wtPath) {
+        state = await deriveState(wtPath);
+      }
+    }
+
+    const blockingStrandedRecoveryAction = state.activeMilestone
+      ? strandedRecoveryActions.find(
+        (action) => action.milestoneId !== state.activeMilestone?.id,
+      ) ?? strandedRecoveryAction
+      : strandedRecoveryAction;
+
+    if (blockingStrandedRecoveryAction) {
+      if (!state.activeMilestone) {
+        ctx.ui.notify(
+          `Stranded work for ${blockingStrandedRecoveryAction.milestoneId} blocks auto-mode, but that milestone is not active in project state. Park or discard it explicitly before continuing.`,
+          "error",
+        );
+        return releaseLockAndReturn();
+      }
+      if (state.activeMilestone.id !== blockingStrandedRecoveryAction.milestoneId) {
+        ctx.ui.notify(
+          `Stranded work for ${blockingStrandedRecoveryAction.milestoneId} blocks auto-mode before ${state.activeMilestone.id}. Recover, park, or discard ${blockingStrandedRecoveryAction.milestoneId} explicitly before continuing.`,
+          "error",
+        );
+        return releaseLockAndReturn();
+      }
+      strandedRecoveryAction = blockingStrandedRecoveryAction;
+      ctx.ui.notify(
+        `Recovering stranded work for ${strandedRecoveryAction.milestoneId} before dispatching new units.`,
+        "info",
+      );
+    }
+
     if (
       process.env.GSD_HEADLESS === "1" &&
       orphanAuditRecovered &&
@@ -957,18 +1207,6 @@ export async function bootstrapAutoSession(
         "info",
       );
       return releaseLockAndReturn();
-    }
-
-    // Stale worktree state recovery (#654)
-    if (
-      state.activeMilestone &&
-      shouldUseWorktreeIsolation(base) &&
-      !detectWorktreeName(base)
-    ) {
-      const wtPath = getAutoWorktreePath(base, state.activeMilestone.id);
-      if (wtPath) {
-        state = await deriveState(wtPath);
-      }
     }
 
     // Milestone branch recovery (#601, #2358)
@@ -1005,7 +1243,10 @@ export async function bootstrapAutoSession(
     // The worktree/branch was created but the milestone only has CONTEXT-DRAFT.md.
     // Route to the interactive discussion handler instead of falling through to
     // auto-mode, which would immediately stop with "needs discussion".
-    if (decideSurvivorAction(hasSurvivorBranch, state.phase) === "discuss") {
+    if (
+      !strandedRecoveryAction &&
+      decideSurvivorAction(hasSurvivorBranch, state.phase) === "discuss"
+    ) {
       const { showSmartEntry } = await import("./guided-flow.js");
       await showSmartEntry(ctx, pi, base, { step: requestedStepMode });
 
@@ -1101,7 +1342,7 @@ export async function bootstrapAutoSession(
       { hasSurvivorBranch },
     );
 
-    if (deepProjectStagePending) {
+    if (deepProjectStagePending && !strandedRecoveryAction) {
       // Deep project-level setup runs before the first milestone exists. Let
       // the auto loop dispatch workflow-preferences / project / requirements
       // units instead of recursing back through showSmartEntry while this
@@ -1109,7 +1350,7 @@ export async function bootstrapAutoSession(
       s.currentMilestoneId = null;
     }
 
-    if (!hasSurvivorBranch && !deepProjectStagePending) {
+    if (!hasSurvivorBranch && !deepProjectStagePending && !strandedRecoveryAction) {
       // No active work — start a new milestone via discuss flow
       if (!state.activeMilestone || state.phase === "complete") {
         // Guard against recursive dialog loop (#1348):
@@ -1185,7 +1426,7 @@ export async function bootstrapAutoSession(
     }
 
     // Unreachable safety check
-    if (!state.activeMilestone && !deepProjectStagePending) {
+    if (!state.activeMilestone && !deepProjectStagePending && !strandedRecoveryAction) {
       const { showSmartEntry } = await import("./guided-flow.js");
       await showSmartEntry(ctx, pi, base, { step: requestedStepMode });
       return releaseLockAndReturn();
@@ -1222,7 +1463,9 @@ export async function bootstrapAutoSession(
     s.resourceVersionOnStart = readResourceVersion();
     s.pendingQuickTasks = [];
     s.currentUnit = null;
-    s.currentMilestoneId ??= deepProjectStagePending ? null : state.activeMilestone?.id ?? null;
+    s.currentMilestoneId ??=
+      strandedRecoveryAction?.milestoneId ??
+      (deepProjectStagePending ? null : state.activeMilestone?.id ?? null);
     s.originalModelId = startModelSnapshot?.id ?? ctx.model?.id ?? null;
     s.originalModelProvider = startModelSnapshot?.provider ?? ctx.model?.provider ?? null;
     s.originalThinkingLevel = startThinkingSnapshot ?? null;
@@ -1232,7 +1475,7 @@ export async function bootstrapAutoSession(
 
     // Capture integration branch
     if (s.currentMilestoneId) {
-      if (getIsolationMode(base) !== "none") {
+      if (getIsolationMode(base) !== "none" || strandedRecoveryAction) {
         captureIntegrationBranch(base, s.currentMilestoneId);
       }
       setActiveMilestoneId(base, s.currentMilestoneId);
@@ -1243,7 +1486,7 @@ export async function bootstrapAutoSession(
     // milestone/<MID>. Auto-checkout back to the integration branch.
     const isolationMode = getIsolationMode(base);
     const isRepo = nativeIsRepo(base);
-    if (isolationMode === "none" && isRepo) {
+    if (isolationMode === "none" && isRepo && !strandedRecoveryAction) {
       try {
         const currentBranch = nativeGetCurrentBranch(base);
         const integrationBranch = nativeDetectMainBranch(base);
@@ -1282,13 +1525,21 @@ export async function bootstrapAutoSession(
 
     if (
       s.currentMilestoneId &&
-      getIsolationMode(base) !== "none" &&
+      (getIsolationMode(base) !== "none" || strandedRecoveryAction?.recoveryMode) &&
       !detectWorktreeName(base) &&
       !isUnderGsdWorktrees(base)
     ) {
-      const enterResult = buildLifecycle().enterMilestone(s.currentMilestoneId, {
-        notify: ctx.ui.notify.bind(ctx.ui),
-      });
+      const lifecycle = buildLifecycle();
+      const enterResult = strandedRecoveryAction?.recoveryMode
+        ? lifecycle.adoptStrandedMilestone(
+          s.currentMilestoneId,
+          base,
+          { notify: ctx.ui.notify.bind(ctx.ui) },
+          { mode: strandedRecoveryAction.recoveryMode },
+        )
+        : lifecycle.enterMilestone(s.currentMilestoneId, {
+          notify: ctx.ui.notify.bind(ctx.ui),
+        });
       if (!enterResult.ok) {
         s.active = false;
         if (enterResult.reason === "lease-conflict") {

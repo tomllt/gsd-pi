@@ -212,6 +212,34 @@ test("enterMilestone returns ok:true mode:none when isolation disabled", () => {
   assert.equal(s.basePath, "/project");
 });
 
+test("adoptStrandedMilestone forces branch recovery even when normal preferences differ", (t) => {
+  const previousCwd = process.cwd();
+  const base = makeGitRepoBase({ isolation: "worktree" });
+  t.after(() => cleanupRepoBase(base, previousCwd));
+
+  const s = makeSession({ basePath: base, originalBasePath: base });
+  const deps = makeDeps();
+  const ctx = makeCtx();
+  const lifecycle = new WorktreeLifecycle(s, deps);
+
+  const result = lifecycle.adoptStrandedMilestone("M001", base, ctx, {
+    mode: "branch",
+  });
+
+  assert.equal(result.ok, true, `expected ok:true, got: ${JSON.stringify(result)}`);
+  if (result.ok) {
+    assert.equal(result.mode, "branch");
+    assert.equal(result.path, base);
+  }
+  assert.equal(s.basePath, base);
+  assert.equal(s.strandedRecoveryIsolationMode, "branch");
+  const currentBranch = execFileSync("git", ["branch", "--show-current"], {
+    cwd: base,
+    encoding: "utf-8",
+  }).trim();
+  assert.equal(currentBranch, "milestone/M001");
+});
+
 test("enterMilestone returns ok:false reason:isolation-degraded when session degraded", () => {
   const s = makeSession({ isolationDegraded: true });
   const deps = makeDeps({ getIsolationMode: () => "branch" });
