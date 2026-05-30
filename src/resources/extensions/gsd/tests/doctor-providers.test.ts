@@ -778,6 +778,69 @@ test("runProviderChecks reports ok for Anthropic via claude-code binary in PATH"
   });
 });
 
+test("runProviderChecks ignores external CLI auth sentinels when the CLI is missing", () => {
+  const scenarios = [
+    {
+      requiredProvider: "anthropic",
+      routeProvider: "claude-code",
+      model: "claude-sonnet-4-6",
+      env: {
+        ANTHROPIC_API_KEY: undefined,
+        ANTHROPIC_OAUTH_TOKEN: undefined,
+        COPILOT_GITHUB_TOKEN: undefined,
+        GH_TOKEN: undefined,
+        GITHUB_TOKEN: undefined,
+      },
+    },
+    {
+      requiredProvider: "google",
+      routeProvider: "google-gemini-cli",
+      model: "gemini-2.5-pro",
+      env: {
+        GEMINI_API_KEY: undefined,
+        GOOGLE_API_KEY: undefined,
+      },
+    },
+  ];
+
+  for (const { requiredProvider, routeProvider, model, env } of scenarios) {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), `gsd-providers-${routeProvider}-sentinel-repo-`)));
+    const tmpHome = realpathSync(mkdtempSync(join(tmpdir(), `gsd-providers-${routeProvider}-sentinel-home-`)));
+    const agentDir = join(tmpHome, ".gsd", "agent");
+    mkdirSync(join(repo, ".gsd"), { recursive: true });
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(
+      join(repo, ".gsd", "PREFERENCES.md"),
+      [
+        "---",
+        "models:",
+        `  execution: ${model}`,
+        "---",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(join(agentDir, "auth.json"), JSON.stringify({
+      [routeProvider]: { type: "api_key", key: "cli" },
+    }));
+
+    withEnv({
+      ...env,
+      HOME: tmpHome,
+      PATH: tmpHome,
+    }, () => {
+      withCwd(repo, () => {
+        const results = runProviderChecks();
+        const provider = results.find(r => r.name === requiredProvider);
+        assert.ok(provider, `${requiredProvider} result should exist`);
+        assert.equal(provider!.status, "error", `${routeProvider} sentinel should not satisfy ${requiredProvider}`);
+      });
+    });
+
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
 test("runProviderChecks detects claude.cmd in PATH on Windows (#4503)", { skip: process.platform !== "win32" }, () => {
   const tmpHome = realpathSync(mkdtempSync(join(tmpdir(), "gsd-providers-cc-win-route-home-")));
   const binDir = join(tmpHome, "bin");

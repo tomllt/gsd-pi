@@ -241,9 +241,15 @@ function resolveKey(providerId: string): KeyLookup {
       const creds = auth.getCredentialsForProvider(providerId);
       if (creds.length > 0) {
         // Filter out empty placeholder keys (from skipped onboarding)
-        const hasRealKey = creds.some(c =>
-          c.type === "oauth" || (c.type === "api_key" && (c as { key?: string }).key)
-        );
+        const hasRealKey = creds.some(c => {
+          if (c.type === "oauth") return true;
+          if (c.type !== "api_key") return false;
+
+          const key = (c as { key?: string }).key?.trim();
+          if (!key) return false;
+
+          return !(CLI_AUTH_PROVIDERS.has(providerId) && key === "cli");
+        });
         if (hasRealKey) {
           return {
             found: true,
