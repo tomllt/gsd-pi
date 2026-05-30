@@ -633,6 +633,21 @@ async function prepareToolCall(
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,
 ): Promise<PreparedToolCall | ImmediateToolCallOutcome> {
+	const externalResult = toolCall.externalResult;
+	if (externalResult) {
+		return {
+			kind: "immediate",
+			result: {
+				content:
+					externalResult.content && externalResult.content.length > 0
+						? (externalResult.content as AgentToolResult<any>["content"])
+						: [{ type: "text", text: "" }],
+				details: externalResult.details ?? {},
+			},
+			isError: externalResult.isError ?? false,
+		};
+	}
+
 	const tool = resolveAgentTool(currentContext.tools, toolCall.name);
 	if (!tool) {
 		if (isToolSearchToolName(toolCall.name)) {
@@ -653,21 +668,6 @@ async function prepareToolCall(
 			kind: "immediate",
 			result: createErrorToolResult(`Tool ${toolCall.name} not found`),
 			isError: true,
-		};
-	}
-
-	const externalResult = toolCall.externalResult;
-	if (externalResult) {
-		return {
-			kind: "immediate",
-			result: {
-				content:
-					externalResult.content && externalResult.content.length > 0
-						? (externalResult.content as AgentToolResult<any>["content"])
-						: [{ type: "text", text: "" }],
-				details: externalResult.details ?? {},
-			},
-			isError: externalResult.isError ?? false,
 		};
 	}
 

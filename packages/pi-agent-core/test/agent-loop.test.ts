@@ -511,6 +511,75 @@ describe("agentLoop with AgentMessage", () => {
 		expect(executed).toEqual(["bash:pwd", "find:*.ts"]);
 	});
 
+	it("uses external tool results before requiring local tool registration", async () => {
+		const context: AgentContext = {
+			systemPrompt: "",
+			messages: [],
+			tools: [],
+		};
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+		};
+
+		let callIndex = 0;
+		const streamFn = () => {
+			const stream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					const message = createAssistantMessage(
+						[
+							{
+								type: "toolCall",
+								id: "tool-glob",
+								name: "Glob",
+								arguments: { pattern: "*.ts" },
+								externalResult: {
+									content: [{ type: "text", text: "src/index.ts" }],
+									details: { source: "claude-code" },
+									isError: false,
+								},
+							} as any,
+							{
+								type: "toolCall",
+								id: "tool-gsd",
+								name: "mcp__gsd-workflow__gsd_progress",
+								arguments: { projectDir: "/tmp/project" },
+								externalResult: {
+									content: [{ type: "text", text: "{\"status\":\"ok\"}" }],
+									details: { source: "gsd-workflow" },
+									isError: false,
+								},
+							} as any,
+						],
+						"toolUse",
+					);
+					stream.push({ type: "done", reason: "toolUse", message });
+				} else {
+					stream.push({ type: "done", reason: "stop", message: createAssistantMessage([{ type: "text", text: "done" }]) });
+				}
+				callIndex++;
+			});
+			return stream;
+		};
+
+		const events: AgentEvent[] = [];
+		const stream = agentLoop([createUserMessage("inspect tools")], context, config, undefined, streamFn);
+		for await (const event of stream) {
+			events.push(event);
+		}
+
+		const toolResults = events.filter(
+			(event): event is Extract<AgentEvent, { type: "tool_execution_end" }> =>
+				event.type === "tool_execution_end",
+		);
+		expect(toolResults.map((event) => [event.toolCallId, event.isError, event.result.content[0]?.text])).toEqual([
+			["tool-glob", false, "src/index.ts"],
+			["tool-gsd", false, "{\"status\":\"ok\"}"],
+		]);
+		expect(toolResults.map((event) => event.result.content[0]?.text).join("\n")).not.toContain("not found");
+	});
+
 	it("returns ToolSearch guidance when the shim is not in the active tool registry", async () => {
 		const context: AgentContext = {
 			systemPrompt: "",
