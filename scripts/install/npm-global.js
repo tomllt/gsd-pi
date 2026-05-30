@@ -50,7 +50,7 @@ function formatPackageManagerFailure(packageManager, result) {
   const output = `${result.stderr}\n${result.stdout}`.trim()
   const meaningful = output
     .split('\n')
-    .filter((line) => !line.includes('npm warn') && !line.includes('npm WARN') && line.trim())
+    .filter((line) => line.trim() && !/^(?:npm\s+warn|warn)\b/i.test(line.trim()))
     .slice(-3)
     .join('; ')
   return meaningful || result.error?.message || `${packageManager} install failed`

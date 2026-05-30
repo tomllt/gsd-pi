@@ -206,3 +206,69 @@ test('pnpm package installs use pnpm commands and global paths', async () => {
     await rm(localDir, { recursive: true, force: true })
   }
 })
+
+test('pnpm install failures omit pnpm warnings from error messages', async () => {
+  const binDir = await mkdtemp(join(tmpdir(), 'gsd-pnpm-bin-'))
+  const localDir = await mkdtemp(join(tmpdir(), 'gsd-pnpm-local-'))
+  const pnpmBin = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  const pnpmPath = join(binDir, pnpmBin)
+  const script = process.platform === 'win32'
+    ? [
+      '@echo off',
+      'if "%1"=="add" (',
+      '  "%GSD_NODE%" -e "process.stderr.write(\' WARN deprecated one\\\\n WARN deprecated two\\\\n WARN deprecated three\\\\nERR_PNPM_FETCH_404 missing package\\\\n\')"',
+      '  exit /b 1',
+      ')',
+      'exit /b 2',
+    ].join('\r\n')
+    : [
+      '#!/usr/bin/env sh',
+      'if [ "$1" = "add" ]; then',
+      '  "$GSD_NODE" -e "process.stderr.write(\' WARN deprecated one\\\\n WARN deprecated two\\\\n WARN deprecated three\\\\nERR_PNPM_FETCH_404 missing package\\\\n\')"',
+      '  exit 1',
+      'fi',
+      'exit 2',
+    ].join('\n')
+
+  try {
+    await writeFile(pnpmPath, script, { mode: 0o755 })
+    if (process.platform !== 'win32') await chmod(pnpmPath, 0o755)
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `
+          import { installLocalPackage } from './scripts/install/npm-global.js'
+
+          try {
+            await installLocalPackage('9.9.9', process.env.GSD_FAKE_LOCAL, { packageManager: 'pnpm' })
+          } catch (error) {
+            process.stdout.write(error.message)
+            process.exit(0)
+          }
+
+          process.exit(1)
+        `,
+      ],
+      {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          GSD_FAKE_LOCAL: localDir,
+          GSD_NODE: process.execPath,
+          PATH: [binDir, process.env.PATH].filter(Boolean).join(delimiter),
+        },
+      },
+    )
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /ERR_PNPM_FETCH_404 missing package/)
+    assert.doesNotMatch(result.stdout, /\bWARN\b/)
+  } finally {
+    await rm(binDir, { recursive: true, force: true })
+    await rm(localDir, { recursive: true, force: true })
+  }
+})

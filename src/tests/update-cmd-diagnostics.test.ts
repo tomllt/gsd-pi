@@ -177,6 +177,52 @@ test("/gsd update handler fetches latest version through the registry endpoint (
   assert.ok(notifications.some((notification) => notification.message.includes("Already up to date")));
 });
 
+test("/gsd update handler suggests pnpm when installed via pnpm", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalVersion = process.env.GSD_VERSION;
+  const originalUserAgent = process.env.npm_config_user_agent;
+  const originalPath = process.env.PATH;
+  const notifications: Array<{ message: string; level: string }> = [];
+
+  try {
+    process.env.GSD_VERSION = "1.0.0";
+    process.env.npm_config_user_agent = "pnpm/10.12.1 npm/? node/v24.0.0";
+    process.env.PATH = "";
+    globalThis.fetch = async () => Response.json({ version: "9.9.9" });
+
+    await handleUpdate({
+      ui: {
+        notify(message: string, level: string) {
+          notifications.push({ message, level });
+        },
+      },
+    } as any);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalVersion === undefined) {
+      delete process.env.GSD_VERSION;
+    } else {
+      process.env.GSD_VERSION = originalVersion;
+    }
+    if (originalUserAgent === undefined) {
+      delete process.env.npm_config_user_agent;
+    } else {
+      process.env.npm_config_user_agent = originalUserAgent;
+    }
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
+  }
+
+  assert.ok(
+    notifications.some((notification) =>
+      notification.message.includes("Try manually: pnpm add -g @opengsd/gsd-pi@latest")
+    ),
+  );
+});
+
 test("isBunInstall detects bun install via argv[1] even when process.versions.bun is undefined (#4145)", async () => {
   const { isBunInstall } = await import("../update-check.js");
   const orig = (process.versions as Record<string, string | undefined>).bun;
