@@ -318,7 +318,7 @@ export class GSDConfigOverlay {
 
     // Apply scroll
     const terminalRows = process.stdout.rows || 32;
-    const maxBodyRows = Math.max(8, Math.min(allLines.length, terminalRows - 8));
+    const maxBodyRows = Math.max(1, Math.min(allLines.length, terminalRows - 12));
     const maxScroll = Math.max(0, allLines.length - maxBodyRows);
     this.scrollOffset = Math.min(this.scrollOffset, maxScroll);
     const visible = allLines.slice(this.scrollOffset, this.scrollOffset + maxBodyRows);

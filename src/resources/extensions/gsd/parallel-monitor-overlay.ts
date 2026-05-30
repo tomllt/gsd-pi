@@ -493,7 +493,7 @@ export class ParallelMonitorOverlay {
 
     // Apply scroll — use terminal rows as height estimate
     const termHeight = process.stdout.rows || 40;
-    const maxBodyRows = Math.max(6, Math.min(lines.length, termHeight - 8));
+    const maxBodyRows = Math.max(1, Math.min(lines.length, termHeight - 12));
     const maxScroll = Math.max(0, lines.length - maxBodyRows);
     this.scrollOffset = Math.min(Math.max(this.scrollOffset, 0), maxScroll);
     const visible = lines
