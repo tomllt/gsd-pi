@@ -431,6 +431,20 @@ describe("stream-adapter — no transcript fabrication (#4102)", () => {
 		assert.ok(!prompt.includes("mcp__gsd-workflow__<tool_name>"));
 		assert.ok(!prompt.includes("mcp__gsd-workflow__gsd_exec"));
 	});
+
+	test("buildPromptFromContext remaps pi-native browser tools for Claude Code", () => {
+		const context: Context = {
+			systemPrompt: "Browser verification: use browser_find and browser_navigate.",
+			messages: [{ role: "user", content: "Verify the app" } as Message],
+		};
+
+		const prompt = buildPromptFromContext(context, { workflowMcpServerName: "gsd-workflow" });
+
+		assert.ok(prompt.includes("browser_navigate"), "remap should name stale browser tool examples");
+		assert.ok(prompt.includes("not Claude Code tools"), "remap should explain browser_* is unavailable in Claude Code");
+		assert.ok(prompt.includes("Never use ToolSearch to select browser_* tools"));
+		assert.ok(prompt.includes("Bash to run a local Playwright/Node check"));
+	});
 });
 
 describe("stream-adapter — Claude Code external tool results", () => {
@@ -925,7 +939,7 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			assert.equal(srv.env.GSD_CLI_PATH, "/tmp/gsd");
 			assert.equal(srv.env.GSD_PERSIST_WRITE_GATE_STATE, "1");
 			assert.equal(srv.env.GSD_WORKFLOW_PROJECT_ROOT, "/tmp/project");
-			assert.deepEqual(options.disallowedTools, ["AskUserQuestion"]);
+			assert.deepEqual(options.disallowedTools, ["ToolSearch", "AskUserQuestion"]);
 			assert.deepEqual(options.allowedTools, [
 				"Read",
 				"Write",
@@ -961,7 +975,7 @@ describe("stream-adapter — session persistence (#2859)", () => {
 				const options = buildSdkOptions("claude-sonnet-4-20250514", "test");
 				const mcpServers = options.mcpServers as Record<string, any>;
 			assert.ok(mcpServers?.["custom-workflow"], "expected custom workflow server config");
-			assert.deepEqual(options.disallowedTools, ["AskUserQuestion"]);
+			assert.deepEqual(options.disallowedTools, ["ToolSearch", "AskUserQuestion"]);
 			assert.deepEqual(options.allowedTools, [
 				"Read",
 				"Write",
@@ -1005,9 +1019,9 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			const mcpServers = (options as any).mcpServers;
 			if (mcpServers) {
 				assert.ok(mcpServers["gsd-workflow"], "if present, must be gsd-workflow");
-				assert.deepEqual((options as any).disallowedTools, ["AskUserQuestion"]);
+				assert.deepEqual((options as any).disallowedTools, ["ToolSearch", "AskUserQuestion"]);
 			} else {
-				assert.deepEqual((options as any).disallowedTools, []);
+				assert.deepEqual((options as any).disallowedTools, ["ToolSearch"]);
 			}
 			rmSync(emptyDir, { recursive: true, force: true });
 		} finally {
@@ -1046,7 +1060,7 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			assert.equal(srv.env.GSD_CLI_PATH, "/tmp/gsd");
 			assert.equal(srv.env.GSD_PERSIST_WRITE_GATE_STATE, "1");
 			assert.equal(srv.env.GSD_WORKFLOW_PROJECT_ROOT, resolvedRepoDir);
-			assert.deepEqual(options.disallowedTools, ["AskUserQuestion"]);
+			assert.deepEqual(options.disallowedTools, ["ToolSearch", "AskUserQuestion"]);
 		} finally {
 			process.chdir(originalCwd);
 			rmSync(repoDir, { recursive: true, force: true });

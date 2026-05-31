@@ -351,6 +351,9 @@ export function buildPromptFromContext(context: Context, toolContext: PromptTool
 	const toolSearchLine = toolContext.workflowMcpServerName
 		? "- ToolSearch is NOT available — never use it to discover tools; invoke the MCP tool directly\n"
 		: "- ToolSearch is NOT available — never use it to discover tools\n";
+	const browserToolLine =
+		"- Pi/GSD browser_* tools from prior context (for example browser_navigate, browser_find, browser_evaluate, browser_close) are not Claude Code tools. " +
+		"Never use ToolSearch to select browser_* tools; for browser verification, use Bash to run a local Playwright/Node check unless an explicit browser MCP tool is already listed.\n";
 
 	// The prior system context lists pi-native tool names (lowercase: bash, read, gsd_exec, etc.)
 	// but this process runs inside Claude Code where tool names differ. Inject a remapping note
@@ -362,6 +365,7 @@ export function buildPromptFromContext(context: Context, toolContext: PromptTool
 			"- Shell commands: 'Bash' (not 'bash')\n" +
 			"- File operations: 'Read', 'Write', 'Edit', 'Glob', 'Grep' (PascalCase, not lowercase)\n" +
 			workflowToolLine +
+			browserToolLine +
 			toolSearchLine +
 			"</tool_context>",
 	);
@@ -1523,7 +1527,11 @@ export function buildSdkOptions(
 	const workflowMcpTools = filteredMcpServers
 		? Object.keys(filteredMcpServers).map((serverName) => `mcp__${serverName}__*`)
 		: (!workflowExplicitlyBlocked && workflowServerName ? [`mcp__${workflowServerName}__*`] : []);
-	const disallowedTools: string[] = [...(workflowMcpTools.length > 0 ? ["AskUserQuestion"] : []), ...extraDisallowedTools];
+	const disallowedTools: string[] = [...new Set([
+		"ToolSearch",
+		...(workflowMcpTools.length > 0 ? ["AskUserQuestion"] : []),
+		...extraDisallowedTools,
+	])];
 	const allowedTools = [
 		"Read",
 		"Write",
