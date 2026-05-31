@@ -3,33 +3,11 @@ import { join } from "node:path";
 
 import type { DoctorIssue } from "./doctor-types.js";
 import { isDbAvailable, _getAdapter } from "./gsd-db.js";
-import { gsdRoot, resolveGsdPathContract, resolveMilestoneFile } from "./paths.js";
+import { isAfter, latestExplicitReopenAt } from "./milestone-reopen-events.js";
+import { resolveGsdPathContract, resolveMilestoneFile } from "./paths.js";
 import { deriveState } from "./state.js";
 import { readEvents } from "./workflow-events.js";
 import { renderAllProjections } from "./workflow-projections.js";
-
-function latestExplicitReopenAt(basePath: string, milestoneId: string): string | null {
-  const root = gsdRoot(basePath);
-  const candidates = [
-    join(root, "event-log.jsonl"),
-    join(root, `event-log-${milestoneId}.jsonl.archived`),
-  ];
-  let latest: string | null = null;
-  for (const file of candidates) {
-    for (const event of readEvents(file)) {
-      const eventMilestoneId = (event.params as { milestoneId?: unknown }).milestoneId;
-      if (event.cmd !== "reopen-milestone" || eventMilestoneId !== milestoneId) continue;
-      if (!latest || event.ts > latest) latest = event.ts;
-    }
-  }
-  return latest;
-}
-
-function isAfter(value: string | null | undefined, cutoff: string | null): boolean {
-  if (!cutoff) return true;
-  if (!value) return true;
-  return Date.parse(value) > Date.parse(cutoff);
-}
 
 export async function checkEngineHealth(
   basePath: string,
@@ -186,14 +164,21 @@ export async function checkEngineHealth(
                AND ud.unit_type = 'complete-milestone'
                AND ud.unit_id = m.id
                AND ud.status = 'completed'
-             ORDER BY COALESCE(ud.ended_at, ud.started_at) DESC, ud.id DESC`,
+               AND ud.id = (
+                 SELECT latest.id
+                 FROM unit_dispatches latest
+                 WHERE latest.milestone_id = m.id
+                   AND latest.unit_type = 'complete-milestone'
+                   AND latest.unit_id = m.id
+                   AND latest.status = 'completed'
+                 ORDER BY COALESCE(latest.ended_at, latest.started_at) DESC, latest.id DESC
+                 LIMIT 1
+               )
+             ORDER BY m.id`,
           )
           .all() as Array<{ id: string; status: string; started_at: string | null; ended_at: string | null }>;
 
-        const seen = new Set<string>();
         for (const row of reopened) {
-          if (seen.has(row.id)) continue;
-          seen.add(row.id);
           const completedAt = row.ended_at ?? row.started_at ?? null;
           const reopenAt = latestExplicitReopenAt(basePath, row.id);
           if (reopenAt && completedAt && Date.parse(reopenAt) > Date.parse(completedAt)) continue;
