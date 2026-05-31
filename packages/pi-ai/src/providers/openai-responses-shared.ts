@@ -132,6 +132,29 @@ export function convertResponsesMessages<TApi extends Api>(
 	}
 
 	let msgIndex = 0;
+	const emittedResponseItemIds = new Set<string>();
+	const uniqueResponseItemId = (baseId: string): string => {
+		const normalizeTo64 = (value: string): string => {
+			if (value.length <= 64) return value;
+			return `msg_${shortHash(value)}`;
+		};
+		let candidate = normalizeTo64(baseId);
+		if (!emittedResponseItemIds.has(candidate)) {
+			emittedResponseItemIds.add(candidate);
+			return candidate;
+		}
+		let suffix = 1;
+		while (true) {
+			const suffixPart = `_${suffix}`;
+			const head = candidate.slice(0, Math.max(0, 64 - suffixPart.length));
+			const deduped = `${head}${suffixPart}`;
+			if (!emittedResponseItemIds.has(deduped)) {
+				emittedResponseItemIds.add(deduped);
+				return deduped;
+			}
+			suffix += 1;
+		}
+	};
 	for (const msg of transformedMessages) {
 		if (msg.role === "user") {
 			if (typeof msg.content === "string") {
@@ -162,6 +185,7 @@ export function convertResponsesMessages<TApi extends Api>(
 		} else if (msg.role === "assistant") {
 			const output: ResponseInput = [];
 			const assistantMsg = msg as AssistantMessage;
+			let textItemIndex = 0;
 			const isDifferentModel =
 				assistantMsg.model !== model.id &&
 				assistantMsg.provider === model.provider &&
@@ -179,10 +203,10 @@ export function convertResponsesMessages<TApi extends Api>(
 					// OpenAI requires id to be max 64 characters
 					let msgId = parsedSignature?.id;
 					if (!msgId) {
-						msgId = `msg_${msgIndex}`;
-					} else if (msgId.length > 64) {
-						msgId = `msg_${shortHash(msgId)}`;
+						msgId = `msg_${msgIndex}_${textItemIndex}`;
 					}
+					msgId = uniqueResponseItemId(msgId);
+					textItemIndex += 1;
 					output.push({
 						type: "message",
 						role: "assistant",
