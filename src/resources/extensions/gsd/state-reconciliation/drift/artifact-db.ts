@@ -389,6 +389,18 @@ function quarantineSliceDir(record: DiskSliceIdDivergenceDrift, basePath: string
   renameSync(record.sliceDir, target);
 }
 
+function diskSliceIdDivergenceGuidance(record: DiskSliceIdDivergenceDrift): string {
+  const quarantineExample = `.gsd/quarantine/milestones/${record.milestoneId}/slices/${record.sliceId}-manual-review`;
+  return (
+    `Slice ID drift in ${record.milestoneId}: ${record.reason}. ` +
+    "Runtime will not import disk-only slice IDs into the DB. " +
+    `Review ${record.sliceDir}. ` +
+    `If ${record.sliceId} is stale, move or delete that directory; to preserve it, move it under ${quarantineExample}. ` +
+    "If it contains work to keep, copy or merge that content into a DB-backed slice, or explicitly recreate the slice through GSD planning, then remove the disk-only directory. " +
+    `After repair, run /gsd doctor ${record.milestoneId}, then resume with /gsd next or /gsd auto.`
+  );
+}
+
 export function repairArtifactDbDrift(
   record:
     | DiskSliceIdDivergenceDrift
@@ -402,10 +414,7 @@ export function repairArtifactDbDrift(
     } else if (record.disposition === "quarantine-scaffold") {
       quarantineSliceDir(record, ctx.basePath);
     } else {
-      throw new Error(
-        `Slice ID drift in ${record.milestoneId}: ${record.reason}. ` +
-          "Runtime will not import disk-only slice IDs into the DB; run explicit recovery/repair after reviewing the directory.",
-      );
+      throw new Error(diskSliceIdDivergenceGuidance(record));
     }
     clearPathCache();
     clearParseCache();
@@ -437,10 +446,7 @@ export function describeArtifactDbDriftBlocker(
 ): string | null {
   if (record.kind === "disk-slice-id-divergence") {
     if (record.disposition !== "block-meaningful") return null;
-    return (
-      `Slice ID drift in ${record.milestoneId}: ${record.reason}. ` +
-      "Runtime will not import disk-only slice IDs into the DB; run explicit recovery/repair after reviewing the directory."
-    );
+    return diskSliceIdDivergenceGuidance(record);
   }
 
   if (record.kind === "completed-milestone-reopened") {

@@ -1132,6 +1132,33 @@ test("ADR-017: artifact/DB status divergence fails closed instead of importing c
   assert.equal(getSlice("M001", "S01")?.status, "pending", "DB status remains authoritative");
 });
 
+test("ADR-017: meaningful disk-only slice drift blocker includes repair guidance", async (t) => {
+  const base = mkdtempSync(join(tmpdir(), "gsd-disk-slice-guidance-"));
+  const diskOnlySliceDir = join(base, ".gsd", "milestones", "M001", "slices", "S99");
+  t.after(() => cleanup(base));
+
+  mkdirSync(diskOnlySliceDir, { recursive: true });
+  writeFileSync(join(diskOnlySliceDir, "S99-PLAN.md"), "# Disk-only plan\n\nWork to review.\n");
+  openDatabase(join(base, ".gsd", "gsd.db"));
+  insertMilestone({ id: "M001", title: "Milestone", status: "active" });
+  insertSlice({ id: "S01", milestoneId: "M001", title: "Known Slice", status: "pending" });
+
+  const result = await reconcileBeforeDispatch(base, {
+    invalidateStateCache: () => {},
+    deriveState: async () => makeState({ activeMilestone: { id: "M001", title: "Milestone" } }),
+  });
+
+  assert.equal(result.ok, true);
+  const message = result.blockers.join("\n");
+  assert.match(message, /Slice ID drift in M001/);
+  assert.match(message, /Review .*S99/);
+  assert.match(message, /move or delete/);
+  assert.match(message, /\.gsd\/quarantine\/milestones\/M001\/slices\/S99-manual-review/);
+  assert.match(message, /copy or merge/);
+  assert.match(message, /\/gsd doctor M001/);
+  assert.match(message, /\/gsd next or \/gsd auto/);
+});
+
 test("ADR-017: orphan task completion artifact fails closed", async (t) => {
   const base = mkdtempSync(join(tmpdir(), "gsd-orphan-task-artifact-drift-"));
   t.after(() => cleanup(base));
