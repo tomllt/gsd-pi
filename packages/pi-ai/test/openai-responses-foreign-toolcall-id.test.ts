@@ -63,4 +63,39 @@ describe("OpenAI Responses foreign tool call ID normalization", () => {
 		expect(functionCall.id?.length ?? 0).toBeLessThanOrEqual(64);
 		expect(functionCall.id).toMatch(/^fc_[A-Za-z0-9]+$/);
 	});
+
+	it("ensures unique Responses message ids after cross-model thinking-to-text downgrade", () => {
+		const model = getModel("openai-codex", "gpt-5.5");
+		const assistant: AssistantMessage = {
+			role: "assistant",
+			content: [
+				{ type: "thinking", thinking: "internal plan" },
+				{ type: "text", text: "visible answer" },
+				{
+					type: "toolCall",
+					id: "call_1|fc_1",
+					name: "edit",
+					arguments: { path: "src/index.ts" },
+				},
+			],
+			api: "openai-responses",
+			provider: "openai-codex",
+			model: "gpt-5.4-mini",
+			usage,
+			stopReason: "toolUse",
+			timestamp: Date.now() - 2000,
+		};
+		const context: Context = {
+			systemPrompt: "You are concise.",
+			messages: [{ role: "user", content: "Use the tool.", timestamp: Date.now() - 3000 }, assistant],
+		};
+
+		const input = convertResponsesMessages(model, context, new Set(["openai", "openai-codex", "opencode"]));
+		const ids = input
+			.filter((item): item is { id: string } => typeof item === "object" && item !== null && "id" in item && typeof item.id === "string")
+			.map((item) => item.id);
+
+		expect(ids.length).toBeGreaterThan(1);
+		expect(new Set(ids).size).toBe(ids.length);
+	});
 });
