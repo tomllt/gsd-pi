@@ -2,7 +2,7 @@
 // File Purpose: Worktree State Projection Module — typed-Interface contract tests for projectRootToWorktree (ADR-016).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WorktreeStateProjection } from "../worktree-state-projection.js";
@@ -55,6 +55,43 @@ test("projectRootToWorktree is idempotent — repeated calls do not throw", () =
     projection.projectRootToWorktree(scope);
     projection.projectRootToWorktree(scope);
     assert.ok(true, "two calls did not throw");
+  } finally {
+    cleanup();
+  }
+});
+
+test("projectRootToWorktree forwards root PROJECT.md into isolated worktrees", () => {
+  const { dir, cleanup } = makeProjectRoot();
+  try {
+    const worktree = join(dir, ".gsd", "worktrees", "M001");
+    mkdirSync(join(dir, ".gsd", "milestones", "M001"), { recursive: true });
+    mkdirSync(join(worktree, ".gsd"), { recursive: true });
+
+    const projectContent = [
+      "# Project",
+      "",
+      "## Milestone Sequence",
+      "",
+      "- [ ] M001: Foundation — Establish the runnable slice.",
+      "",
+    ].join("\n");
+    writeFileSync(join(dir, ".gsd", "PROJECT.md"), projectContent);
+    writeFileSync(join(dir, ".gsd", "REQUIREMENTS.md"), "# Requirements\n");
+    writeFileSync(join(dir, ".gsd", "milestones", "M001", "M001-ROADMAP.md"), "# M001\n");
+
+    const workspace = createWorkspace(worktree);
+    const scope = scopeMilestone(workspace, "M001");
+    const projection = new WorktreeStateProjection();
+
+    projection.projectRootToWorktree(scope);
+
+    const projectedProject = join(worktree, ".gsd", "PROJECT.md");
+    assert.ok(existsSync(projectedProject), "PROJECT.md is available to worktree-bound units");
+    assert.equal(readFileSync(projectedProject, "utf-8"), projectContent);
+    assert.ok(
+      existsSync(join(worktree, ".gsd", "milestones", "M001", "M001-ROADMAP.md")),
+      "milestone artifacts still project into the worktree",
+    );
   } finally {
     cleanup();
   }

@@ -172,6 +172,35 @@ const ROOT_DIAGNOSTIC_FILES = [
   "metrics.json",
 ] as const;
 
+/**
+ * Root-level .gsd/ projections copied from project root into worktrees for
+ * compatibility reads. Project root remains authoritative; copy-back still
+ * excludes these markdown projections.
+ */
+const ROOT_FORWARD_PROJECTION_FILES = [
+  "DECISIONS.md",
+  "REQUIREMENTS.md",
+  "PROJECT.md",
+  "KNOWLEDGE.md",
+  "OVERRIDES.md",
+  "QUEUE.md",
+  "completed-units.json",
+  "metrics.json",
+  "mcp.json",
+] as const;
+
+function syncRootProjectionFilesToWorktree(prGsd: string, wtGsd: string): void {
+  mkdirSync(wtGsd, { recursive: true });
+
+  for (const file of ROOT_FORWARD_PROJECTION_FILES) {
+    const src = join(prGsd, file);
+    const dst = join(wtGsd, file);
+    if (!existsSync(src) || existsSync(dst)) continue;
+
+    safeCopy(src, dst, { force: false });
+  }
+}
+
 // ─── Implementation cores ────────────────────────────────────────────────
 //
 // The `_*Impl` exports take raw paths so the deprecated path-string
@@ -203,6 +232,10 @@ export function _projectRootToWorktreeImpl(
   // cpSync rejects the copy because source === destination (ERR_FS_CP_EINVAL).
   // Compare realpaths and skip when they resolve to the same physical path (#2184).
   if (isSamePath(prGsd, wtGsd)) return;
+
+  // Root PROJECT/REQUIREMENTS/DECISIONS projections must be readable from a
+  // worktree-bound unit; the project root remains authoritative.
+  syncRootProjectionFilesToWorktree(prGsd, wtGsd);
 
   // Copy milestone directory from project root to worktree — additive only.
   // force:false prevents cpSync from overwriting existing worktree files.
