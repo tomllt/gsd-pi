@@ -35,6 +35,18 @@ GSD runs as a terminal-first TUI with optional browser dashboard controls.
 
 See [CHANGELOG.md](./CHANGELOG.md) for release-by-release fixes and [Legacy Release History](./docs/archive/legacy-release-history.md) for archived history before the `open-gsd/gsd-pi` baseline.
 
+## Latest Release Highlights
+
+`v1.1.1` is the current `latest` npm release. It includes the `1.1.x` feature set plus a release-path patch that waits for npm tarballs to become installable before publishing Docker and GitHub release artifacts.
+
+- **Claude Opus 4.8 support** — Add the latest Claude model option to the generated model catalog.
+- **Better `/gsd` observability** — Add `/gsd usage` and `/gsd context` commands for inspecting session usage and context state.
+- **Sharper skill scoping** — Scope the skill catalog per unit, trim duplicate prompt surfaces, and apply unit-context manifest policy during auto-mode dispatch.
+- **Improved guided installs** — Redesign the `npx @opengsd/gsd-pi@latest` flow so first-time and scripted installs are clearer and more reliable.
+- **Smoother auto-mode progress** — Improve requirements backlog handling, completion summaries, quick branch inference, cleanup logic, and milestone closeout behavior.
+- **Cloud MCP gateway runtime** — Add the local cloud MCP gateway runtime with persisted auth state.
+- **More reliable packages** — Pin native engine packages to the release version and verify npm installability before release Docker images are built.
+
 ## Status
 
 This repository is starting a new development baseline at version `1.0.0` under the `open-gsd/gsd-pi` project.
