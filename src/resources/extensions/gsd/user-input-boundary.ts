@@ -39,7 +39,7 @@ function extractTextFromMessage(msg: unknown): string {
   return parts.join("\n");
 }
 
-function lastAssistantText(messages: unknown[] | undefined): string {
+export function lastAssistantText(messages: unknown[] | null | undefined): string {
   if (!Array.isArray(messages)) return "";
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];

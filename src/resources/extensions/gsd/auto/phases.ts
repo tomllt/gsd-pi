@@ -19,6 +19,7 @@ import {
   type PostUnitContext,
   type PreVerificationOpts,
 } from "../auto-post-unit.js";
+import { lastAssistantText } from "../user-input-boundary.js";
 import type { Phase } from "../types.js";
 import {
   MAX_RECOVERY_CHARS,
@@ -97,30 +98,6 @@ import { classifyError, isTransient } from "../error-classifier.js";
 
 export const STUCK_WINDOW_SIZE = 6;
 const STUCK_RECOVERY_ATTEMPTS_KEY = "stuck_recovery_attempts";
-const TRANSIENT_PROVIDER_MESSAGE_KINDS = new Set(["rate-limit", "network", "stream", "connection", "server"]);
-
-function extractLastAssistantText(messages: unknown[] | null | undefined): string {
-  if (!Array.isArray(messages)) return "";
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (!msg || typeof msg !== "object") continue;
-    if ((msg as { role?: unknown }).role !== "assistant") continue;
-    const content = (msg as { content?: unknown }).content;
-    if (typeof content === "string" && content.trim()) return content.trim();
-    if (!Array.isArray(content)) continue;
-    const parts: string[] = [];
-    for (const block of content) {
-      if (!block || typeof block !== "object") continue;
-      const typed = block as { type?: unknown; text?: unknown };
-      if (typed.type === "text" && typeof typed.text === "string") {
-        parts.push(typed.text);
-      }
-    }
-    const text = parts.join("\n").trim();
-    if (text) return text;
-  }
-  return "";
-}
 
 export function resolveDispatchRecoveryAttempts(
   unitRecoveryCount: Map<string, number>,
@@ -2662,13 +2639,9 @@ export async function runUnitPhase(
         (u: { type: string; id: string; startedAt: number; toolCalls: number }) => u.type === unitType && u.id === unitId && u.startedAt === _resolveCurrentUnitStartedAtForTest(s.currentUnit),
       );
       if (lastUnit && lastUnit.toolCalls === 0) {
-        const lastAssistantMessage = extractLastAssistantText(s.lastUnitAgentEndMessages);
+        const lastAssistantMessage = lastAssistantText(s.lastUnitAgentEndMessages);
         const providerMessageClass = classifyError(lastAssistantMessage);
-        if (
-          lastAssistantMessage &&
-          isTransient(providerMessageClass) &&
-          TRANSIENT_PROVIDER_MESSAGE_KINDS.has(providerMessageClass.kind)
-        ) {
+        if (lastAssistantMessage && isTransient(providerMessageClass)) {
           const retryAfterMs = "retryAfterMs" in providerMessageClass ? providerMessageClass.retryAfterMs : 15_000;
           await pauseAutoForProviderError(
             ctx.ui,
