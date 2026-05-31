@@ -122,6 +122,32 @@ If both files exist, server names are merged and the first definition found wins
 }
 ```
 
+### Example: gsd-browser MCP server
+
+Use `gsd-browser` when GSD or an external MCP client needs deterministic browser automation, versioned element refs, assertions, screenshots, visual diffs, recordings, or a live human takeover viewer.
+
+Install the companion CLI first:
+
+```bash
+npm install -g @opengsd/gsd-browser
+```
+
+Then add a local MCP server entry:
+
+```json
+{
+  "mcpServers": {
+    "gsd-browser": {
+      "type": "stdio",
+      "command": "gsd-browser",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Keep this in `.gsd/mcp.json` when browser paths, vault settings, or session state are machine-local. Use `.mcp.json` only when the team should share the same server entry.
+
 ### Example: HTTP server
 
 ```json
