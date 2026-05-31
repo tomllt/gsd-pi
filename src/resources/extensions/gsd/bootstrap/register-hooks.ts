@@ -1379,12 +1379,14 @@ export function registerHooks(
     // Drop the heavy browser surface too unless explicitly opted in — it stays
     // registered, so auto run-uat (which scopes browser tools in from the full
     // registry) still works. Both filters are skipped under full-tools mode.
-    const dropBrowser = !isFullGsdToolSurfaceRequested() && !isBrowserToolSurfaceRequested();
+    const fullToolsRequested = isFullGsdToolSurfaceRequested();
+    const dropAliases = !fullToolsRequested;
+    const dropBrowser = !fullToolsRequested && !isBrowserToolSurfaceRequested();
     const providerCompatible = compatible.filter(
-      (name) => !isWorkflowAliasTool(name) && !(dropBrowser && isBrowserTool(name)),
+      (name) => !(dropAliases && isWorkflowAliasTool(name)) && !(dropBrowser && isBrowserTool(name)),
     );
     const surfaceReduced = providerCompatible.length !== compatible.length;
-    if (isFullGsdToolSurfaceRequested()) {
+    if (fullToolsRequested) {
       return surfaceReduced ? { toolNames: providerCompatible } : undefined;
     }
     const registeredToolNames = resolveRegisteredToolNames(pi, event.activeToolNames);
