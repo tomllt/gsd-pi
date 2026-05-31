@@ -323,7 +323,10 @@ export function repoIdentity(basePath: string): string {
     // Unknown remote status (transient git failure): prefer persisted identity.
     const markerRoot = resolveGitRoot(basePath);
     const markerId = readGsdIdMarker(markerRoot);
-    if (markerId) return markerId;
+    if (markerId) {
+      const markerPath = join(process.env.GSD_STATE_DIR || gsdHome(), "projects", markerId);
+      if (hasProjectState(markerPath)) return markerId;
+    }
   }
   // Local-only repo: include git root since there's no remote to anchor identity.
   const root = resolveGitRoot(basePath);

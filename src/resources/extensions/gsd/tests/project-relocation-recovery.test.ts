@@ -271,6 +271,46 @@ describe("project-relocation-recovery (#2750)", () => {
     rmSync(repoB, { recursive: true, force: true });
   });
 
+  test("repoIdentity ignores stale .gsd-id after relocation migration when git remote lookup fails", () => {
+    const repoA = realpathSync(mkdtempSync(join(tmpdir(), "gsd-reloc-stale-marker-a-")));
+    initRepo(repoA);
+
+    const externalA = ensureGsdSymlink(repoA);
+    mkdirSync(join(externalA, "milestones"), { recursive: true });
+    writeFileSync(join(externalA, "milestones", "M001.md"), "# Local Milestone\n", "utf-8");
+
+    const repoB = join(
+      tmpdir(),
+      `gsd-reloc-stale-marker-b-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    renameSync(repoA, repoB);
+
+    const migratedExternal = externalGsdRoot(repoB);
+    const expectedIdentity = repoIdentity(repoB);
+    rmSync(join(repoB, ".git", "config"), { force: true });
+
+    const warnings: unknown[][] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+
+    try {
+      assert.strictEqual(
+        repoIdentity(repoB),
+        expectedIdentity,
+        "transient git failures must not pin identity to a stale marker",
+      );
+      assert.ok(
+        existsSync(join(migratedExternal, "milestones", "M001.md")),
+        "migrated state remains under the recovered identity",
+      );
+    } finally {
+      console.warn = originalWarn;
+      rmSync(repoB, { recursive: true, force: true });
+    }
+  });
+
   // ── Edge cases ────────────────────────────────────────────────────────
 
   test("identity remains different for repos with different remotes", () => {
