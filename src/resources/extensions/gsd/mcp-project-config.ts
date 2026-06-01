@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,12 @@ interface ProjectMcpServerSpec {
 interface McpConfigFile {
   mcpServers?: Record<string, ProjectMcpServerConfig>;
   servers?: Record<string, ProjectMcpServerConfig>;
+  [key: string]: unknown;
+}
+
+interface ClaudeCodeLocalSettingsFile {
+  enabledMcpjsonServers?: unknown;
+  disabledMcpjsonServers?: unknown;
   [key: string]: unknown;
 }
 
@@ -223,6 +229,78 @@ function readExistingConfig(configPath: string): McpConfigFile {
   }
 }
 
+function readExistingClaudeCodeSettings(settingsPath: string): ClaudeCodeLocalSettingsFile {
+  if (!existsSync(settingsPath)) return {};
+
+  const raw = readFileSync(settingsPath, "utf-8");
+  try {
+    const parsed = JSON.parse(raw) as ClaudeCodeLocalSettingsFile;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (err) {
+    throw new Error(
+      `Failed to parse ${settingsPath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+export function ensureClaudeCodeMcpJsonServersEnabled(
+  projectRoot: string,
+  serverNames: string[],
+): boolean {
+  const resolvedProjectRoot = resolve(projectRoot);
+  assertSafeDirectory(resolvedProjectRoot);
+
+  const targetServerNames = [...new Set(serverNames.filter((name) => name.trim().length > 0))];
+  if (targetServerNames.length === 0) return false;
+
+  const settingsDir = resolve(resolvedProjectRoot, ".claude");
+  const settingsPath = resolve(settingsDir, "settings.local.json");
+  const existing = readExistingClaudeCodeSettings(settingsPath);
+
+  const enabled = Array.isArray(existing.enabledMcpjsonServers)
+    ? [...existing.enabledMcpjsonServers]
+    : [];
+  const enabledNames = new Set(enabled.filter((value): value is string => typeof value === "string"));
+  let changed = !Array.isArray(existing.enabledMcpjsonServers);
+
+  for (const serverName of targetServerNames) {
+    if (!enabledNames.has(serverName)) {
+      enabled.push(serverName);
+      enabledNames.add(serverName);
+      changed = true;
+    }
+  }
+
+  let nextDisabled = existing.disabledMcpjsonServers;
+  if (Array.isArray(existing.disabledMcpjsonServers)) {
+    const blockedNames = new Set(targetServerNames);
+    const filtered = existing.disabledMcpjsonServers.filter((value) => !blockedNames.has(String(value)));
+    if (filtered.length !== existing.disabledMcpjsonServers.length) {
+      nextDisabled = filtered;
+      changed = true;
+    }
+  }
+
+  if (!changed) return false;
+
+  const nextSettings: ClaudeCodeLocalSettingsFile = {
+    ...existing,
+    enabledMcpjsonServers: enabled,
+    ...(Array.isArray(existing.disabledMcpjsonServers) ? { disabledMcpjsonServers: nextDisabled } : {}),
+  };
+
+  mkdirSync(settingsDir, { recursive: true });
+  writeFileSync(settingsPath, `${JSON.stringify(nextSettings, null, 2)}\n`, "utf-8");
+  return true;
+}
+
+export function ensureClaudeCodeMcpJsonServerEnabled(
+  projectRoot: string,
+  serverName: string,
+): boolean {
+  return ensureClaudeCodeMcpJsonServersEnabled(projectRoot, [serverName]);
+}
+
 export function ensureProjectWorkflowMcpConfig(
   projectRoot: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -241,14 +319,25 @@ export function ensureProjectWorkflowMcpConfig(
   const desiredServerNames = Object.keys(desiredServers);
 
   const alreadyPresent = existsSync(configPath);
-  const unchanged =
+  const mcpConfigUnchanged =
     desiredServerNames.every((serverName) => (
       JSON.stringify(previousServers[serverName] ?? null)
         === JSON.stringify(desiredServers[serverName])
     ))
     && existing.mcpServers !== undefined;
 
-  if (unchanged) {
+  if (!mcpConfigUnchanged) {
+    const nextConfig: McpConfigFile = {
+      ...existing,
+      mcpServers: nextServers,
+    };
+
+    writeFileSync(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`, "utf-8");
+  }
+
+  const localSettingsChanged = ensureClaudeCodeMcpJsonServersEnabled(resolvedProjectRoot, desiredServerNames);
+
+  if (mcpConfigUnchanged && !localSettingsChanged) {
     return {
       configPath,
       serverName: workflowServerName,
@@ -256,13 +345,6 @@ export function ensureProjectWorkflowMcpConfig(
       status: "unchanged",
     };
   }
-
-  const nextConfig: McpConfigFile = {
-    ...existing,
-    mcpServers: nextServers,
-  };
-
-  writeFileSync(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`, "utf-8");
 
   return {
     configPath,

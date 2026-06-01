@@ -58,6 +58,7 @@ export function shouldAutoPrepareWorkflowMcp(ctx: WorkflowMcpAutoPrepContext): b
   const authMode = getAuthModeSafe(ctx, provider);
 
   if (provider !== "claude-code") return false;
+  if (authMode === undefined) return true;
   return usesWorkflowMcpTransport(authMode as any, baseUrl) || authMode === "externalCli";
 }
 

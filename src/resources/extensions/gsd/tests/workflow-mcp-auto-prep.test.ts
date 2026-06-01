@@ -19,6 +19,14 @@ test("shouldAutoPrepareWorkflowMcp enables prep for externalCli local transport"
   assert.equal(result, true);
 });
 
+test("shouldAutoPrepareWorkflowMcp enables prep when Claude Code provider is known before auth mode settles", () => {
+  const result = shouldAutoPrepareWorkflowMcp({
+    model: { provider: "claude-code", baseUrl: "local://claude-code" },
+  });
+
+  assert.equal(result, true);
+});
+
 test("prepareWorkflowMcpForProject uses the selected unit model when session provider differs", (t) => {
   const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-unit-model-"));
   const notifications: Array<{ message: string; level: "info" | "warning" | "error" | "success" }> = [];
@@ -163,6 +171,13 @@ test("before_agent_start auto-prepares project workflow MCP for Claude Code CLI"
   };
   assert.ok(parsed.mcpServers?.[GSD_WORKFLOW_MCP_SERVER_NAME]);
   assert.ok(parsed.mcpServers?.[GSD_BROWSER_MCP_SERVER_NAME]);
+  const settings = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.local.json"), "utf-8")) as {
+    enabledMcpjsonServers?: string[];
+  };
+  assert.deepEqual(settings.enabledMcpjsonServers, [
+    GSD_WORKFLOW_MCP_SERVER_NAME,
+    GSD_BROWSER_MCP_SERVER_NAME,
+  ]);
   assert.match(notifications.join("\n"), /Claude Code MCP prepared/);
 });
 
