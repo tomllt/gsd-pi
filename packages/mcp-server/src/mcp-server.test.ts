@@ -18,6 +18,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { EventEmitter } from 'node:events';
 
 import { SessionManager } from './session-manager.js';
+import { installGlobalErrorHandlers } from './cli-errors.js';
 import {
   askUserQuestionsHandler,
   buildAskUserQuestionsElicitRequest,
@@ -27,6 +28,29 @@ import {
 } from './server.js';
 import { MAX_EVENTS } from './types.js';
 import type { ManagedSession, CostAccumulator, PendingBlocker } from './types.js';
+
+describe('installGlobalErrorHandlers', () => {
+  it('logs uncaught exceptions and unhandled rejections to stderr', () => {
+    const writes: string[] = [];
+    const runtime = new EventEmitter() as EventEmitter & {
+      stderr: { write(message: string): boolean };
+    };
+    runtime.stderr = {
+      write(message: string): boolean {
+        writes.push(message);
+        return true;
+      },
+    };
+
+    installGlobalErrorHandlers(runtime);
+    runtime.emit('uncaughtException', new Error('boom'));
+    runtime.emit('unhandledRejection', 'bad rejection');
+
+    const output = writes.join('');
+    assert.match(output, /\[gsd-mcp-server\] Uncaught exception: Error: boom/);
+    assert.match(output, /\[gsd-mcp-server\] Unhandled rejection: bad rejection/);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Mock RpcClient (duck-typed to match RpcClient interface)

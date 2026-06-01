@@ -95,11 +95,19 @@ export class RpcClient {
 			args.push(...this.options.args);
 		}
 
-		this.process = spawn("node", [cliPath, ...args], {
+		let startupError: Error | null = null;
+
+		this.process = spawn(process.execPath, [cliPath, ...args], {
 			cwd: this.options.cwd,
 			env: { ...process.env, ...this.options.env },
 			stdio: ["pipe", "pipe", "pipe"],
 		});
+
+		const onProcessError = (error: Error) => {
+			startupError = this.handleProcessError(error);
+		};
+		this.process.on("error", onProcessError);
+		this.process.stdin?.on("error", onProcessError);
 
 		// Collect stderr for debugging. The agent process can run for hours/days,
 		// so cap the retained tail to avoid unbounded heap growth — only the most
@@ -122,15 +130,16 @@ export class RpcClient {
 			if (this.pendingRequests.size > 0) {
 				const reason = signal ? `signal ${signal}` : `code ${code}`;
 				const error = new Error(`Agent process exited unexpectedly (${reason}). Stderr: ${this.stderr}`);
-				for (const [id, pending] of this.pendingRequests) {
-					this.pendingRequests.delete(id);
-					pending.reject(error);
-				}
+				this.rejectPendingRequests(error);
 			}
 		});
 
 		// Wait a moment for process to initialize
 		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		if (startupError) {
+			throw startupError;
+		}
 
 		if (this.process.exitCode !== null) {
 			throw new Error(`Agent process exited immediately with code ${this.process.exitCode}. Stderr: ${this.stderr}`);
@@ -627,6 +636,20 @@ export class RpcClient {
 			}
 		} catch {
 			// Ignore non-JSON lines
+		}
+	}
+
+	private handleProcessError(error: Error): Error {
+		const stderr = this.stderr ? ` Stderr: ${this.stderr}` : "";
+		const wrapped = new Error(`Agent process error: ${error.message}.${stderr}`, { cause: error });
+		this.rejectPendingRequests(wrapped);
+		return wrapped;
+	}
+
+	private rejectPendingRequests(error: Error): void {
+		for (const [id, pending] of this.pendingRequests) {
+			this.pendingRequests.delete(id);
+			pending.reject(error);
 		}
 	}
 
