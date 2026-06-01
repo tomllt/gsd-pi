@@ -539,9 +539,10 @@ export function getWorkflowTransportSupportError(
   }
 
   const uniqueRequired = [...new Set(requiredTools)];
+  const piRuntimeRequired = uniqueRequired.filter((tool) => !MCP_WORKFLOW_TOOL_SURFACE.has(tool));
   const missing = (options.activeTools && options.activeTools.length > 0)
-    ? uniqueRequired.filter((tool) => !hasRequiredTool(tool, options.activeTools!))
-    : uniqueRequired.filter((tool) => !MCP_WORKFLOW_TOOL_SURFACE.has(tool));
+    ? piRuntimeRequired.filter((tool) => !hasRequiredTool(tool, options.activeTools!))
+    : piRuntimeRequired;
   if (missing.length === 0) return null;
 
   if (options.activeTools && options.activeTools.length > 0) {
