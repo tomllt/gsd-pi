@@ -105,6 +105,10 @@ export function getApiKeyEnvVars(provider: string): readonly string[] | undefine
 		return ["ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_API_KEY"];
 	}
 
+	if (provider === "anthropic-vertex") {
+		return ["ANTHROPIC_VERTEX_PROJECT_ID"];
+	}
+
 	const envMap: Record<string, string> = {
 		openai: "OPENAI_API_KEY",
 		"azure-openai-responses": "AZURE_OPENAI_API_KEY",
@@ -141,11 +145,11 @@ export function getApiKeyEnvVars(provider: string): readonly string[] | undefine
 }
 
 /**
- * Find configured environment variables that can provide an API key for a provider.
+ * Find configured environment variables that can provide an API key or auth marker for a provider.
  *
- * This only reports actual API key variables. It intentionally excludes ambient
- * credential sources such as AWS profiles, AWS IAM credentials, and Google
- * Application Default Credentials.
+ * This only reports explicit environment variables. It intentionally excludes
+ * ambient credential sources such as AWS profiles, AWS IAM credentials, and
+ * Google Application Default Credentials.
  */
 export function findEnvKeys(provider: KnownProvider): string[] | undefined;
 export function findEnvKeys(provider: string): string[] | undefined;
@@ -165,6 +169,26 @@ export function findEnvKeys(provider: string): string[] | undefined {
 export function getEnvApiKey(provider: KnownProvider): string | undefined;
 export function getEnvApiKey(provider: string): string | undefined;
 export function getEnvApiKey(provider: string): string | undefined {
+	if (provider === "anthropic-vertex") {
+		const hasProject = !!(
+			process.env.ANTHROPIC_VERTEX_PROJECT_ID ||
+			getProcEnv("ANTHROPIC_VERTEX_PROJECT_ID")
+		);
+		if (hasProject) {
+			return "<authenticated>";
+		}
+
+		const hasGoogleProject = !!(
+			process.env.GOOGLE_CLOUD_PROJECT ||
+			process.env.GCLOUD_PROJECT ||
+			getProcEnv("GOOGLE_CLOUD_PROJECT") ||
+			getProcEnv("GCLOUD_PROJECT")
+		);
+		if (hasGoogleProject && hasVertexAdcCredentials()) {
+			return "<authenticated>";
+		}
+	}
+
 	const envKeys = findEnvKeys(provider);
 	if (envKeys?.[0]) {
 		return process.env[envKeys[0]] || getProcEnv(envKeys[0]);
