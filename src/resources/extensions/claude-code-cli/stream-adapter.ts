@@ -28,7 +28,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { PartialMessageBuilder, ZERO_USAGE, mapUsage } from "./partial-builder.js";
 import { buildWorkflowMcpServers, resolveWorkflowMcpProjectRoot } from "../gsd/workflow-mcp.js";
-import { buildProjectGsdMcpServers } from "../gsd/mcp-project-config.js";
+import { buildProjectGsdMcpServers, ensureProjectWorkflowMcpConfig } from "../gsd/mcp-project-config.js";
 import { loadProjectGSDPreferences } from "../gsd/preferences.js";
 import { discoverBrowserMcpServerName, discoverMcpServerNames, discoverWorkflowMcpServerName, computeMcpDisallowedTools } from "../gsd/mcp-filter.js";
 import { showInterviewRound, type Question, type RoundResult } from "../shared/tui.js";
@@ -1477,6 +1477,19 @@ function browserMcpServerNameFromAllowedTools(allowedTools: unknown): string | u
 	return allowedTools.includes("mcp__gsd-browser__*") ? "gsd-browser" : undefined;
 }
 
+export function autoInitClaudeCodeWorkflowMcp(cwd: string): void {
+	const projectRoot = resolveWorkflowMcpProjectRoot(cwd);
+	try {
+		ensureProjectWorkflowMcpConfig(projectRoot);
+	} catch (err) {
+		if (process.env.GSD_DEBUG === "1") {
+			console.warn(
+				`[claude-code] workflow MCP auto-init failed: ${err instanceof Error ? err.message : String(err)}`,
+			);
+		}
+	}
+}
+
 /**
  * Build the options object passed to the Claude Agent SDK's `query()` call.
  *
@@ -1619,7 +1632,7 @@ export function buildSdkOptions(
 		cwd: sdkCwd,
 		permissionMode,
 		allowDangerouslySkipPermissions: permissionMode === "bypassPermissions",
-		settingSources: ["project"],
+		settingSources: ["project", "local"],
 		systemPrompt: { type: "preset", preset: "claude_code" },
 		disallowedTools,
 		...(allowedTools.length > 0 ? { allowedTools } : {}),
@@ -1954,6 +1967,7 @@ async function pumpSdkMessages(
 		const onExternalToolCall = (options as ClaudeCodeStreamOptions | undefined)?.onExternalToolCall;
 		const onExternalToolResult = (options as ClaudeCodeStreamOptions | undefined)?.onExternalToolResult;
 		const cwd = resolveClaudeCodeCwd(options);
+		autoInitClaudeCodeWorkflowMcp(cwd);
 		const canUseToolHandler = createClaudeCodeCanUseToolHandler(uiContext);
 		// When no UI is available (headless / auto-mode), auto-approve all
 		// tool requests. This replaces the old bypassPermissions workaround.

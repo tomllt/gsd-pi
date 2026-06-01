@@ -1,7 +1,7 @@
 // gsd-pi - Claude Code stream adapter regression tests
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -33,6 +33,7 @@ import {
 	resolveBundledClaudeCliPath,
 	normalizeClaudePathForSdk,
 	roundResultToElicitationContent,
+	autoInitClaudeCodeWorkflowMcp,
 } from "../stream-adapter.ts";
 import type { AssistantMessage, Context, Message } from "@gsd/pi-ai";
 import type { SDKUserMessage } from "../sdk-types.ts";
@@ -794,6 +795,11 @@ describe("stream-adapter — session persistence (#2859)", () => {
 		assert.equal(options.persistSession, true, "persistSession must default to true");
 	});
 
+	test("buildSdkOptions loads project and local settings so approved .mcp.json servers are active", () => {
+		const options = buildSdkOptions("claude-sonnet-4-20250514", "test prompt");
+		assert.deepEqual(options.settingSources, ["project", "local"]);
+	});
+
 	test("buildSdkOptions sets model and prompt correctly", () => {
 		const options = buildSdkOptions("claude-sonnet-4-20250514", "hello world");
 		assert.equal(options.model, "claude-sonnet-4-20250514");
@@ -826,6 +832,29 @@ describe("stream-adapter — session persistence (#2859)", () => {
 		} finally {
 			restore();
 			rmSync(explicitCwd, { recursive: true, force: true });
+		}
+	});
+
+	test("autoInitClaudeCodeWorkflowMcp writes and approves project GSD MCP config", () => {
+		const projectRoot = realpathSync(mkdtempSync(join(tmpdir(), "claude-sdk-auto-init-")));
+		const restore = setWorkflowMcpEnv({
+			GSD_WORKFLOW_MCP_COMMAND: "node",
+			GSD_WORKFLOW_MCP_NAME: "gsd-workflow",
+			GSD_WORKFLOW_MCP_ARGS: JSON.stringify(["server.js"]),
+			GSD_WORKFLOW_MCP_CWD: projectRoot,
+		});
+
+		try {
+			autoInitClaudeCodeWorkflowMcp(projectRoot);
+			assert.equal(existsSync(join(projectRoot, ".mcp.json")), true);
+
+			const settings = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.local.json"), "utf-8")) as {
+				enabledMcpjsonServers?: string[];
+			};
+			assert.deepEqual(settings.enabledMcpjsonServers, ["gsd-workflow", "gsd-browser"]);
+		} finally {
+			restore();
+			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
 

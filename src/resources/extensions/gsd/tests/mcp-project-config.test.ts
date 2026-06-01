@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
+  ensureClaudeCodeMcpJsonServerEnabled,
   ensureProjectWorkflowMcpConfig,
   GSD_BROWSER_MCP_SERVER_NAME,
   GSD_WORKFLOW_MCP_SERVER_NAME,
@@ -54,6 +55,14 @@ test("ensureProjectWorkflowMcpConfig creates .mcp.json with workflow and browser
     ]);
     assert.equal(browserArgs[mcpArgIndex + 6], projectRoot);
     assert.equal((browserServer as { cwd?: string })?.cwd, projectRoot);
+
+    const settings = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.local.json"), "utf-8")) as {
+      enabledMcpjsonServers?: string[];
+    };
+    assert.deepEqual(settings.enabledMcpjsonServers, [
+      GSD_WORKFLOW_MCP_SERVER_NAME,
+      GSD_BROWSER_MCP_SERVER_NAME,
+    ]);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }
@@ -115,6 +124,11 @@ test("ensureProjectWorkflowMcpConfig uses custom workflow server name from env",
     assert.ok(parsed.mcpServers?.["custom-workflow"]);
     assert.ok(parsed.mcpServers?.[GSD_BROWSER_MCP_SERVER_NAME]);
     assert.equal(parsed.mcpServers?.[GSD_WORKFLOW_MCP_SERVER_NAME], undefined);
+
+    const settings = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.local.json"), "utf-8")) as {
+      enabledMcpjsonServers?: string[];
+    };
+    assert.deepEqual(settings.enabledMcpjsonServers, ["custom-workflow", GSD_BROWSER_MCP_SERVER_NAME]);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }
@@ -136,6 +150,11 @@ test("ensureProjectWorkflowMcpConfig can disable the default browser MCP server"
     };
     assert.ok(parsed.mcpServers?.[GSD_WORKFLOW_MCP_SERVER_NAME]);
     assert.equal(parsed.mcpServers?.[GSD_BROWSER_MCP_SERVER_NAME], undefined);
+
+    const settings = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.local.json"), "utf-8")) as {
+      enabledMcpjsonServers?: string[];
+    };
+    assert.deepEqual(settings.enabledMcpjsonServers, [GSD_WORKFLOW_MCP_SERVER_NAME]);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }
@@ -152,6 +171,55 @@ test("ensureProjectWorkflowMcpConfig is idempotent when config is already curren
     assert.equal(first.status, "created");
     assert.equal(second.status, "unchanged");
     assert.equal(first.configPath, second.configPath);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("ensureProjectWorkflowMcpConfig updates stale Claude Code MCP approval state", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-init-"));
+  mkdirSync(join(projectRoot, ".gsd"), { recursive: true });
+  const settingsPath = join(projectRoot, ".claude", "settings.local.json");
+
+  try {
+    const first = ensureProjectWorkflowMcpConfig(projectRoot);
+    assert.equal(first.status, "created");
+
+    writeFileSync(
+      settingsPath,
+      `${JSON.stringify({
+        permissions: { allow: ["Bash(gh issue *)"] },
+        enabledMcpjsonServers: [],
+        disabledMcpjsonServers: [GSD_WORKFLOW_MCP_SERVER_NAME, GSD_BROWSER_MCP_SERVER_NAME],
+      }, null, 2)}\n`,
+      "utf-8",
+    );
+
+    const second = ensureProjectWorkflowMcpConfig(projectRoot);
+    assert.equal(second.status, "updated");
+
+    const settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as {
+      permissions?: { allow?: string[] };
+      enabledMcpjsonServers?: string[];
+      disabledMcpjsonServers?: string[];
+    };
+    assert.deepEqual(settings.permissions?.allow, ["Bash(gh issue *)"]);
+    assert.deepEqual(settings.enabledMcpjsonServers, [
+      GSD_WORKFLOW_MCP_SERVER_NAME,
+      GSD_BROWSER_MCP_SERVER_NAME,
+    ]);
+    assert.deepEqual(settings.disabledMcpjsonServers, []);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("ensureClaudeCodeMcpJsonServerEnabled is idempotent", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-init-"));
+
+  try {
+    assert.equal(ensureClaudeCodeMcpJsonServerEnabled(projectRoot, "gsd-workflow"), true);
+    assert.equal(ensureClaudeCodeMcpJsonServerEnabled(projectRoot, "gsd-workflow"), false);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }

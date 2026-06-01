@@ -40,9 +40,11 @@ function collectServerEntries(servers: unknown): DiscoveredMcpServer[] {
 export function discoverMcpServers(projectDir: string): DiscoveredMcpServer[] {
   const mcpJsonPath = resolve(projectDir, ".mcp.json");
   const settingsPath = resolve(projectDir, ".claude", "settings.json");
+  const localSettingsPath = resolve(projectDir, ".claude", "settings.local.json");
 
   const mcpJson = readJsonFile(mcpJsonPath) as McpJsonFile | undefined;
   const settings = readJsonFile(settingsPath, true) as ClaudeSettingsFile | undefined;
+  const localSettings = readJsonFile(localSettingsPath, true) as ClaudeSettingsFile | undefined;
 
   const seen = new Set<string>();
   const discovered: DiscoveredMcpServer[] = [];
@@ -50,6 +52,7 @@ export function discoverMcpServers(projectDir: string): DiscoveredMcpServer[] {
     ...collectServerEntries(mcpJson?.mcpServers),
     ...collectServerEntries(mcpJson?.servers),
     ...collectServerEntries(settings?.mcpServers),
+    ...collectServerEntries(localSettings?.mcpServers),
   ]) {
     if (seen.has(entry.name)) continue;
     seen.add(entry.name);
