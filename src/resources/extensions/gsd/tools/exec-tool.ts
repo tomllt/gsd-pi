@@ -14,8 +14,11 @@ import { isContextModeEnabled, type ContextModeConfig } from "../preferences-typ
 import { contextModeDisabledResult, type ToolExecutionResult } from "./context-mode-tool-result.js";
 
 export interface ExecToolParams {
-  runtime: ExecSandboxRequest["runtime"];
-  script: string;
+  runtime?: unknown;
+  script?: unknown;
+  command?: unknown;
+  cmd?: unknown;
+  code?: unknown;
   purpose?: string;
   timeout_ms?: number;
 }
@@ -78,6 +81,39 @@ function paramError(message: string): ToolExecutionResult {
     details: { operation: "gsd_exec", error: "invalid_params", detail: message },
     isError: true,
   };
+}
+
+function normalizeRuntime(value: unknown): ExecSandboxRequest["runtime"] | ToolExecutionResult {
+  if (value === undefined || value === null || value === "") return "bash";
+  if (typeof value !== "string") {
+    return paramError(`invalid runtime "${String(value)}" — must be bash | node | python`);
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "" || normalized === "bash" || normalized === "sh" || normalized === "shell") return "bash";
+  if (normalized === "node" || normalized === "nodejs" || normalized === "js" || normalized === "javascript") return "node";
+  if (normalized === "python" || normalized === "python3" || normalized === "py") return "python";
+  return paramError(`invalid runtime "${value}" — must be bash | node | python`);
+}
+
+function normalizeScript(params: ExecToolParams): string | ToolExecutionResult {
+  const candidates = [params.script, params.command, params.cmd, params.code];
+  let sawNonString = false;
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    if (typeof candidate !== "string") {
+      sawNonString = true;
+      continue;
+    }
+    if (candidate.trim().length > 0) return candidate;
+  }
+  if (sawNonString) {
+    return paramError("script/command must be a non-empty string");
+  }
+  return paramError("script is required and must be a non-empty string");
+}
+
+function isToolExecutionResult(value: unknown): value is ToolExecutionResult {
+  return typeof value === "object" && value !== null && Array.isArray((value as { content?: unknown }).content);
 }
 
 function escapeRegExp(value: string): string {
@@ -201,14 +237,10 @@ export async function executeGsdExec(
 ): Promise<ToolExecutionResult> {
   if (!isEnabled(deps.preferences)) return contextModeDisabledResult("gsd_exec");
 
-  const runtime = params.runtime;
-  if (runtime !== "bash" && runtime !== "node" && runtime !== "python") {
-    return paramError(`invalid runtime "${String(runtime)}" — must be bash | node | python`);
-  }
-  const script = typeof params.script === "string" ? params.script : "";
-  if (script.trim().length === 0) {
-    return paramError("script is required and must be a non-empty string");
-  }
+  const runtime = normalizeRuntime(params.runtime);
+  if (isToolExecutionResult(runtime)) return runtime;
+  const script = normalizeScript(params);
+  if (isToolExecutionResult(script)) return script;
   if (Buffer.byteLength(script, "utf8") > 200_000) {
     return paramError("script exceeds the 200 KB length limit");
   }

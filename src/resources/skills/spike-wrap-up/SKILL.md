@@ -1,6 +1,6 @@
 ---
 name: spike-wrap-up
-description: Package findings from a completed spike into a durable, project-local skill that auto-loads on future similar work. Reads the most recent `.gsd/workflows/spikes/` directory, interviews the user briefly on what's reusable, then writes `.claude/skills/<name>/SKILL.md`. Use when asked to "wrap up the spike", "package this as a skill", "make this reusable", "turn findings into a skill", or at the end of the synthesize phase of `/gsd start spike`. Closes the parity gap with GSD v1's `/gsd-spike-wrap-up`.
+description: Package findings from a completed spike into a durable project-local skill that auto-loads on future similar work. Reads the latest `.gsd/workflows/spikes/` dir, interviews the user on what's reusable, then writes `.claude/skills/<name>/SKILL.md`. Use when asked to "wrap up the spike", "package this as a skill", "make this reusable", "turn findings into a skill", or at the synthesize phase of `/gsd start spike`.
 ---
 
 <objective>

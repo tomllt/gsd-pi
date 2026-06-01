@@ -1,6 +1,6 @@
 {
   "name": "@opengsd/gsd-pi",
-  "version": "1.0.2",
+  "version": "1.1.1",
   "description": "GSD Pi local-first coding agent",
   "license": "MIT",
   "repository": {
@@ -202,11 +202,11 @@
   },
   "optionalDependencies": {
     "@mariozechner/clipboard": "0.3.6",
-    "@opengsd/engine-darwin-arm64": "1.0.2",
-    "@opengsd/engine-darwin-x64": "1.0.2",
-    "@opengsd/engine-linux-arm64-gnu": "1.0.2",
-    "@opengsd/engine-linux-x64-gnu": "1.0.2",
-    "@opengsd/engine-win32-x64-msvc": "1.0.2",
+    "@opengsd/engine-darwin-arm64": "1.1.1",
+    "@opengsd/engine-darwin-x64": "1.1.1",
+    "@opengsd/engine-linux-arm64-gnu": "1.1.1",
+    "@opengsd/engine-linux-x64-gnu": "1.1.1",
+    "@opengsd/engine-win32-x64-msvc": "1.1.1",
     "fsevents": "~2.3.3",
     "koffi": "^2.9.0"
   },

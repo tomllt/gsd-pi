@@ -241,6 +241,36 @@ test('executeGsdExec: enforces per-call timeout override end-to-end', async () =
   }
 });
 
+test('executeGsdExec: defaults to bash and accepts command alias', async () => {
+  const base = freshBase();
+  try {
+    const result = await executeGsdExec(
+      { command: 'echo command-alias-defaults-to-bash' },
+      { baseDir: base, preferences: { context_mode: { enabled: true } } },
+    );
+    assert.equal(result.isError, false);
+    assert.equal(result.details.runtime, 'bash');
+    assert.ok(result.content[0].text.includes('command-alias-defaults-to-bash'));
+  } finally {
+    cleanup(base);
+  }
+});
+
+test('executeGsdExec: accepts common runtime aliases', async () => {
+  const base = freshBase();
+  try {
+    const result = await executeGsdExec(
+      { runtime: 'js', code: 'console.log("runtime-alias-node")' },
+      { baseDir: base, preferences: { context_mode: { enabled: true } } },
+    );
+    assert.equal(result.isError, false);
+    assert.equal(result.details.runtime, 'node');
+    assert.ok(result.content[0].text.includes('runtime-alias-node'));
+  } finally {
+    cleanup(base);
+  }
+});
+
 test('executeGsdExec: rejects empty script', async () => {
   const base = freshBase();
   try {

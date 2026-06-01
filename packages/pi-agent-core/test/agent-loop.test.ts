@@ -629,6 +629,7 @@ describe("agentLoop with AgentMessage", () => {
 		);
 		expect(toolResult?.isError).toBe(false);
 		expect(toolResult?.result.content[0]?.text).toContain("gsd_milestone_status");
+		expect(toolResult?.result.content[0]?.text).not.toContain("Call `mcp__gsd-workflow__gsd_milestone_status`");
 	});
 
 	it("returns Agent guidance when subagent is not in the active tool registry", async () => {

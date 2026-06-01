@@ -6,6 +6,7 @@ import {
   getMilestoneSlices,
   getSliceTasks,
   isDbAvailable,
+  refreshOpenDatabaseFromDisk,
 } from "./gsd-db.js";
 import { parsePlan, parseRoadmap } from "./parsers-legacy.js";
 import {
@@ -99,6 +100,11 @@ export async function checkMarkdownHierarchyAgainstDb(
   if (!opened || !isDbAvailable()) {
     throw new Error(`failed to open or create the GSD database at ${basePath}`);
   }
+
+  // The markdown projections may have just been written by a workflow/MCP
+  // server in another process. Reopen before comparing so startup does not
+  // warn from a stale long-lived SQLite handle.
+  refreshOpenDatabaseFromDisk();
 
   const beforeDb = countDbHierarchy();
   if (sameCounts(markdown, beforeDb)) {

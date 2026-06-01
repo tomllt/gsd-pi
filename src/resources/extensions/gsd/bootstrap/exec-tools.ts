@@ -43,11 +43,16 @@ export function registerExecTools(pi: ExtensionAPI): void {
       "Need persisted output? Read the stdout_path returned in details (file on local disk).",
     ],
     parameters: Type.Object({
-      runtime: Type.Union(
-        [Type.Literal("bash"), Type.Literal("node"), Type.Literal("python")],
-        { description: "Interpreter: bash (-c), node (-e), or python3 (-c)." },
+      runtime: Type.Optional(
+        Type.String({
+          description:
+            "Optional interpreter. Defaults to bash. Supported: bash, node, python; sh/shell, js/nodejs, and py/python3 aliases are accepted.",
+        }),
       ),
-      script: Type.String({ description: "Script body. Keep output small (log the finding, not the data)." }),
+      script: Type.Optional(Type.String({ description: "Script body. Keep output small (log the finding, not the data)." })),
+      command: Type.Optional(Type.String({ description: "Alias for script; defaults to bash when runtime is omitted." })),
+      cmd: Type.Optional(Type.String({ description: "Short alias for script." })),
+      code: Type.Optional(Type.String({ description: "Alias for script, useful for node/python snippets." })),
       purpose: Type.Optional(Type.String({ description: "Short label recorded in meta.json for later review." })),
       timeout_ms: Type.Optional(
         Type.Number({

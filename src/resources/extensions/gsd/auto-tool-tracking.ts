@@ -4,6 +4,8 @@
  * can distinguish "waiting for tool completion" from "truly idle".
  */
 
+import { stripMcpToolPrefix } from "@gsd/pi-ai";
+
 interface InFlightTool {
   startedAt: number;
   toolName: string;
@@ -24,7 +26,7 @@ const INTERACTIVE_TOOLS = new Set(["ask_user_questions", "secure_env_collect"]);
  */
 export function markToolStart(toolCallId: string, isActive: boolean, toolName?: string): void {
   if (!isActive) return;
-  inFlightTools.set(toolCallId, { startedAt: Date.now(), toolName: toolName ?? "unknown" });
+  inFlightTools.set(toolCallId, { startedAt: Date.now(), toolName: stripMcpToolPrefix(toolName ?? "unknown") });
 }
 
 /**

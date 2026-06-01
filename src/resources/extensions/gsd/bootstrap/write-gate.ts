@@ -802,7 +802,7 @@ export function shouldBlockPlanningUnit(
   if (!policy) return { block: false };
   if (policy.mode === "all") return { block: false };
 
-  const tool = toolName;
+  const tool = canonicalToolName(toolName);
 
   // Read-only mode: only Read-class tools are permitted.
   if (policy.mode === "read-only") {

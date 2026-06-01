@@ -85,6 +85,13 @@ export const IDLE_TIMEOUT_MS = 15_000
 export const NEW_MILESTONE_IDLE_TIMEOUT_MS = 120_000
 const INTERACTIVE_HEADLESS_TOOLS = new Set(['ask_user_questions', 'secure_env_collect'])
 
+export function canonicalHeadlessToolName(toolName: string | undefined): string {
+  const name = String(toolName ?? '')
+  if (!name.startsWith('mcp__')) return name
+  const toolSeparator = name.indexOf('__', 'mcp__'.length)
+  return toolSeparator >= 0 ? name.slice(toolSeparator + 2) : name
+}
+
 function isManualResolutionNotification(message: string): boolean {
   return (
     message.includes('resolve manually and re-run /gsd auto') ||
@@ -154,7 +161,7 @@ export function isMilestoneReadyNotification(event: Record<string, unknown>): bo
 }
 
 export function isInteractiveHeadlessTool(toolName: string | undefined): boolean {
-  return INTERACTIVE_HEADLESS_TOOLS.has(String(toolName ?? ''))
+  return INTERACTIVE_HEADLESS_TOOLS.has(canonicalHeadlessToolName(toolName))
 }
 
 export function shouldArmHeadlessIdleTimeout(toolCallCount: number, interactiveToolCount: number): boolean {

@@ -43,6 +43,14 @@ describe("hasInteractiveToolInFlight", () => {
     assert.equal(hasInteractiveToolInFlight(), true);
   });
 
+  test("returns true when MCP-scoped interactive tools are in-flight", () => {
+    markToolStart("call-1", true, "mcp__custom-workflow__ask_user_questions");
+    assert.equal(hasInteractiveToolInFlight(), true);
+    clearInFlightTools();
+    markToolStart("call-2", true, "mcp__custom-workflow__secure_env_collect");
+    assert.equal(hasInteractiveToolInFlight(), true);
+  });
+
   test("returns false after interactive tool completes", () => {
     markToolStart("call-1", true, "ask_user_questions");
     assert.equal(hasInteractiveToolInFlight(), true);

@@ -370,6 +370,49 @@ test("mergeCompletedMilestone — synthesizes roadmap from DB when projection is
   }
 });
 
+test("mergeCompletedMilestone — stale worktree marker does not auto-commit dirty root overlap", async () => {
+  const savedCwd = process.cwd();
+  const repo = createTempRepo();
+
+  try {
+    setupWorktreeIsolation(repo);
+    setupRoadmap(repo, "M011", "Dirty Root Recovery", ["S01: App shell"]);
+
+    createMilestoneBranch(repo, "M011", [
+      { name: "index.html", content: "<h1>M011</h1>\n" },
+    ]);
+
+    // Stale marker without a registered git worktree. Recovery must not treat
+    // the project root as a worktree and auto-commit this overlapping file to
+    // main before attempting the milestone merge.
+    mkdirSync(join(repo, ".gsd", "worktrees", "M011", ".gsd"), { recursive: true });
+    writeFileSync(join(repo, "index.html"), "<h1>local root draft</h1>\n");
+
+    process.chdir(repo);
+    const result = await mergeCompletedMilestone(repo, "M011");
+
+    assert.equal(result.success, false, "dirty overlap should block branch-mode recovery");
+    assert.match(
+      result.error ?? "",
+      /checkout|overwritten|untracked|would be overwritten/i,
+      "error should explain that checkout/dirty root state blocked recovery",
+    );
+
+    const subjects = run("git log --format=%s", repo);
+    assert.ok(
+      !subjects.includes("chore: auto-commit before milestone merge"),
+      "recovery must not auto-commit project-root overlap to main",
+    );
+    assert.equal(run("git branch --show-current", repo), "main");
+    assert.equal(run("git branch --list milestone/M011", repo).trim(), "milestone/M011");
+    assert.equal(run("git status --short -- index.html", repo), "?? index.html");
+  } finally {
+    process.chdir(savedCwd);
+    try { run("git reset --hard HEAD", repo); } catch { /* */ }
+    cleanup(repo);
+  }
+});
+
 test("mergeCompletedMilestone — clean merge, session status cleaned up", async () => {
   const savedCwd = process.cwd();
   const repo = createTempRepo();

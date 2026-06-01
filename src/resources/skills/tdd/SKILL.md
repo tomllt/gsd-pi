@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Test-driven development with red-green-refactor loops built around vertical slices (tracer bullets), not horizontal layers. Use when asked to "use TDD", "write test-first", "red-green-refactor", "build this with tests", or whenever a feature has a clear observable contract and would benefit from tests that outlive refactors. Complements the bundled test and add-tests skills — use this for the discipline, use those for the mechanics.
+description: Test-driven development with red-green-refactor loops around vertical slices (tracer bullets), not horizontal layers. Use when asked to "use TDD", "write test-first", "red-green-refactor", "build this with tests", or when a feature has a clear observable contract. The discipline complement to the test/add-tests skills (the mechanics).
 ---
 
 <objective>

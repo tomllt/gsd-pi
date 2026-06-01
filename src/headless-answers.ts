@@ -8,6 +8,7 @@
 
 import { readFileSync } from 'node:fs'
 import { serializeJsonLine } from '@gsd/agent-modes'
+import { canonicalHeadlessToolName } from './headless-events.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,7 +150,7 @@ export class AnswerInjector {
    * Observe every event for question metadata (tool_execution_start of ask_user_questions).
    */
   observeEvent(event: Record<string, unknown>): void {
-    if (event.type !== 'tool_execution_start' || event.toolName !== 'ask_user_questions') return
+    if (event.type !== 'tool_execution_start' || canonicalHeadlessToolName(String(event.toolName ?? '')) !== 'ask_user_questions') return
 
     // Extract questions from event.input.questions or event.args?.questions
     const input = (event.input ?? event.args) as Record<string, unknown> | undefined

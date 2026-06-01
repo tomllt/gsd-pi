@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DISCUSS_TOOLS_ALLOWLIST } from "../constants.ts";
-import { buildMinimalAutoGsdToolSet, buildMinimalGsdToolSet, buildMinimalGsdWorkflowToolSet, buildRequestScopedGsdToolSet, MINIMAL_AUTO_BASE_TOOL_NAMES, MINIMAL_GSD_TOOL_NAMES, restoreGsdWorkflowTools, scopeGsdWorkflowToolsForDispatch } from "../bootstrap/register-hooks.ts";
+import { buildMinimalAutoGsdToolSet, buildMinimalGsdToolSet, buildMinimalGsdWorkflowToolSet, buildRequestScopedGsdToolSet, MINIMAL_AUTO_BASE_TOOL_NAMES, MINIMAL_GSD_TOOL_NAMES, requestHasGsdCustomType, restoreGsdWorkflowTools, scopeGsdWorkflowToolsForDispatch } from "../bootstrap/register-hooks.ts";
 import { applyUnitSkillVisibility } from "../skill-scope.ts";
 
 test("buildMinimalGsdToolSet preserves non-GSD tools and replaces broad GSD surface", () => {
@@ -55,6 +55,17 @@ test("buildMinimalGsdToolSet always preserves ToolSearch shim", () => {
   assert.ok(result.includes("ToolSearch"));
 });
 
+test("requestHasGsdCustomType detects GSD-driven requests (drives interactive default scoping)", () => {
+  // Plain interactive chat → no gsd-* customType → scoped to the minimal set.
+  assert.equal(requestHasGsdCustomType(undefined), false);
+  assert.equal(requestHasGsdCustomType([]), false);
+  assert.equal(requestHasGsdCustomType([{ customType: "user" }, {}]), false);
+  // GSD workflow commands carry a gsd-* customType → keep their full surface.
+  assert.equal(requestHasGsdCustomType([{ customType: "gsd-quick-task" }]), true);
+  assert.equal(requestHasGsdCustomType([{}, { customType: "gsd-workflow-template" }]), true);
+  assert.equal(requestHasGsdCustomType([{ customType: "gsd-run" }]), true);
+});
+
 test("buildMinimalAutoGsdToolSet keeps unit-specific completion tools without aliases", () => {
   const result = buildMinimalAutoGsdToolSet([
     "ask_user_questions",
@@ -85,6 +96,24 @@ test("buildMinimalAutoGsdToolSet keeps unit-specific completion tools without al
   assert.ok(!result.includes("gsd_complete_task"));
   assert.ok(!result.includes("gsd_slice_complete"));
   assert.ok(!result.includes("gsd_complete_slice"));
+});
+
+test("buildMinimalAutoGsdToolSet re-resolves run-uat browser tools from the registry when dropped from the active set", () => {
+  // B2 drops the browser surface from the advertised interactive set, but the
+  // tools stay registered. run-uat must still get them: resolution reads the
+  // full registry, not just the (browser-stripped) active set.
+  const active = ["ask_user_questions", "bash", "read", "gsd_summary_save"];
+  const registered = [
+    ...active,
+    "browser_navigate",
+    "browser_click",
+    "browser_snapshot_refs",
+    "gsd_exec",
+  ];
+  const result = buildMinimalAutoGsdToolSet(active, "run-uat", registered);
+  assert.ok(result.includes("browser_navigate"), "run-uat needs browser_navigate");
+  assert.ok(result.includes("browser_click"), "run-uat needs browser_click");
+  assert.ok(result.includes("gsd_summary_save"));
 });
 
 test("buildMinimalAutoGsdToolSet keeps only the auto base non-GSD tools", () => {
@@ -169,6 +198,24 @@ test("buildMinimalAutoGsdToolSet preserves browser tools for run-uat", () => {
   assert.ok(result.includes("browser_screenshot"));
   assert.ok(result.includes("browser_wait_for"));
   assert.ok(result.includes("gsd_summary_save"));
+  assert.ok(!result.includes("gsd_task_complete"));
+});
+
+test("buildMinimalAutoGsdToolSet includes discuss-slice persistence tools", () => {
+  const result = buildMinimalAutoGsdToolSet([
+    "bash",
+    "read",
+    "gsd_summary_save",
+    "gsd_decision_save",
+    "gsd_plan_slice",
+    "gsd_task_complete",
+    "memory_query",
+    "capture_thought",
+  ], "discuss-slice");
+
+  assert.ok(result.includes("gsd_summary_save"));
+  assert.ok(result.includes("gsd_decision_save"));
+  assert.ok(!result.includes("gsd_plan_slice"));
   assert.ok(!result.includes("gsd_task_complete"));
 });
 

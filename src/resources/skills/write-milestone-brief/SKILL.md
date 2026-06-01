@@ -78,7 +78,7 @@ Then append a one-line summary to `.gsd/DECISIONS.md` for any genuinely hard-to-
 After writing, offer the user (do not auto-execute):
 
 1. **Proceed to planning** — run `/gsd dispatch plan` to generate `M###-ROADMAP.md` from this brief.
-2. **File as GitHub issue** — use `mcp__github__issue_write` to create a tracking issue. Requires explicit "yes" per the outward-action rule. Use the PRD template below for the body.
+2. **File as GitHub issue** — use the active GitHub issue-write tool if one is available, using its exact active tool name. Requires explicit "yes" per the outward-action rule. Use the PRD template below for the body.
 3. **Iterate on the brief** — if something feels wrong, run `grill-me` to stress-test before moving on.
 
 ### GitHub issue body template (only if user chooses option 2)

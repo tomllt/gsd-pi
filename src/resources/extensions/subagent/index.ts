@@ -732,18 +732,18 @@ const TaskItem = Type.Object({
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 	model: Type.Optional(Type.String({ description: "Model override for this task (e.g. 'claude-sonnet-4-6')" })),
 	context: Type.Optional(StringEnum(["fresh", "fork"] as const, {
-		description: 'Context mode for this task. "fresh" keeps the existing isolated context behavior; "fork" branches the parent session.',
+		description: 'Context mode for this task (see context field on the top-level params).',
 		default: "fresh",
 	})),
 });
 
 const ChainItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
-	task: Type.String({ description: "Task with optional {previous} placeholder for prior output" }),
+	task: Type.String({ description: "Task with optional {previous} placeholder for prior step output" }),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 	model: Type.Optional(Type.String({ description: "Model override for this step (e.g. 'claude-sonnet-4-6')" })),
 	context: Type.Optional(StringEnum(["fresh", "fork"] as const, {
-		description: 'Context mode for this step. "fresh" keeps the existing isolated context behavior; "fork" branches the parent session.',
+		description: 'Context mode for this step (see context field on the top-level params).',
 		default: "fresh",
 	})),
 });
@@ -817,21 +817,14 @@ export default function (pi: ExtensionAPI) {
 		name: "subagent",
 		label: "Subagent",
 		description: [
-			"Delegate tasks to specialized subagents with isolated context windows.",
-			"Each subagent is a separate pi process with its own tools, model, and system prompt.",
-			"Modes: single ({ agent, task }), parallel ({ tasks: [{agent, task},...] }), chain ({ chain: [{agent, task},...] } with {previous} placeholder).",
-			"Agents are defined as .md files in ~/.gsd/agent/agents/ (user) or .gsd/agents/ (project).",
-			"Use the /subagent command to list available agents and their descriptions.",
-			"Use chain mode to pipeline: scout finds context, planner designs, worker implements.",
+			"Delegate tasks to specialized subagents, each a separate pi process with its own isolated context window, tools, model, and system prompt.",
+			"Modes: single ({ agent, task }), parallel ({ tasks: [{agent, task},...] }), chain ({ chain: [{agent, task},...] } where each step's {previous} placeholder receives the prior output).",
+			"Agents are defined as .md files in ~/.gsd/agent/agents/ (user) or .gsd/agents/ (project); list them with the /subagent command.",
 		].join(" "),
 		promptGuidelines: [
-			"Prefer subagent dispatch over inline work whenever a task is self-contained — recon, planning, review, refactor, test writing, security audit, doc writing. Each dispatch gets a fresh context window, so your main session stays focused on synthesis.",
-			"Before reading more than ~3 files to understand something, dispatch the scout agent and work from its compressed report instead.",
-			"Before any change touching ≥2 packages, the orchestration kernel, auto-mode, or a public API, dispatch the planner agent first. Plan first, then implement.",
+			"Prefer subagent dispatch over inline work for self-contained tasks (recon, planning, review, refactor, test writing, security audit, docs); each dispatch gets a fresh context window so the main session stays focused on synthesis.",
 			"You MUST use parallel mode when ≥2 ready tasks are independent of each other's output. Do not serialize independent tasks manually — that wastes wall time and context.",
-			"Use chain mode for sequential pipelines where each step's output feeds the next: scout → planner → worker, or worker → reviewer → worker.",
-			"Before opening a PR or marking a slice complete, dispatch the reviewer agent (and security agent if the change touches auth, network, parsing, file IO, or shell exec).",
-			"Always check available agents with /subagent before choosing one — there are bundled specialists plus any project-scoped agents.",
+			"Check available agents with /subagent before choosing one — there are bundled specialists plus any project-scoped agents.",
 		],
 		parameters: SubagentParams,
 

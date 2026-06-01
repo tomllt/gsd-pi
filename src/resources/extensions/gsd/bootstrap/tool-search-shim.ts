@@ -1,5 +1,5 @@
 // GSD does not implement Anthropic deferred-tool ToolSearch. Models trained on
-// that API sometimes try `select:mcp__gsd-workflow__<tool>` and get a hard
+// that API sometimes try `select:mcp__<server>__<tool>` and get a hard
 // "Tool ToolSearch not found" failure. This shim returns explicit call guidance.
 
 import { createToolSearchShimResult, Type } from "@gsd/pi-ai";
@@ -12,14 +12,14 @@ export function registerToolSearchShim(pi: ExtensionAPI): void {
 		name: "ToolSearch",
 		label: "Tool Search (guidance)",
 		description:
-			"Not supported in GSD. Workflow tools are already in your tool list — invoke them by name " +
-			"(e.g. gsd_save_gate_result or mcp__gsd-workflow__gsd_save_gate_result). Do not use ToolSearch.",
+			"Not supported in GSD. If the needed workflow tool is active, invoke the exact listed tool name " +
+			"(e.g. gsd_save_gate_result, or the active MCP-scoped workflow name in Claude Code). Do not use ToolSearch.",
 		parameters: Type.Object({
 			query: Type.String({ description: "Ignored — use a direct tool call instead" }),
 			max_results: Type.Optional(Type.Number()),
 		}),
 		async execute(_toolCallId, params) {
-			return createToolSearchShimResult(params);
+			return createToolSearchShimResult(params, { activeToolNames: pi.getActiveTools() });
 		},
 		renderCall(args: any, theme: any) {
 			const q = args.query ?? "";

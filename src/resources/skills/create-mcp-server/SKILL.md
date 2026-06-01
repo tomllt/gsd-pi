@@ -1,6 +1,6 @@
 ---
 name: create-mcp-server
-description: Build, iterate, and evaluate Model Context Protocol (MCP) servers that expose external services as tools an LLM can call. Use when asked to "build an MCP server", "create an MCP tool", "wrap this API as MCP", "expose X to Claude", or when extending GSD with custom tool integrations. Covers research, schema/tool design, error handling, pagination, testing via MCP Inspector, and producing a 10-question eval set that proves the server actually enables real work.
+description: Build, iterate, and evaluate Model Context Protocol (MCP) servers that expose external services as tools an LLM can call. Covers schema/tool design, error handling, pagination, MCP Inspector testing, and an eval set. Use when asked to "build an MCP server", "create an MCP tool", "wrap this API as MCP", "expose X to Claude", or when extending GSD with custom tool integrations.
 ---
 
 <objective>

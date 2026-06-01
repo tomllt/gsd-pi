@@ -42,6 +42,12 @@ function bundledSharedDir(): string {
     : join(process.cwd(), "src", "resources", "shared");
 }
 
+function bundledSkillsDir(): string {
+  return existsSync(join(process.cwd(), "dist", "resources", "skills"))
+    ? join(process.cwd(), "dist", "resources", "skills")
+    : join(process.cwd(), "src", "resources", "skills");
+}
+
 test("getExtensionKey normalizes top-level .ts and .js entry names to the same key", async () => {
   const { getExtensionKey } = await import("../resource-loader.ts");
   const extensionsDir = "/tmp/extensions";
@@ -296,6 +302,56 @@ test("initResources resyncs when current manifest is missing top-level shared re
     hasSyncedResourceFile(join(fakeAgentDir, "shared"), "package-manager-detection"),
     true,
     "current managed-resource manifests must not skip missing top-level shared files",
+  );
+});
+
+test("initResources resyncs when current manifest is missing bundled skills", async (t) => {
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-resource-loader-skill-stale-"));
+  const fakeAgentDir = join(tmp, ".gsd", "agent");
+  const restoreHome = overrideHomeEnv(tmp);
+
+  t.after(() => {
+    restoreHome();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  const {
+    computeResourceFingerprint,
+    hasMissingBundledResourceFiles,
+    initResources,
+  } = await import("../resource-loader.ts");
+  initResources(fakeAgentDir);
+
+  rmSync(join(fakeAgentDir, "skills", "tdd"), { recursive: true, force: true });
+  const packageVersion = JSON.parse(
+    readFileSync(join(process.cwd(), "package.json"), "utf-8"),
+  ).version;
+  writeFileSync(
+    join(fakeAgentDir, "managed-resources.json"),
+    JSON.stringify({
+      gsdVersion: process.env.GSD_VERSION && process.env.GSD_VERSION !== "0.0.0"
+        ? process.env.GSD_VERSION
+        : packageVersion,
+      packageName: "@opengsd/gsd-pi",
+      contentHash: computeResourceFingerprint(),
+    }),
+  );
+
+  assert.equal(
+    hasMissingBundledResourceFiles(
+      join(fakeAgentDir, "skills"),
+      bundledSkillsDir(),
+    ),
+    true,
+    "test setup should simulate a current manifest with missing bundled skills",
+  );
+
+  initResources(fakeAgentDir);
+
+  assert.equal(
+    existsSync(join(fakeAgentDir, "skills", "tdd", "SKILL.md")),
+    true,
+    "current managed-resource manifests must not skip missing bundled skills",
   );
 });
 

@@ -162,6 +162,8 @@ export function discardMilestone(basePath: string, milestoneId: string): boolean
     } catch (err) {
       logWarning("engine", `discardMilestone DB cleanup failed for ${milestoneId}: ${(err as Error).message}`);
     }
+  } else {
+    logWarning("engine", `discardMilestone DB cleanup skipped for ${milestoneId}: database unavailable`);
   }
 
   invalidateAllCaches();

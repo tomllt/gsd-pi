@@ -1,6 +1,6 @@
 ---
 name: forensics
-description: Post-mortem a failed GSD auto-mode run. Traces from symptom to root cause using `.gsd/activity/*.jsonl`, `.gsd/journal/YYYY-MM-DD.jsonl`, `.gsd/metrics.json`, and `.gsd/auto.lock`. Produces a filing-ready bug report with file:line references and a concrete fix suggestion. Use when asked to "forensics", "post-mortem", "why did auto-mode fail", "trace the stuck loop", "debug the crash", after `/gsd forensics` is invoked, or when a session ended in an unexpected terminal state. Reads existing artifacts — does NOT re-run anything.
+description: Post-mortem a failed GSD auto-mode run. Traces symptom to root cause via `.gsd/` activity, journal, metrics, and lock artifacts, producing a filing-ready bug report with file:line refs and a fix suggestion. Use when asked to "forensics", "post-mortem", "why did auto-mode fail", "trace the stuck loop", "debug the crash", after `/gsd forensics`, or when a session ended in an unexpected terminal state. Reads artifacts only — re-runs nothing.
 ---
 
 <objective>
@@ -126,7 +126,7 @@ Format the output as a GitHub-issue-ready report:
 <high / medium / low> — <what would change this confidence>
 ```
 
-Offer to file this as a GitHub issue via `mcp__github__issue_write` — explicit confirmation required per the outward-action rule. Also save a copy to `.gsd/forensics/<slug>.md` for future reference.
+Offer to file this as a GitHub issue via the active GitHub issue-write tool if one is available, using its exact active tool name — explicit confirmation required per the outward-action rule. Also save a copy to `.gsd/forensics/<slug>.md` for future reference.
 
 </process>
 

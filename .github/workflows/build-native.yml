@@ -15,7 +15,7 @@ on:
           - "false"
           - "true"
       publish_auth:
-        description: "npm auth: token creates packages not on npm yet; trusted after first publish"
+        description: "npm auth: token creates/bootstrap-publishes packages; trusted only works if npm trusts build-native.yml"
         required: false
         default: "trusted"
         type: choice

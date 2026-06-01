@@ -82,7 +82,7 @@ import {
   loadEffectiveGSDPreferences,
   getIsolationMode,
 } from "./preferences.js";
-import { sendDesktopNotification } from "./notifications.js";
+import { playNotificationBell, sendDesktopNotification } from "./notifications.js";
 import type { GSDPreferences } from "./preferences.js";
 import {
   type BudgetAlertLevel,
@@ -218,7 +218,14 @@ import {
   deregisterSigtermHandler as _deregisterSigtermHandler,
   detectWorkingTreeActivity,
 } from "./auto-supervisor.js";
-import { isDbAvailable, getMilestone, getMilestoneSlices } from "./gsd-db.js";
+import {
+  isDbAvailable,
+  getMilestone,
+  getMilestoneSlices,
+  getSlice,
+  getTask,
+  refreshOpenDatabaseFromDisk,
+} from "./gsd-db.js";
 import { markLatestActiveForWorkerCanceled } from "./db/unit-dispatches.js";
 import { writeUnitRuntimeRecord } from "./unit-runtime.js";
 import { countPendingCaptures } from "./captures.js";
@@ -1374,10 +1381,15 @@ export async function stopAuto(
   const loadedPreferences = loadEffectiveGSDPreferences(s.basePath || undefined)?.preferences;
   const stopNotificationPrefix = formatAutoStopNotificationPrefix(reason);
   const displayReason = formatAutoStopDisplayReason(reason);
+  const isHeadlessStop = process.env.GSD_HEADLESS === "1";
   const completionStopRequested = Boolean(options.completionWidget);
-  const installCompletionWidget = completionStopRequested;
-  const preserveCompletionSurface = completionStopRequested;
+  const preserveCloseoutTranscript = !isHeadlessStop && (
+    options.preserveCloseoutTranscript ?? completionStopRequested
+  );
+  const installCompletionWidget = completionStopRequested && !preserveCloseoutTranscript;
+  const preserveCompletionSurface = completionStopRequested || preserveCloseoutTranscript;
   s.completionStopInProgress = preserveCompletionSurface;
+  playNotificationBell("stop", loadedPreferences?.notifications);
 
   // #4764 — telemetry: record the exit reason, isolation mode, whether an auto
   // worktree was active, and whether the current milestone was merged before
@@ -1801,8 +1813,9 @@ export async function stopAuto(
     if (installCompletionWidget) {
       // Completion stops keep the durable final closeout surface visible.
     } else if (preserveCompletionSurface) {
-      ctx?.ui.setWidget("gsd-progress", undefined);
-      ctx?.ui.setWidget("gsd-outcome", undefined);
+      // Foreground closeout-boundary stops preserve the transcript that the
+      // completing unit already printed. Avoid replacing it with a widget or
+      // clearing the progress slot, which can push the closeout into scrollback.
     } else {
       ctx?.ui.setWidget("gsd-progress", undefined);
       const status = isBlockedStopReason(reason) ? "blocked" : reason?.toLowerCase().includes("fail") ? "failed" : "stopped";
@@ -2070,6 +2083,25 @@ export function createWiredDispatchAdapter(
   dispatchBasePath: string,
   session?: AutoSession,
 ): DispatchAdapter {
+  function getAlreadyClosedDispatchReason(unitType: string, unitId: string): string | null {
+    if (!isDbAvailable()) return null;
+    refreshOpenDatabaseFromDisk();
+    const { milestone, slice, task } = parseUnitId(unitId);
+    if (unitType === "execute-task" && milestone && slice && task) {
+      const row = getTask(milestone, slice, task);
+      return row && isClosedStatus(row.status)
+        ? `execute-task ${unitId} is already ${row.status}`
+        : null;
+    }
+    if (unitType === "complete-slice" && milestone && slice) {
+      const row = getSlice(milestone, slice);
+      return row && isClosedStatus(row.status)
+        ? `complete-slice ${unitId} is already ${row.status}`
+        : null;
+    }
+    return null;
+  }
+
   return {
     async decideNextUnit(input) {
       const state = input.stateSnapshot;
@@ -2109,6 +2141,15 @@ export function createWiredDispatchAdapter(
       const pendingRetry = session?.pendingVerificationRetryDispatch;
       if (session && pendingRetry) {
         session.pendingVerificationRetryDispatch = null;
+        const alreadyClosedReason = getAlreadyClosedDispatchReason(
+          pendingRetry.unitType,
+          pendingRetry.unitId,
+        );
+        if (alreadyClosedReason) {
+          session.pendingOrchestrationDispatch = null;
+          session.pendingVerificationRetry = null;
+          return { kind: "skipped", reason: alreadyClosedReason };
+        }
         session.pendingOrchestrationDispatch = pendingRetry;
         return {
           unitType: pendingRetry.unitType,
@@ -2145,6 +2186,14 @@ export function createWiredDispatchAdapter(
           kind: "skipped",
           reason: action.matchedRule ?? "dispatch-skip",
         };
+      }
+      const alreadyClosedReason = getAlreadyClosedDispatchReason(action.unitType, action.unitId);
+      if (alreadyClosedReason) {
+        if (session) {
+          session.pendingOrchestrationDispatch = null;
+          session.pendingVerificationRetry = null;
+        }
+        return { kind: "skipped", reason: alreadyClosedReason };
       }
       if (session) {
         const pending: PendingOrchestrationDispatch = {

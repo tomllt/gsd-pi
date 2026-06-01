@@ -175,11 +175,7 @@ DO reason through it:
 - Learning correct usage patterns
 
 **How**:
-```
-Use mcp__context7__resolve-library-id with library name
-Then mcp__context7__get-library-docs with library ID
-Ask specific questions about the library
-```
+Use the active Context7 documentation tools if they are available: resolve the library ID with the library name, then fetch docs with the library ID. Ask specific questions about the library, and use exact tool names from the active tool list.
 
 **Good uses**:
 - "How do I use Prisma transactions?"

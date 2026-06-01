@@ -1,6 +1,6 @@
 {
   "name": "@gsd/pi-coding-agent",
-  "version": "1.0.2",
+  "version": "1.1.1",
   "description": "Coding agent CLI (vendored from earendil-works/pi)",
   "type": "module",
   "gsd": {

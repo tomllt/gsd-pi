@@ -21,7 +21,7 @@ on:
         required: false
         default: ""
       publish_auth:
-        description: "npm auth: token uses NPM_TOKEN; trusted uses OIDC (default)"
+        description: "npm auth fallback: token uses NPM_TOKEN for prerelease/native publishes; trusted uses OIDC (default)"
         required: false
         default: "trusted"
         type: choice
@@ -152,13 +152,26 @@ jobs:
           trap 'node scripts/postpack-restore-workspace.cjs' EXIT
           node scripts/prepack-resolve-workspace.cjs
           npm publish --ignore-scripts --tag "${CHANNEL}"
-          echo "Verifying @opengsd/gsd-pi@${VERSION} is reachable on npm..."
-          for i in 1 2 3 4 5; do
-            npm view "@opengsd/gsd-pi@${VERSION}" version 2>/dev/null && echo "Confirmed: @opengsd/gsd-pi@${VERSION} is live." && exit 0
-            echo "Attempt $i: not yet visible - waiting 10s..."
-            sleep 10
+          echo "Verifying @opengsd/gsd-pi@${VERSION} can be installed from npm..."
+          DELAY=10
+          for attempt in $(seq 1 12); do
+            PREFIX=$(mktemp -d "${RUNNER_TEMP:-/tmp}/gsd-npm-install-XXXXXX")
+            CACHE=$(mktemp -d "${RUNNER_TEMP:-/tmp}/gsd-npm-cache-XXXXXX")
+            if npm install -g "@opengsd/gsd-pi@${VERSION}" --ignore-scripts --prefer-online --prefix "${PREFIX}" --cache "${CACHE}"; then
+              rm -rf "${PREFIX}" "${CACHE}"
+              echo "Confirmed: @opengsd/gsd-pi@${VERSION} installs from npm."
+              exit 0
+            fi
+            rm -rf "${PREFIX}" "${CACHE}"
+            if [ "${attempt}" = "12" ]; then
+              break
+            fi
+            echo "Attempt ${attempt}: package metadata or tarball not fully propagated - waiting ${DELAY}s..."
+            sleep "${DELAY}"
+            DELAY=$((DELAY * 2))
+            if [ "${DELAY}" -gt 60 ]; then DELAY=60; fi
           done
-          echo "::error::Publish step succeeded but @opengsd/gsd-pi@${VERSION} is not reachable on npm after 50s. Check trusted publishing and registry propagation."
+          echo "::error::Publish step succeeded but @opengsd/gsd-pi@${VERSION} was not installable from npm after retries. Check registry tarball propagation before continuing."
           exit 1
 
   prerelease-verify:
@@ -221,9 +234,126 @@ jobs:
           echo "::error::Recommended actions: (1) investigate the failing step above, (2) if the version exists on npm, deprecate it with 'npm deprecate @opengsd/gsd-pi@${PUBLISH_VERSION} \"broken ${CHANNEL} build; see Actions run\"', (3) cut a fix and re-run NPM Publish."
           exit 1
 
+  prod-release-plan:
+    name: Plan Production Release
+    if: ${{ github.event.inputs.channel == 'latest' }}
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Generate changelog and determine version
+        id: release
+        run: |
+          OUTPUT=$(node scripts/generate-changelog.mjs)
+          echo "$OUTPUT" | jq .
+          mkdir -p release-metadata
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$(echo "$OUTPUT" | jq -r '.newVersion')" >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" | jq -r '.changelogEntry' > release-metadata/changelog-entry.md
+          echo "$OUTPUT" | jq -r '.releaseNotes' > release-metadata/release-notes.md
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v5
+        with:
+          name: prod-release-metadata
+          path: release-metadata/
+          if-no-files-found: error
+
+  prod-native-build:
+    name: Build native ${{ matrix.platform }}
+    if: ${{ github.event.inputs.channel == 'latest' }}
+    needs: prod-release-plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            platform: darwin-arm64
+          - os: macos-14
+            target: x86_64-apple-darwin
+            platform: darwin-x64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x64-gnu
+          - os: blacksmith-4vcpu-ubuntu-2404-arm
+            target: aarch64-unknown-linux-gnu
+            platform: linux-arm64-gnu
+            cross: true
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: win32-x64-msvc
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prod-release-plan.outputs.source_sha }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust compilation target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: native-${{ matrix.platform }}
+          workspaces: |
+            native -> target
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build native addon
+        working-directory: native/crates/engine
+        env:
+          # CARGO_ENCODED_RUSTFLAGS overrides target-specific rustflags in
+          # .cargo/config.toml, which sets -C target-cpu=native for dev builds.
+          # CI must produce portable binaries.
+          CARGO_ENCODED_RUSTFLAGS: ""
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare artifact (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p artifacts
+          cp native/target/${{ matrix.target }}/release/libgsd_engine.dylib artifacts/gsd_engine.node 2>/dev/null || \
+          cp native/target/${{ matrix.target }}/release/libgsd_engine.so artifacts/gsd_engine.node 2>/dev/null || \
+          { echo "::error::No library found for ${{ matrix.platform }}"; exit 1; }
+          ls -la artifacts/
+
+      - name: Prepare artifact (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir artifacts
+          copy native\target\${{ matrix.target }}\release\gsd_engine.dll artifacts\gsd_engine.node
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: native-${{ matrix.platform }}
+          path: artifacts/gsd_engine.node
+          if-no-files-found: error
+
   prod-release:
     name: Production Release
     if: ${{ github.event.inputs.channel == 'latest' }}
+    needs:
+      - prod-release-plan
+      - prod-native-build
     # npm trusted publishing + provenance require GitHub-hosted runners (not Blacksmith).
     runs-on: ubuntu-latest
     environment: prod
@@ -233,6 +363,19 @@ jobs:
           ref: main
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Verify release source is still current
+        env:
+          RELEASE_SOURCE_SHA: ${{ needs.prod-release-plan.outputs.source_sha }}
+        run: |
+          CURRENT_SHA=$(git rev-parse HEAD)
+          if [ "${CURRENT_SHA}" != "${RELEASE_SOURCE_SHA}" ]; then
+            echo "::error::main moved after the production release was planned."
+            echo "::error::planned=${RELEASE_SOURCE_SHA}"
+            echo "::error::current=${CURRENT_SHA}"
+            echo "::error::Re-run NPM Publish so native binaries, changelog, and package version are computed from the same commit."
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -263,18 +406,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GSD_LIVE_TESTS: "1"
 
-      - name: Generate changelog and determine version
-        id: release
-        run: |
-          OUTPUT=$(node scripts/generate-changelog.mjs)
-          echo "$OUTPUT" | jq .
-          echo "version=$(echo "$OUTPUT" | jq -r '.newVersion')" >> "$GITHUB_OUTPUT"
-          echo "$OUTPUT" | jq -r '.changelogEntry' > /tmp/changelog-entry.md
-          echo "$OUTPUT" | jq -r '.releaseNotes' > /tmp/release-notes.md
+      - name: Download release metadata
+        uses: actions/download-artifact@v5
+        with:
+          name: prod-release-metadata
+          path: release-metadata
 
       - name: Bump version and sync packages
         env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: node scripts/bump-version.mjs "$RELEASE_VERSION"
 
       - name: Validate package files after version bump
@@ -286,17 +426,26 @@ jobs:
           echo "All package.json files are valid"
 
       - name: Update CHANGELOG.md
-        run: node scripts/update-changelog.mjs /tmp/changelog-entry.md
+        run: node scripts/update-changelog.mjs release-metadata/changelog-entry.md
 
       - name: Commit and tag release
         env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SOURCE_SHA: ${{ needs.prod-release-plan.outputs.source_sha }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          REMOTE_MAIN_SHA=$(git rev-parse origin/main)
+          if [ "${REMOTE_MAIN_SHA}" != "${RELEASE_SOURCE_SHA}" ]; then
+            echo "::error::main moved before the release commit could be created."
+            echo "::error::planned=${RELEASE_SOURCE_SHA}"
+            echo "::error::origin/main=${REMOTE_MAIN_SHA}"
+            echo "::error::Re-run NPM Publish so the release includes the latest main."
+            exit 1
+          fi
           git add package.json pnpm-lock.yaml CHANGELOG.md native/Cargo.toml native/Cargo.lock native/npm/*/package.json pkg/package.json packages/*/package.json extensions/google-search/package.json
           git commit -m "release: v${RELEASE_VERSION}"
-          git pull --rebase origin main
           git tag "v${RELEASE_VERSION}"
 
       - name: Build release
@@ -309,6 +458,105 @@ jobs:
           export GSD_SMOKE_BINARY
           pnpm run test:live-regression
 
+      - name: Download native artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: native-*
+          path: artifacts
+          merge-multiple: false
+
+      - name: Copy native binaries to platform packages
+        run: |
+          for platform in darwin-arm64 darwin-x64 linux-x64-gnu linux-arm64-gnu win32-x64-msvc; do
+            cp "artifacts/native-${platform}/gsd_engine.node" "native/npm/${platform}/gsd_engine.node"
+            echo "Copied binary for ${platform}"
+            ls -la "native/npm/${platform}/"
+          done
+
+      - name: Select native npm publish auth
+        run: |
+          if [ "${{ github.event.inputs.publish_auth || 'trusted' }}" = "token" ]; then
+            echo "Using NPM_TOKEN for native package publish."
+          else
+            echo "Using npm trusted publishing for native package publish."
+          fi
+
+      - name: Require token auth for native packages not on npm yet
+        if: github.event.inputs.publish_auth != 'token'
+        run: |
+          MISSING=()
+          for platform in darwin-arm64 darwin-x64 linux-x64-gnu linux-arm64-gnu win32-x64-msvc; do
+            PKG="@opengsd/engine-${platform}"
+            if ! npm view "${PKG}" name >/dev/null 2>&1; then
+              MISSING+=("${PKG}")
+            fi
+          done
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error::These npm packages do not exist on npm yet:"
+            for pkg in "${MISSING[@]}"; do
+              echo "::error::  - ${pkg}"
+            done
+            echo "::error::Trusted publishing is configured after first publish. Re-run with publish_auth=token and NPM_TOKEN set."
+            exit 1
+          fi
+
+      - name: Verify NPM_TOKEN is configured for native token publish
+        if: github.event.inputs.publish_auth == 'token'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::publish_auth=token requires the NPM_TOKEN repository secret."
+            exit 1
+          fi
+          npm whoami
+
+      - name: Publish native platform packages for release version
+        env:
+          ENGINE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
+          NODE_AUTH_TOKEN: ${{ github.event.inputs.publish_auth == 'token' && secrets.NPM_TOKEN || '' }}
+          TAG_FLAG: --tag latest
+        run: bash scripts/publish-engine-packages.sh
+
+      - name: Verify native platform packages are published
+        env:
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
+        run: |
+          echo "Verifying native platform packages at version ${RELEASE_VERSION}..."
+          DELAY=5
+          for attempt in $(seq 1 5); do
+            FAILED=0
+            for platform in darwin-arm64 darwin-x64 linux-x64-gnu linux-arm64-gnu win32-x64-msvc; do
+              PKG="@opengsd/engine-${platform}"
+              PUBLISHED=$(npm view "${PKG}@${RELEASE_VERSION}" version 2>/dev/null || echo "")
+              if [ "${PUBLISHED}" != "${RELEASE_VERSION}" ]; then
+                FAILED=1
+                break
+              fi
+            done
+            if [ "${FAILED}" = "0" ]; then
+              echo "All native platform packages verified (attempt ${attempt})."
+              exit 0
+            fi
+            if [ "${attempt}" = "5" ]; then
+              echo "::error::One or more native platform packages were not visible after 5 attempts."
+              for platform in darwin-arm64 darwin-x64 linux-x64-gnu linux-arm64-gnu win32-x64-msvc; do
+                PKG="@opengsd/engine-${platform}"
+                PUBLISHED=$(npm view "${PKG}@${RELEASE_VERSION}" version 2>/dev/null || echo "")
+                if [ "${PUBLISHED}" = "${RELEASE_VERSION}" ]; then
+                  echo "  ✓ ${PKG}@${RELEASE_VERSION}"
+                else
+                  echo "  ✗ ${PKG}@${RELEASE_VERSION} (got: '${PUBLISHED}')"
+                fi
+              done
+              exit 1
+            fi
+            echo "  Attempt ${attempt}: not all packages visible yet, retrying in ${DELAY}s..."
+            sleep "${DELAY}"
+            DELAY=$((DELAY * 2))
+            if [ "${DELAY}" -gt 30 ]; then DELAY=30; fi
+          done
+
       - name: Verify native platform packages for release version
         run: pnpm run verify:native-platform-packages
 
@@ -317,7 +565,7 @@ jobs:
 
       - name: Publish release to npm @latest
         env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           trap 'node scripts/postpack-restore-workspace.cjs' EXIT
           node scripts/prepack-resolve-workspace.cjs
@@ -333,18 +581,31 @@ jobs:
               exit 1
             fi
           fi
-          echo "Verifying @opengsd/gsd-pi@${RELEASE_VERSION} is reachable on npm..."
-          for i in 1 2 3 4 5; do
-            npm view "@opengsd/gsd-pi@${RELEASE_VERSION}" version 2>/dev/null && echo "Confirmed: @opengsd/gsd-pi@${RELEASE_VERSION} is live." && exit 0
-            echo "Attempt $i: not yet visible - waiting 10s..."
-            sleep 10
+          echo "Verifying @opengsd/gsd-pi@${RELEASE_VERSION} can be installed from npm..."
+          DELAY=10
+          for attempt in $(seq 1 12); do
+            PREFIX=$(mktemp -d "${RUNNER_TEMP:-/tmp}/gsd-npm-install-XXXXXX")
+            CACHE=$(mktemp -d "${RUNNER_TEMP:-/tmp}/gsd-npm-cache-XXXXXX")
+            if npm install -g "@opengsd/gsd-pi@${RELEASE_VERSION}" --ignore-scripts --prefer-online --prefix "${PREFIX}" --cache "${CACHE}"; then
+              rm -rf "${PREFIX}" "${CACHE}"
+              echo "Confirmed: @opengsd/gsd-pi@${RELEASE_VERSION} installs from npm."
+              exit 0
+            fi
+            rm -rf "${PREFIX}" "${CACHE}"
+            if [ "${attempt}" = "12" ]; then
+              break
+            fi
+            echo "Attempt ${attempt}: package metadata or tarball not fully propagated - waiting ${DELAY}s..."
+            sleep "${DELAY}"
+            DELAY=$((DELAY * 2))
+            if [ "${DELAY}" -gt 60 ]; then DELAY=60; fi
           done
-          echo "::error::Publish step succeeded but @opengsd/gsd-pi@${RELEASE_VERSION} is not reachable on npm after 50s. Check trusted publishing and registry propagation."
+          echo "::error::Publish step succeeded but @opengsd/gsd-pi@${RELEASE_VERSION} was not installable from npm after retries. Check registry tarball propagation before continuing."
           exit 1
 
       - name: Push release commit and tag
         env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           git push origin main
           git push origin "v${RELEASE_VERSION}"
@@ -352,20 +613,20 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           gh release create "v${RELEASE_VERSION}" \
             --title "v${RELEASE_VERSION}" \
-            --notes-file /tmp/release-notes.md \
+            --notes-file release-metadata/release-notes.md \
             --latest
 
       - name: Post to Discord
         if: ${{ env.DISCORD_WEBHOOK != '' }}
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
-          NOTES=$(cat /tmp/release-notes.md)
+          NOTES=$(cat release-metadata/release-notes.md)
           curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg c "**GSD v${RELEASE_VERSION} Released**\n\n${NOTES}\n\n\`npm i @opengsd/gsd-pi@${RELEASE_VERSION}\`" '{content:$c}')"
@@ -379,9 +640,10 @@ jobs:
 
       - name: Build and push release Docker image
         env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           docker build --target runtime \
+            --build-arg "GSD_VERSION=${RELEASE_VERSION}" \
             -t ghcr.io/open-gsd/gsd-pi:latest \
             -t "ghcr.io/open-gsd/gsd-pi:${RELEASE_VERSION}" \
             .
@@ -391,7 +653,7 @@ jobs:
       - name: Open back-merge PR main to next if behind
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           if ! git ls-remote --exit-code --heads origin next >/dev/null 2>&1; then
             echo "next branch does not exist yet; skipping back-merge"

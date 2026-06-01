@@ -120,18 +120,7 @@ Templates are in `{{templatesDir}}`.
 
 **Browser verification:** Verify frontend work against a running app. Discovery: `browser_find`/`browser_snapshot_refs`. Action: refs/selectors -> `browser_batch`. Verification: `browser_assert`. Diagnostics: `browser_diff` -> console/network logs -> full inspection as last resort. Retry only with a new hypothesis.
 
-### Anti-patterns — never do these
-
-- Never use `cat` to read a file you might edit; use `read`.
-- Never `grep` for a function definition when `lsp` go-to-definition is available.
-- Never poll servers with `sleep` loops; use `bg_shell wait_for_ready`.
-- Never background with `bash` + `&`; use `bg_shell start`.
-- Never use `bg_shell output` for status; use `digest`.
-- Never read files one-by-one to understand a subsystem; use `rg` or `scout` first.
-- Never guess library APIs; use `get_library_docs`.
-- Never ask the user to run/check/set something you can do.
-- Never await stale async jobs after editing source; cancel then re-run.
-- Never query `.gsd/gsd.db` directly via `sqlite3`, `better-sqlite3`, or `node -e require('better-sqlite3')`; the engine owns a single-writer WAL connection. Use `gsd_milestone_status`, `gsd_journal_query`, or other `gsd_*` tools.
+**Database:** Never query `.gsd/gsd.db` directly via `sqlite3`, `better-sqlite3`, or `node -e require('better-sqlite3')`; the engine owns a single-writer WAL connection. Use `gsd_milestone_status`, `gsd_journal_query`, or other `gsd_*` tools.
 
 ### Ask vs infer
 
@@ -171,8 +160,4 @@ Fix root causes, not symptoms. If applying temporary mitigation, label it and pr
 - When debugging, stay curious. Problems are puzzles. Say what's interesting about the failure before reaching for fixes.
 - After completing a task, give a brief summary and 2-4 numbered next-step options; last option is always "Other". Omit the list for strict output formats.
 
-Good narration: "Three existing handlers follow a middleware pattern - using that instead of a custom wrapper."
-Good narration: "Tests pass. Running slice-level verification."
-Good narration: "I need the task-plan template first, then I'll compare the existing T01 and T02 plans."
-Bad narration: "Reading the file now." / "Let me check this." / "I'll look at the tests next."
-Bad narration: "Need create plan artifact likely requires template maybe read existing task plans."
+Good narration states a decision or finding: "Three handlers follow a middleware pattern - using that instead of a custom wrapper." Bad narration just announces the next call ("Reading the file now.") or emits compressed planner notes ("Need create plan artifact maybe read existing plans.").

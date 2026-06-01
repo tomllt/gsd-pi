@@ -33,6 +33,11 @@ export interface StopAutoOptions {
     milestoneTitle?: string | null;
     allMilestonesComplete?: boolean;
   };
+  /**
+   * Foreground closeout-boundary stops already have the useful final surface in
+   * the transcript. Preserve it instead of installing a replacement widget.
+   */
+  preserveCloseoutTranscript?: boolean;
   /** Preserve, rather than merge, a completed milestone during stop cleanup. */
   preserveCompletedMilestoneBranch?: boolean;
 }

@@ -92,10 +92,10 @@ test('loadAndValidateAnswerFile — wrong types (non-string secret value)', (t) 
 // AnswerInjector — observeEvent + tryHandle
 // ---------------------------------------------------------------------------
 
-function makeToolExecutionStart(questions: Record<string, unknown>[]) {
+function makeToolExecutionStart(questions: Record<string, unknown>[], toolName = 'ask_user_questions') {
   return {
     type: 'tool_execution_start',
-    toolName: 'ask_user_questions',
+    toolName,
     input: { questions },
   };
 }
@@ -138,6 +138,25 @@ test('observeEvent stores metadata', (t) => {
   assert.strictEqual(handled, false);
   // But questionsDefaulted should be incremented because processWithMeta was reached
   assert.strictEqual(injector.getStats().questionsDefaulted, 1);
+});
+
+test('observeEvent stores metadata for MCP-scoped ask_user_questions', (t) => {
+  const injector = new AnswerInjector({ questions: { deploy_target: 'GCP' } });
+
+  injector.observeEvent(makeToolExecutionStart([{
+    id: 'deploy_target',
+    header: 'Deploy',
+    question: 'Where to deploy?',
+    options: [{ label: 'AWS' }, { label: 'GCP' }],
+  }], 'mcp__custom-workflow__ask_user_questions'));
+
+  const captured: string[] = [];
+  const captureStdin = (data: string) => { captured.push(data); };
+  const event = makeSelectEvent('req-1', 'Deploy: Where to deploy?', ['AWS', 'GCP']);
+  const handled = injector.tryHandle(event, captureStdin);
+
+  assert.strictEqual(handled, true);
+  assert.strictEqual(captured.length, 1);
 });
 
 test('tryHandle matches by question ID — single select', (t) => {
@@ -312,7 +331,7 @@ test('tryHandle deferred resolution — observeEvent after tryHandle', async (t)
 // ---------------------------------------------------------------------------
 
 test('getSecretEnvVars returns secrets map', (t) => {
-  const secrets = { API_KEY: 'sk-123', DB_URL: 'postgres://localhost/db' };
+  const secrets = { API_KEY: 'sk-123', DB_URL: 'db-local-fixture' };
   const injector = new AnswerInjector({ secrets });
 
   assert.deepStrictEqual(injector.getSecretEnvVars(), secrets);

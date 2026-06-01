@@ -51,15 +51,15 @@ export interface FileEditEvidence {
 export type EvidenceEntry = BashEvidence | FileWriteEvidence | FileEditEvidence;
 
 const EXECUTION_TOOL_NAMES = new Set([
-  "bash",
-  "Bash",
-  "PowerShell",
   "async_bash",
+  "bash",
+  "exec_command",
+  "functions.exec_command",
   "gsd_exec",
   "gsd_exec_search",
-  "mcp__gsd-workflow__gsd_exec",
-  "mcp__gsd-workflow__gsd_exec_search",
+  "powershell",
 ]);
+const MCP_EXECUTION_TOOL_RE = /^mcp__.+__gsd_exec(?:_search)?$/;
 
 // ─── Module State ───────────────────────────────────────────────────────────
 
@@ -87,6 +87,13 @@ export function getFilePaths(): string[] {
   return unitEvidence
     .filter((e): e is FileWriteEvidence | FileEditEvidence => e.kind === "write" || e.kind === "edit")
     .map(e => e.path);
+}
+
+/** True when a tool name represents a shell/command execution surface. */
+export function isExecutionToolName(name: unknown): boolean {
+  if (typeof name !== "string") return false;
+  const normalized = name.trim().toLowerCase();
+  return EXECUTION_TOOL_NAMES.has(normalized) || MCP_EXECUTION_TOOL_RE.test(normalized);
 }
 
 // ─── Persistence (Bug #4385 — evidence must survive session restarts) ────────
@@ -199,7 +206,7 @@ export function clearEvidenceFromDisk(
  * Exit codes and output are filled in by recordToolResult after execution.
  */
 export function recordToolCall(toolCallId: string, toolName: string, input: Record<string, unknown>): void {
-  if (EXECUTION_TOOL_NAMES.has(toolName)) {
+  if (isExecutionToolName(toolName)) {
     unitEvidence.push({
       kind: "bash",
       toolCallId,

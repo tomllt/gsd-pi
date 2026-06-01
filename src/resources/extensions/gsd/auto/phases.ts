@@ -583,6 +583,7 @@ async function restorePreflightStashOrStop(
 export async function _runMilestoneMergeWithStashRestore(
   ic: IterationContext,
   milestoneId: string,
+  options: { preserveCloseoutTranscript?: boolean } = {},
 ): Promise<{ action: "break"; reason: string } | null> {
   const { ctx, pi, s, deps } = ic;
 
@@ -597,6 +598,7 @@ export async function _runMilestoneMergeWithStashRestore(
       : `Pre-merge dirty working tree overlaps milestone ${milestoneId}`;
     await deps.stopAuto(ctx, pi, reason, {
       preserveCompletedMilestoneBranch: true,
+      preserveCloseoutTranscript: options.preserveCloseoutTranscript,
     });
     return {
       action: "break",
@@ -677,6 +679,7 @@ export async function _runMilestoneMergeWithStashRestore(
 export async function _runMilestoneMergeOnceWithStashRestore(
   ic: IterationContext,
   milestoneId: string,
+  options: { preserveCloseoutTranscript?: boolean } = {},
 ): Promise<{ action: "break"; reason: string } | null> {
   if (ic.s.milestoneMergedInPhases) {
     debugLog("autoLoop", {
@@ -686,7 +689,7 @@ export async function _runMilestoneMergeOnceWithStashRestore(
     });
     return null;
   }
-  return _runMilestoneMergeWithStashRestore(ic, milestoneId);
+  return _runMilestoneMergeWithStashRestore(ic, milestoneId, options);
 }
 
 async function emitCancelledUnitEnd(
@@ -3063,7 +3066,9 @@ export async function runFinalize(
   }
 
   if (preUnitSnapshot?.type === "complete-milestone" && s.currentMilestoneId) {
-    const stop = await _runMilestoneMergeOnceWithStashRestore(ic, s.currentMilestoneId);
+    const stop = await _runMilestoneMergeOnceWithStashRestore(ic, s.currentMilestoneId, {
+      preserveCloseoutTranscript: true,
+    });
     if (stop) {
       clearFinalizingUnit();
       return stop;

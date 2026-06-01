@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
+import { copyFileSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -7,7 +8,9 @@ import test from "node:test";
 import { ensureDbOpen } from "../bootstrap/dynamic-tools.ts";
 import {
   closeDatabase,
+  checkpointDatabase,
   getAllMilestones,
+  _getAdapter,
   insertMilestone,
   insertSlice,
   insertTask,
@@ -19,6 +22,20 @@ import {
 } from "../migration-auto-check.ts";
 import { writeGSDDirectory } from "../migrate/writer.ts";
 import type { GSDProject } from "../migrate/types.ts";
+
+const _require = createRequire(import.meta.url);
+
+function openRawSqliteForTest(dbPath: string): { exec(sql: string): void; close(): void } {
+  try {
+    const mod = _require("node:sqlite") as { DatabaseSync: new (path: string) => { exec(sql: string): void; close(): void } };
+    return new mod.DatabaseSync(dbPath);
+  } catch {
+    type SqliteCtor = new (path: string) => { exec(sql: string): void; close(): void };
+    const mod = _require("better-sqlite3") as SqliteCtor | { default: SqliteCtor };
+    const DatabaseCtor: SqliteCtor = typeof mod === "function" ? mod : mod.default;
+    return new DatabaseCtor(dbPath);
+  }
+}
 
 function makeBase(): string {
   return mkdtempSync(join(tmpdir(), "gsd-migration-auto-check-"));
@@ -129,6 +146,44 @@ test("migration auto-check leaves matching DB hierarchy alone", async () => {
     assert.equal(result.reason, "in-sync");
     assert.deepEqual(result.markdown, { milestones: 1, slices: 1, tasks: 1 });
     assert.deepEqual(result.afterDb, { milestones: 1, slices: 1, tasks: 1 });
+  } finally {
+    cleanup(base);
+  }
+});
+
+test("migration auto-check refreshes a stale open DB handle before comparing", async () => {
+  const base = makeBase();
+  try {
+    await writeGSDDirectory(projectFixture(), base);
+    assert.equal(await ensureDbOpen(base), true);
+    insertMilestone({ id: "M001", title: "Legacy Milestone", status: "active" });
+    checkpointDatabase();
+
+    const dbPath = join(base, ".gsd", "gsd.db");
+    const replacementPath = join(base, ".gsd", "gsd-replacement.db");
+    copyFileSync(dbPath, replacementPath);
+
+    const replacement = openRawSqliteForTest(replacementPath);
+    try {
+      replacement.exec(`
+        INSERT INTO slices (milestone_id, id, title, status, risk, depends, demo, created_at, sequence)
+        VALUES ('M001', 'S01', 'Legacy Slice', 'pending', 'medium', '[]', 'Legacy slice demo', '', 1);
+        INSERT INTO tasks (milestone_id, slice_id, id, title, status, sequence)
+        VALUES ('M001', 'S01', 'T01', 'Legacy Task', 'pending', 1);
+      `);
+    } finally {
+      replacement.close();
+    }
+
+    const staleAdapter = _getAdapter();
+    renameSync(replacementPath, dbPath);
+
+    const result = await checkMarkdownHierarchyAgainstDb(base);
+    assert.notEqual(_getAdapter(), staleAdapter, "startup comparison must reopen the active DB handle");
+    assert.equal(result.action, "none");
+    assert.equal(result.reason, "in-sync");
+    assert.deepEqual(result.markdown, { milestones: 1, slices: 1, tasks: 1 });
+    assert.deepEqual(result.beforeDb, { milestones: 1, slices: 1, tasks: 1 });
   } finally {
     cleanup(base);
   }

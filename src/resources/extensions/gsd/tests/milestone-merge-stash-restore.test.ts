@@ -17,7 +17,7 @@ interface CallLog {
   mergeCalls: number;
   postflightCalls: number;
   stopAutoCalls: Array<string | undefined>;
-  stopAutoOptions: Array<{ preserveCompletedMilestoneBranch?: boolean } | undefined>;
+  stopAutoOptions: Array<{ preserveCompletedMilestoneBranch?: boolean; preserveCloseoutTranscript?: boolean } | undefined>;
   pauseAutoCalls: Array<string | undefined>;
   notifyCalls: Array<{ message: string; level: string }>;
   milestoneMergedInPhases: boolean;
@@ -104,7 +104,7 @@ function buildIc(opts: {
       _c?: unknown,
       _p?: unknown,
       reason?: string,
-      options?: { preserveCompletedMilestoneBranch?: boolean },
+      options?: { preserveCompletedMilestoneBranch?: boolean; preserveCloseoutTranscript?: boolean },
     ) => {
       log.stopAutoCalls.push(reason);
       log.stopAutoOptions.push(options);
@@ -290,6 +290,30 @@ test("dirty overlap: preflight stops before merge and postflight restore", async
     log.stopAutoOptions[0]?.preserveCompletedMilestoneBranch,
     true,
     "stopAuto cleanup must preserve the branch instead of merging after preflight blocks",
+  );
+});
+
+test("dirty overlap after closeout preserves the visible closeout transcript", async () => {
+  const { ic, log } = buildIc({
+    preflightResult: PREFLIGHT_BLOCKED,
+    mergeBehavior: "succeed",
+    postflightResult: POP_OK,
+  });
+
+  const result = await _runMilestoneMergeWithStashRestore(ic, "M002", {
+    preserveCloseoutTranscript: true,
+  });
+
+  assert.deepEqual(result, {
+    action: "break",
+    reason: "preflight-dirty-overlap",
+  });
+  assert.equal(log.mergeCalls, 0, "blocked preflight must not start milestone merge");
+  assert.equal(log.stopAutoOptions[0]?.preserveCompletedMilestoneBranch, true);
+  assert.equal(
+    log.stopAutoOptions[0]?.preserveCloseoutTranscript,
+    true,
+    "post-closeout merge blocks must not replace the closeout transcript with a stop widget",
   );
 });
 

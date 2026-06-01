@@ -637,11 +637,16 @@ export function initResources(agentDir: string, skillsDir: string = join(agentDi
       join(agentDir, 'shared'),
       join(resourcesDir, 'shared'),
     )
+    const hasMissingSkillFiles = hasMissingBundledResourceFiles(
+      skillsDir,
+      join(resourcesDir, 'skills'),
+    )
     if (
       manifest.contentHash &&
       manifest.contentHash === currentHash &&
       !hasStaleExtensionFiles &&
-      !hasMissingSharedFiles
+      !hasMissingSharedFiles &&
+      !hasMissingSkillFiles
     ) {
       return
     }

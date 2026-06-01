@@ -72,6 +72,30 @@ test("ensureProjectWorkflowMcpConfig preserves existing mcp servers", () => {
   }
 });
 
+test("ensureProjectWorkflowMcpConfig uses custom workflow server name from env", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-init-"));
+  mkdirSync(join(projectRoot, ".gsd"), { recursive: true });
+
+  try {
+    const result = ensureProjectWorkflowMcpConfig(projectRoot, {
+      GSD_WORKFLOW_MCP_COMMAND: "node",
+      GSD_WORKFLOW_MCP_NAME: "custom-workflow",
+      GSD_WORKFLOW_MCP_ARGS: JSON.stringify(["server.js"]),
+      GSD_WORKFLOW_MCP_CWD: projectRoot,
+    });
+    assert.equal(result.status, "created");
+    assert.equal(result.serverName, "custom-workflow");
+
+    const parsed = JSON.parse(readFileSync(result.configPath, "utf-8")) as {
+      mcpServers?: Record<string, { command?: string; args?: string[] }>;
+    };
+    assert.ok(parsed.mcpServers?.["custom-workflow"]);
+    assert.equal(parsed.mcpServers?.[GSD_WORKFLOW_MCP_SERVER_NAME], undefined);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test("ensureProjectWorkflowMcpConfig is idempotent when config is already current", () => {
   const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-init-"));
   mkdirSync(join(projectRoot, ".gsd"), { recursive: true });

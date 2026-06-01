@@ -20,7 +20,7 @@ import {
   unlinkSync,
   lstatSync as lstatSyncFn,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep as pathSep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep as pathSep } from "node:path";
 import { GSDError, GSD_IO_ERROR, GSD_GIT_ERROR } from "./errors.js";
 import {
   reconcileWorktreeDb,
@@ -60,6 +60,7 @@ import { logWarning, logError } from "./workflow-logger.js";
 import { loadEffectiveGSDPreferences } from "./preferences.js";
 import { MILESTONE_ID_RE } from "./milestone-ids.js";
 import { runWorktreePostCreateHook } from "./worktree-post-create-hook.js";
+import { classifyProject } from "./detection.js";
 import {
   nativeGetCurrentBranch,
   nativeDetectMainBranch,
@@ -257,6 +258,47 @@ export function _resolveAutoWorktreeStartPoint(
     branchExists(gitMainBranch)
     ? gitMainBranch
     : undefined;
+}
+
+function importUntrackedProjectRootContentIntoEmptyWorktree(
+  projectRoot: string,
+  worktreeRoot: string,
+  milestoneId: string,
+): number {
+  const worktreeClassification = classifyProject(worktreeRoot);
+  if (worktreeClassification.kind !== "greenfield") return 0;
+
+  const projectRootClassification = classifyProject(projectRoot);
+  if (
+    projectRootClassification.kind === "greenfield" ||
+    projectRootClassification.kind === "invalid-repo" ||
+    projectRootClassification.untrackedFiles.length === 0
+  ) {
+    return 0;
+  }
+
+  let copied = 0;
+  for (const relPath of projectRootClassification.untrackedFiles) {
+    const src = join(projectRoot, relPath);
+    if (!existsSync(src)) continue;
+
+    const dst = join(worktreeRoot, relPath);
+    if (existsSync(dst)) continue;
+
+    mkdirSync(dirname(dst), { recursive: true });
+    cpSync(src, dst, { recursive: true, force: false });
+    copied++;
+  }
+
+  if (copied > 0) {
+    debugLog("createAutoWorktree", {
+      phase: "import-untracked-project-content",
+      milestoneId,
+      copied,
+    });
+  }
+
+  return copied;
 }
 
 export function _shouldReconcileWorktreeDb(
@@ -1332,6 +1374,8 @@ export function createAutoWorktree(
   // .gsd/ — both reads and writes converge on the project-root .gsd/.
   // The original concerns (#759, #778) no longer apply because there is
   // no second copy to drift.
+
+  importUntrackedProjectRootContentIntoEmptyWorktree(basePath, info.path, milestoneId);
 
   // Run user-configured post-create hook (#597) — e.g. copy .env, symlink assets
   const hookError = runWorktreePostCreateHook(basePath, info.path);

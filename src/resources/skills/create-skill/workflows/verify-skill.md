@@ -82,11 +82,7 @@ which {tool-name}
 ```
 
 ### For API/Service Skills
-Use Context7 to fetch current documentation:
-```
-mcp__context7__resolve-library-id: {service-name}
-mcp__context7__get-library-docs: {library-id}, topic: {relevant-topic}
-```
+Use the active Context7 documentation tools to fetch current documentation if they are available. Resolve the library ID first, then fetch docs for `{library-id}` with `topic: {relevant-topic}`; use the exact tool names from the active tool list.
 
 Compare skill's documented patterns against current docs:
 - Are endpoints still valid?
@@ -94,11 +90,7 @@ Compare skill's documented patterns against current docs:
 - Are there deprecated methods being used?
 
 ### For Framework Skills
-Use Context7:
-```
-mcp__context7__resolve-library-id: {framework-name}
-mcp__context7__get-library-docs: {library-id}, topic: {specific-api}
-```
+Use the active Context7 documentation tools if they are available. Resolve the library ID first, then fetch docs for `{library-id}` with `topic: {specific-api}`; use the exact tool names from the active tool list.
 
 Check:
 - Are documented APIs still current?

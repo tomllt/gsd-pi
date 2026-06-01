@@ -4,6 +4,8 @@
  * of a hard "Tool ToolSearch not found" failure.
  */
 
+import { parseMcpToolName } from "./mcp-tool-name.js";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -36,30 +38,83 @@ export function extractToolSearchQuery(args: unknown): string {
 	return "";
 }
 
-function formatDirectCallHint(toolName: string): string {
-	if (toolName.startsWith("mcp__")) {
-		return `Call \`${toolName}\` directly in a tool-use block. ToolSearch is not available in GSD.`;
-	}
-	if (toolName.startsWith("gsd_") || toolName === "memory_query" || toolName === "capture_thought") {
-		return (
-			`Call \`${toolName}\` directly (or \`mcp__gsd-workflow__${toolName}\` when running inside Claude Code). ` +
-			"ToolSearch is not available in GSD."
-		);
-	}
-	return `Call \`${toolName}\` directly. ToolSearch is not available in GSD.`;
+export interface ToolSearchShimOptions {
+	activeToolNames?: readonly string[];
 }
 
-export function createToolSearchShimResult(args: unknown): {
+function activeEquivalentForSelectedTool(toolName: string, activeToolNames: readonly string[] | undefined): string | null {
+	if (!activeToolNames || activeToolNames.length === 0) return null;
+	const mcp = parseMcpToolName(toolName);
+	const canonicalToolName = mcp?.tool ?? toolName;
+
+	for (const activeName of activeToolNames) {
+		if (activeName === toolName || activeName === canonicalToolName) return activeName;
+		const activeMcp = parseMcpToolName(activeName);
+		if (activeMcp?.tool === canonicalToolName) return activeName;
+	}
+
+	const requestedLower = toolName.toLowerCase();
+	const canonicalLower = canonicalToolName.toLowerCase();
+	for (const activeName of activeToolNames) {
+		if (activeName.toLowerCase() === requestedLower || activeName.toLowerCase() === canonicalLower) return activeName;
+		const activeMcp = parseMcpToolName(activeName);
+		if (activeMcp?.tool.toLowerCase() === canonicalLower) return activeName;
+	}
+
+	return null;
+}
+
+function formatDirectCallHint(toolName: string, options: ToolSearchShimOptions = {}): { text: string; resolvedTool: string } {
+	const activeEquivalent = activeEquivalentForSelectedTool(toolName, options.activeToolNames);
+	if (activeEquivalent) {
+		return {
+			text: `Call \`${activeEquivalent}\` directly. ToolSearch is not available in GSD.`,
+			resolvedTool: activeEquivalent,
+		};
+	}
+
+	const mcpTool = parseMcpToolName(toolName);
+	if (mcpTool) {
+		return {
+			text:
+				`ToolSearch is not available in GSD. Do not call \`${toolName}\` unless it appears in the active tool list. ` +
+				`Call \`${mcpTool.tool}\` directly if listed, or use the exact active MCP-scoped name shown in your tool list.`,
+			resolvedTool: mcpTool.tool,
+		};
+	}
+
+	if (toolName.startsWith("mcp__")) {
+		return {
+			text:
+				`ToolSearch is not available in GSD. Do not call \`${toolName}\` unless it appears in the active tool list. ` +
+				"Use the exact active tool name shown in your tool list.",
+			resolvedTool: toolName,
+		};
+	}
+	if (toolName.startsWith("gsd_") || toolName === "memory_query" || toolName === "capture_thought") {
+		return {
+			text:
+				`Call \`${toolName}\` directly. In Claude Code, use that server's MCP-scoped name from the active tool list. ` +
+				"ToolSearch is not available in GSD.",
+			resolvedTool: toolName,
+		};
+	}
+	return {
+		text: `Call \`${toolName}\` directly. ToolSearch is not available in GSD.`,
+		resolvedTool: toolName,
+	};
+}
+
+export function createToolSearchShimResult(args: unknown, options: ToolSearchShimOptions = {}): {
 	content: Array<{ type: "text"; text: string }>;
 	details: { operation: "tool_search_shim"; query: string; resolvedTool: string | null };
 } {
 	const query = extractToolSearchQuery(args);
 	const selected = parseToolSearchSelectQuery(query);
-	const text = selected
-		? formatDirectCallHint(selected)
-		: "ToolSearch is not available in GSD. Call the workflow tool you need directly by name.";
+	const resolved = selected ? formatDirectCallHint(selected, options) : null;
+	const text = resolved?.text ?? "ToolSearch is not available in GSD. Call the workflow tool you need directly by name.";
 	return {
 		content: [{ type: "text", text }],
-		details: { operation: "tool_search_shim", query, resolvedTool: selected },
+		details: { operation: "tool_search_shim", query, resolvedTool: resolved?.resolvedTool ?? null },
 	};
 }

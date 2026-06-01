@@ -296,6 +296,11 @@ test('complete-slice closeout policy allows gsd_exec verification surface', () =
   assert.strictEqual(r.block, false);
 });
 
+test('complete-slice closeout policy allows MCP-scoped gsd_exec verification surface', () => {
+  const r = shouldBlockPlanningUnit('mcp__custom-workflow__gsd_exec', '', BASE, 'complete-slice', PLANNING_DISPATCH_REVIEW);
+  assert.strictEqual(r.block, false);
+});
+
 test('planning-dispatch: still blocks writes to user source (write isolation preserved)', () => {
   const r = shouldBlockPlanningUnit('write', join(BASE, 'src', 'main.ts'), BASE, 'plan-slice', PLANNING_DISPATCH);
   assert.strictEqual(r.block, true);
@@ -326,6 +331,11 @@ test('planning-unit: allows ask_user_questions', () => {
 
 test('planning-unit: allows gsd_* MCP tools (own validation)', () => {
   const r = shouldBlockPlanningUnit('gsd_summary_save', '', BASE, 'discuss-milestone', PLANNING);
+  assert.strictEqual(r.block, false);
+});
+
+test('planning-unit: allows MCP-scoped gsd_* tools (own validation)', () => {
+  const r = shouldBlockPlanningUnit('mcp__custom-workflow__gsd_summary_save', '', BASE, 'discuss-milestone', PLANNING);
   assert.strictEqual(r.block, false);
 });
 

@@ -58,3 +58,33 @@ test("detects top-level bash tool call via toolName field", () => {
 
   assert.equal(_hasExecutionToolCallsInSessionForTest(entries), true);
 });
+
+test("detects session execution tools supported by the evidence collector", () => {
+  const entries = [
+    {
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            toolName: "async_bash",
+            arguments: { command: "npm test" },
+          },
+          {
+            type: "toolCall",
+            toolName: "PowerShell",
+            arguments: { command: "Get-ChildItem" },
+          },
+          {
+            type: "toolCall",
+            toolName: "functions.exec_command",
+            arguments: { cmd: "pnpm test" },
+          },
+        ],
+      },
+    },
+  ];
+
+  assert.equal(_hasExecutionToolCallsInSessionForTest(entries), true);
+});

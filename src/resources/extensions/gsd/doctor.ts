@@ -332,7 +332,7 @@ export async function runGSDDoctor(basePath: string, options?: { fix?: boolean; 
     return true;
   };
 
-  const prefs = loadEffectiveGSDPreferences();
+  const prefs = loadEffectiveGSDPreferences(basePath);
   if (prefs) {
     const prefIssues = validatePreferenceShape(prefs.preferences);
     for (const issue of prefIssues) {

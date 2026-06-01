@@ -50,7 +50,7 @@ import { createRepositoryRegistryFromPreferences, defaultRepositoryTargets } fro
 import type { SliceRow } from "./db-task-slice-rows.js";
 import { getSlice } from "./gsd-db.js";
 import { getLedger } from "./metrics.js";
-import { getUnitCostSpikeAction } from "./auto-budget.js";
+import { getUnitCostSpikeAction, resolveUnitCostSpikeMultiplier } from "./auto-budget.js";
 import { formatPostUnitStatusCard } from "./auto-status-message.js";
 
 export interface VerificationContext {
@@ -601,6 +601,7 @@ export async function runPostUnitVerification(
     // ── Post-execution checks (run after main verification passes for execute-task units) ──
     let postExecChecks: PostExecutionCheckJSON[] | undefined;
     let postExecBlockingFailure = false;
+    let postExecFailureSummary: string | null = null;
 
     if (result.passed && mid && sid && tid) {
       // Check preferences — respect enhanced_verification and enhanced_verification_post
@@ -697,6 +698,13 @@ export async function runPostUnitVerification(
               const blockingCount = postExecResult.checks.filter(
                 (c) => !c.passed && c.blocking
               ).length;
+              const firstBlockingFailure = postExecResult.checks.find(
+                (c) => !c.passed && c.blocking
+              );
+              if (firstBlockingFailure) {
+                postExecFailureSummary =
+                  `[${firstBlockingFailure.category}] ${firstBlockingFailure.target}: ${firstBlockingFailure.message}`;
+              }
               ctx.ui.notify(
                 `Post-execution checks failed: ${blockingCount} blocking issue${blockingCount === 1 ? "" : "s"} found`,
                 "error"
@@ -709,6 +717,13 @@ export async function runPostUnitVerification(
               // Strict mode: treat warnings as blocking
               if (prefs?.enhanced_verification_strict === true) {
                 postExecBlockingFailure = true;
+                const firstWarning = postExecResult.checks.find(
+                  (c) => (!c.passed && !c.blocking) || (c.passed && c.category === "pattern")
+                );
+                if (firstWarning) {
+                  postExecFailureSummary =
+                    `[${firstWarning.category}] ${firstWarning.target}: ${firstWarning.message}`;
+                }
               }
             }
           }
@@ -811,12 +826,13 @@ export async function runPostUnitVerification(
       s.verificationRetryCount.delete(retryKey);
       s.verificationRetryFailureHashes.delete(retryKey);
       s.pendingVerificationRetry = null;
+      const failureDetail = postExecFailureSummary ?? "unknown post-execution check failure";
       ctx.ui.notify(
-        `Post-execution checks failed — cross-task consistency issue detected, pausing for human review`,
+        `Post-execution checks failed (${failureDetail}) — pausing for human review`,
         "error",
       );
       await pauseAuto(ctx, pi, {
-        message: "Post-execution checks failed: cross-task consistency issue detected.",
+        message: `Post-execution checks failed: ${failureDetail}.`,
         category: "unknown",
       });
       return "pause";
@@ -853,7 +869,7 @@ export async function runPostUnitVerification(
         });
         return "pause";
       }
-      if (getUnitCostSpikeAction(unitCostUsd, rollingAvgUsd, 3.0) === "pause") {
+      if (getUnitCostSpikeAction(unitCostUsd, rollingAvgUsd, resolveUnitCostSpikeMultiplier(prefs)) === "pause") {
         ctx.ui.notify(
           `Unit ${s.currentUnit.id} cost spike detected (${unitCostUsd.toFixed(2)} vs avg ${rollingAvgUsd.toFixed(2)}) during verification retry; keeping verification failure as the authoritative blocker.`,
           "warning",

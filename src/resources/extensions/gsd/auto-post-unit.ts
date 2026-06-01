@@ -68,7 +68,7 @@ import {
   runMilestoneCloseoutGitHub,
 } from "./milestone-closeout.js";
 import type { AutoSession, SidecarItem } from "./auto/session.js";
-import { getEvidence, clearEvidenceFromDisk } from "./safety/evidence-collector.js";
+import { getEvidence, clearEvidenceFromDisk, isExecutionToolName } from "./safety/evidence-collector.js";
 import { validateFileChanges } from "./safety/file-change-validator.js";
 import { crossReferenceEvidence, type ClaimedEvidence } from "./safety/evidence-cross-ref.js";
 import { validateContent } from "./safety/content-validator.js";
@@ -94,7 +94,7 @@ import {
 import { validateArtifact } from "./schemas/validate.js";
 import { verificationRetryKey } from "./auto/verification-retry-policy.js";
 import { getLedger } from "./metrics.js";
-import { getUnitCostSpikeAction } from "./auto-budget.js";
+import { getUnitCostSpikeAction, resolveUnitCostSpikeMultiplier } from "./auto-budget.js";
 import { resolveCanonicalMilestoneRoot } from "./worktree-manager.js";
 
 // ─── Path Comparison Helper ───────────────────────────────────────────────
@@ -223,13 +223,45 @@ function completeSliceReopenReplanHandoffDetected(
     agentEndMessagesIncludeToolCall(agentEndMessages, "gsd_task_reopen") ||
     agentEndMessagesMentionTool(agentEndMessages, "gsd_task_reopen") ||
     unitActivityMentionsTool(s.basePath, unitType, unitId, "gsd_task_reopen") ||
-    unitActivityMentionsTool(s.canonicalProjectRoot, unitType, unitId, "gsd_task_reopen") ||
+    unitActivityMentionsTool(s.canonicalProjectRoot, unitType, unitId, "gsd_task_reopen")
+  );
+}
+
+function completeSliceReplanSignalDetected(
+  s: AutoSession,
+  agentEndMessages: unknown[] | undefined,
+): boolean {
+  if (s.currentUnit?.type !== "complete-slice") return false;
+  return (
     agentEndMessagesIncludeSuccessfulToolResult(agentEndMessages, "gsd_replan_slice") ||
     agentEndMessagesIncludeToolCall(agentEndMessages, "gsd_replan_slice") ||
     agentEndMessagesMentionTool(agentEndMessages, "gsd_replan_slice") ||
-    unitActivityMentionsTool(s.basePath, unitType, unitId, "gsd_replan_slice") ||
-    unitActivityMentionsTool(s.canonicalProjectRoot, unitType, unitId, "gsd_replan_slice")
+    unitActivityMentionsTool(s.basePath, s.currentUnit.type, s.currentUnit.id, "gsd_replan_slice") ||
+    unitActivityMentionsTool(s.canonicalProjectRoot, s.currentUnit.type, s.currentUnit.id, "gsd_replan_slice")
   );
+}
+
+function completeSliceValidReplanOutcomeDetected(
+  s: AutoSession,
+  agentEndMessages: unknown[] | undefined,
+): boolean {
+  if (s.currentUnit?.type !== "complete-slice") return false;
+  const { milestone: mid, slice: sid } = parseUnitId(s.currentUnit.id);
+  if (!mid || !sid) return false;
+
+  if (!completeSliceReplanSignalDetected(s, agentEndMessages)) return false;
+
+  const replanPath = resolveSliceFile(s.basePath, mid, sid, "REPLAN");
+  const canonicalReplanPath = resolveSliceFile(s.canonicalProjectRoot, mid, sid, "REPLAN");
+  const hasReplanArtifact = (
+    Boolean(replanPath && existsSync(replanPath)) ||
+    Boolean(canonicalReplanPath && existsSync(canonicalReplanPath))
+  );
+  if (!hasReplanArtifact) return false;
+
+  if (!isDbAvailable()) return true;
+  const slice = getSlice(mid, sid);
+  return Boolean(slice && !isClosedStatus(slice.status));
 }
 
 function formatPreExecutionCheckDetail(check: PreExecutionCheckJSON): string {
@@ -488,12 +520,6 @@ export function _shouldDispatchQuickTaskForTest(
     state.pendingQuickTasks.length > 0 &&
     !!state.currentUnit &&
     state.currentUnit.type !== "quick-task";
-}
-
-function isExecutionToolName(name: unknown): boolean {
-  if (typeof name !== "string") return false;
-  const normalized = name.trim().toLowerCase();
-  return normalized === "bash" || normalized === "gsd_exec";
 }
 
 export function _hasExecutionToolCallsInSessionForTest(entries: readonly unknown[]): boolean {
@@ -1470,11 +1496,11 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
                       suppressedWarning: "evidence-empty-but-session-has-exec-calls",
                     });
                   } else {
-                    logWarning("safety", `evidence mismatch: ${missingCommandMismatches.length} claimed command(s) not found in bash calls`);
-                  ctx.ui.notify(
-                    `Safety: task ${sTid} claimed ${missingCommandMismatches.length} command(s) not found in recorded bash calls`,
-                    "warning",
-                  );
+                    logWarning("safety", `evidence mismatch: ${missingCommandMismatches.length} claimed command(s) not found in recorded execution calls`);
+                    ctx.ui.notify(
+                      `Safety: task ${sTid} claimed ${missingCommandMismatches.length} command(s) not found in recorded execution calls`,
+                      "warning",
+                    );
                   }
                 }
 
@@ -1798,7 +1824,29 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
           "warning",
         );
         return "continue";
-      } else if (!triggerArtifactVerified && !isDbAvailable()) {
+      } else if (
+        !triggerArtifactVerified &&
+        completeSliceValidReplanOutcomeDetected(s, opts?.agentEndMessages)
+      ) {
+        const retryKey = `${s.currentUnit.type}:${s.currentUnit.id}`;
+        s.pendingVerificationRetry = null;
+        s.verificationRetryCount.delete(retryKey);
+        s.verificationRetryFailureHashes.delete(retryKey);
+        debugLog("postUnit", {
+          phase: "artifact-verify-complete-slice-replan-outcome",
+          unitType: s.currentUnit.type,
+          unitId: s.currentUnit.id,
+        });
+        ctx.ui.notify(
+          `complete-slice ${s.currentUnit.id} produced a valid replan outcome; continuing orchestration instead of retrying closeout.`,
+          "warning",
+        );
+        return "continue";
+      } else if (
+        !triggerArtifactVerified &&
+        !isDbAvailable() &&
+        !completeSliceReplanSignalDetected(s, opts?.agentEndMessages)
+      ) {
         debugLog("postUnit", { phase: "artifact-verify-skip-db-unavailable", unitType: s.currentUnit.type, unitId: s.currentUnit.id });
         const dbSkipDiag = diagnoseExpectedArtifact(s.currentUnit.type, s.currentUnit.id, verificationBasePath);
         ctx.ui.notify(
@@ -1856,7 +1904,7 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
             await pauseAuto(ctx, pi);
             return "dispatched";
           }
-          if (getUnitCostSpikeAction(unitCostUsd, rollingAvgUsd, 3.0) === "pause") {
+          if (getUnitCostSpikeAction(unitCostUsd, rollingAvgUsd, resolveUnitCostSpikeMultiplier(prefs)) === "pause") {
             s.pendingVerificationRetry = null;
             s.verificationRetryCount.delete(retryKey);
             s.verificationRetryFailureHashes.delete(retryKey);

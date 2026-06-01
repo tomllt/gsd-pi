@@ -47,7 +47,7 @@ export const WORKFLOW_TOOL_CONTRACTS = [
 	},
 	{
 		canonicalName: "gsd_plan_milestone",
-		aliases: [],
+		aliases: ["gsd_milestone_plan"],
 		schemaId: "workflow.milestone.plan",
 		executorId: "executePlanMilestone",
 		writePolicy: "write",
@@ -55,7 +55,7 @@ export const WORKFLOW_TOOL_CONTRACTS = [
 	},
 	{
 		canonicalName: "gsd_plan_slice",
-		aliases: [],
+		aliases: ["gsd_slice_plan"],
 		schemaId: "workflow.slice.plan",
 		executorId: "executePlanSlice",
 		writePolicy: "write",
@@ -127,7 +127,7 @@ export const WORKFLOW_TOOL_CONTRACTS = [
 	},
 	{
 		canonicalName: "gsd_summary_save",
-		aliases: [],
+		aliases: ["gsd_save_summary"],
 		schemaId: "workflow.summary.save",
 		executorId: "executeSummarySave",
 		writePolicy: "write",
@@ -172,6 +172,14 @@ export const WORKFLOW_TOOL_CONTRACTS = [
 		executorId: "executeMilestoneStatus",
 		writePolicy: "read",
 		auditEvent: "workflow.milestone.status",
+	},
+	{
+		canonicalName: "gsd_checkpoint_db",
+		aliases: [],
+		schemaId: "workflow.database.checkpoint",
+		executorId: "executeCheckpointDb",
+		writePolicy: "read",
+		auditEvent: "workflow.database.checkpoint",
 	},
 	{
 		canonicalName: "gsd_journal_query",
@@ -235,3 +243,17 @@ export const WORKFLOW_TOOL_NAMES = WORKFLOW_TOOL_CONTRACTS.flatMap((tool) => [
 	tool.canonicalName,
 	...tool.aliases,
 ]) as readonly string[];
+
+/** Canonical tool names only (excludes backwards-compatibility aliases). */
+export const CANONICAL_WORKFLOW_TOOL_NAMES = WORKFLOW_TOOL_CONTRACTS.map(
+	(tool) => tool.canonicalName,
+) as readonly string[];
+
+/**
+ * Backwards-compatibility alias names (each forwards to a canonical twin).
+ * Callers may exclude these from an advertised tool surface to save tokens —
+ * see registerWorkflowTools({ advertiseAliases }).
+ */
+export const WORKFLOW_TOOL_ALIAS_NAMES = WORKFLOW_TOOL_CONTRACTS.flatMap(
+	(tool) => tool.aliases,
+) as readonly string[];

@@ -19,6 +19,7 @@ import {
   openDatabase,
 } from "../gsd-db.ts";
 import { createWorktree } from "../worktree-manager.ts";
+import { _resetLogs, drainLogs, setStderrLoggingEnabled } from "../workflow-logger.ts";
 
 // ─── Fixture Helpers ───────────────────────────────────────────────────────
 
@@ -190,7 +191,9 @@ test('getActiveMilestoneId skips parked', async () => {
   // ─── Test 10: discardMilestone removes directory ──────────────────────
 test('discardMilestone removes directory', async () => {
     const base = createFixtureBase();
+    const previousStderr = setStderrLoggingEnabled(false);
     try {
+      _resetLogs();
       createMilestone(base, 'M001', { withRoadmap: true });
       clearCaches();
 
@@ -200,7 +203,13 @@ test('discardMilestone removes directory', async () => {
       const success = discardMilestone(base, 'M001');
       assert.ok(success, 'discardMilestone returns true');
       assert.ok(!existsSync(mDir), 'milestone dir removed after discard');
+      const logs = drainLogs();
+      assert.ok(
+        logs.some((entry) => entry.message.includes('discardMilestone DB cleanup skipped for M001: database unavailable')),
+        'discardMilestone warns when DB cleanup is skipped',
+      );
     } finally {
+      setStderrLoggingEnabled(previousStderr);
       cleanup(base);
     }
 });

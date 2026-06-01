@@ -1,6 +1,6 @@
 ---
 name: observability
-description: Add agent-first observability to code — structured logs, health endpoints, failure-state persistence, and explicit failure modes — so the next agent hitting a problem at 3am has the signals it needs to diagnose. Use when asked to "add logging", "add observability", "add metrics", "debug later", "make this observable", or when building/refactoring a subsystem that will run unattended (auto-mode engine, background jobs, servers, watchers). Operationalizes VISION.md's "agent-first observability" principle.
+description: Add agent-first observability — structured logs, health endpoints, failure-state persistence, explicit failure modes — so the next agent can diagnose problems unattended. Use when asked to "add logging", "add observability", "add metrics", "make this observable", or when building/refactoring a subsystem that runs unattended (auto-mode engine, background jobs, servers, watchers).
 ---
 
 <objective>

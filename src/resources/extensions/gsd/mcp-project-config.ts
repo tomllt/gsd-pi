@@ -21,6 +21,11 @@ export interface EnsureProjectWorkflowMcpConfigResult {
   status: "created" | "updated" | "unchanged";
 }
 
+interface ProjectWorkflowMcpServerSpec {
+  serverName: string;
+  server: ProjectMcpServerConfig;
+}
+
 interface McpConfigFile {
   mcpServers?: Record<string, ProjectMcpServerConfig>;
   servers?: Record<string, ProjectMcpServerConfig>;
@@ -48,6 +53,13 @@ export function buildProjectWorkflowMcpServerConfig(
   projectRoot: string,
   env: NodeJS.ProcessEnv = process.env,
 ): ProjectMcpServerConfig {
+  return buildProjectWorkflowMcpServerSpec(projectRoot, env).server;
+}
+
+function buildProjectWorkflowMcpServerSpec(
+  projectRoot: string,
+  env: NodeJS.ProcessEnv = process.env,
+): ProjectWorkflowMcpServerSpec {
   const resolvedProjectRoot = resolve(projectRoot);
   const gsdCliPath = resolveBundledGsdCliPath(env);
   const launch = detectWorkflowMcpLaunchConfig(resolvedProjectRoot, {
@@ -62,10 +74,13 @@ export function buildProjectWorkflowMcpServerConfig(
   }
 
   return {
-    command: launch.command,
-    ...(launch.args && launch.args.length > 0 ? { args: launch.args } : {}),
-    ...(launch.cwd ? { cwd: launch.cwd } : {}),
-    ...(launch.env ? { env: launch.env } : {}),
+    serverName: launch.name || GSD_WORKFLOW_MCP_SERVER_NAME,
+    server: {
+      command: launch.command,
+      ...(launch.args && launch.args.length > 0 ? { args: launch.args } : {}),
+      ...(launch.cwd ? { cwd: launch.cwd } : {}),
+      ...(launch.env ? { env: launch.env } : {}),
+    },
   };
 }
 
@@ -92,23 +107,23 @@ export function ensureProjectWorkflowMcpConfig(
 
   const configPath = resolve(resolvedProjectRoot, ".mcp.json");
   const existing = readExistingConfig(configPath);
-  const desiredServer = buildProjectWorkflowMcpServerConfig(resolvedProjectRoot, env);
+  const { serverName, server: desiredServer } = buildProjectWorkflowMcpServerSpec(resolvedProjectRoot, env);
   const previousServers = existing.mcpServers ?? {};
   const nextServers = {
     ...previousServers,
-    [GSD_WORKFLOW_MCP_SERVER_NAME]: desiredServer,
+    [serverName]: desiredServer,
   };
 
   const alreadyPresent = existsSync(configPath);
   const unchanged =
-    JSON.stringify(previousServers[GSD_WORKFLOW_MCP_SERVER_NAME] ?? null)
+    JSON.stringify(previousServers[serverName] ?? null)
       === JSON.stringify(desiredServer)
     && existing.mcpServers !== undefined;
 
   if (unchanged) {
     return {
       configPath,
-      serverName: GSD_WORKFLOW_MCP_SERVER_NAME,
+      serverName,
       status: "unchanged",
     };
   }
@@ -122,7 +137,7 @@ export function ensureProjectWorkflowMcpConfig(
 
   return {
     configPath,
-    serverName: GSD_WORKFLOW_MCP_SERVER_NAME,
+    serverName,
     status: alreadyPresent ? "updated" : "created",
   };
 }

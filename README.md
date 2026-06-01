@@ -13,16 +13,6 @@ GSD Pi is a local-first coding agent for planning, implementing, verifying, and 
 
 It combines a terminal agent, project workflow tools, worktree-aware Git automation, and optional UI integrations so a project can move from idea to reviewed implementation with less manual coordination.
 
-## Screenshots
-
-GSD runs as a terminal-first TUI with optional browser dashboard controls.
-
-![GSD TUI running an agent workflow](./docs/assets/screenshots/gsd-tui-agent-run.png)
-
-![GSD TUI progress dashboard](./docs/assets/screenshots/gsd-tui-progress-dashboard.png)
-
-![GSD TUI metrics dashboard](./docs/assets/screenshots/gsd-tui-metrics-dashboard.png)
-
 ## Feature Roll-Up
 
 - **Guided terminal agent** — Start with `gsd`, configure providers, and run planned or quick coding sessions from your shell.
@@ -34,6 +24,16 @@ GSD runs as a terminal-first TUI with optional browser dashboard controls.
 - **Terminal and web surfaces** — Use the TUI by default, or launch `gsd --web` when a visual control plane fits the work better than a terminal.
 
 See [CHANGELOG.md](./CHANGELOG.md) for release-by-release fixes and [Legacy Release History](./docs/archive/legacy-release-history.md) for archived history before the `open-gsd/gsd-pi` baseline.
+
+## Latest Release Highlights
+
+- **Claude Opus 4.8 support** — Add the latest Claude model option to the generated model catalog.
+- **Better `/gsd` observability** — Add `/gsd usage` and `/gsd context` commands for inspecting session usage and context state.
+- **Sharper skill scoping** — Scope the skill catalog per unit, trim duplicate prompt surfaces, and apply unit-context manifest policy during auto-mode dispatch.
+- **Improved guided installs** — Redesign the `npx @opengsd/gsd-pi@latest` flow so first-time and scripted installs are clearer and more reliable.
+- **Smoother auto-mode progress** — Improve requirements backlog handling, completion summaries, quick branch inference, cleanup logic, and milestone closeout behavior.
+- **Cloud MCP gateway runtime** — Add the local cloud MCP gateway runtime with persisted auth state.
+- **More reliable installs** — Resolve native engine packages to the matching release version across npm installs and Docker images.
 
 ## Status
 

@@ -66,7 +66,7 @@ At the end, offer the user one of:
 
 1. Append resolved decisions to `.gsd/DECISIONS.md` (one line each, dated).
 2. Write or update `M###-CONTEXT.md` or `S##-CONTEXT.md` for the active milestone/slice.
-3. Draft a GitHub issue via `mcp__github__issue_write` (only with explicit confirmation per the outward-action rule).
+3. Draft a GitHub issue via the active GitHub issue-write tool if one is available, using its exact active tool name (only with explicit confirmation per the outward-action rule).
 4. Leave it as conversation context if the work is ephemeral.
 
 Default: ask which they want. Do not auto-write.

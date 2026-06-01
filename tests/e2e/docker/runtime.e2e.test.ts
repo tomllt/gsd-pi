@@ -19,6 +19,9 @@ import { join, resolve } from "node:path";
 
 import { stripAnsi } from "../_shared/index.ts";
 
+const DOCKER_BUILD_TIMEOUT_MS = 900_000;
+const RUNTIME_LOCAL_TEST_TIMEOUT_MS = DOCKER_BUILD_TIMEOUT_MS + 120_000;
+
 function dockerAvailable(): boolean {
 	const probe = spawnSync("docker", ["version", "--format", "{{.Server.Version}}"], {
 		stdio: "pipe",
@@ -81,7 +84,7 @@ function dockerBuildLocal(tarballName: string, tag: string): void {
 			cwd: root,
 			stdio: "pipe",
 			encoding: "utf8",
-			timeout: 600_000,
+			timeout: DOCKER_BUILD_TIMEOUT_MS,
 		},
 	);
 }
@@ -92,7 +95,7 @@ function dockerBuildBuilder(tag: string): void {
 		cwd: root,
 		stdio: "pipe",
 		encoding: "utf8",
-		timeout: 900_000,
+		timeout: DOCKER_BUILD_TIMEOUT_MS,
 	});
 }
 
@@ -126,7 +129,7 @@ describe("docker runtime e2e", () => {
 
 	test(
 		"CI builder image target builds for publish workflow bootstrap",
-		{ skip: skipReason ?? false, timeout: 900_000 },
+		{ skip: skipReason ?? false, timeout: RUNTIME_LOCAL_TEST_TIMEOUT_MS },
 		(t) => {
 			t.after(() => dockerRmImage(BUILDER_TAG));
 
@@ -136,7 +139,7 @@ describe("docker runtime e2e", () => {
 
 	test(
 		"`gsd --version` inside runtime-local container exits 0 with semver",
-		{ skip: skipReason ?? false, timeout: 900_000 },
+		{ skip: skipReason ?? false, timeout: RUNTIME_LOCAL_TEST_TIMEOUT_MS },
 		(t) => {
 			const packed = packToRoot();
 			t.after(packed.cleanup);

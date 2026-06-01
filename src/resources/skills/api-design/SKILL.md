@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: Design or review an HTTP/REST/GraphQL API for versioning, pagination, error shapes, idempotency, auth, and evolvability. Use when asked to "design an API", "shape the endpoints", "design the schema", "add a new endpoint", "review this API", or when building/modifying a public or internal HTTP surface. Complements `design-an-interface` (which is interface-agnostic) by covering HTTP-specific concerns like status codes, cache headers, and breaking-change management.
+description: Design or review an HTTP/REST/GraphQL API for versioning, pagination, error shapes, idempotency, auth, status codes, cache headers, and breaking-change management. Use when asked to "design an API", "shape the endpoints", "design the schema", "add a new endpoint", "review this API", or when building/modifying a public or internal HTTP surface. HTTP-specific complement to `design-an-interface`.
 ---
 
 <objective>

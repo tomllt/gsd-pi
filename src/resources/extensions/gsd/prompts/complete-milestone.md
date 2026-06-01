@@ -84,7 +84,7 @@ Subagents report only; they do not write user source. Fold any findings into Dec
    - `deviations` (string) — Deviations from the original plan
 
 14. Do not commit manually — the system auto-commits your changes after this unit completes.
-- Say: "Milestone {{milestoneId}} complete."
+- After `gsd_complete_milestone` succeeds, emit only one closeout line: "Milestone {{milestoneId}} complete." Do not add a second final-status block, repeat the tool result, or restate the closeout summary.
 
 **Important:** Do NOT skip code-change, success-criteria, or definition-of-done verification (steps 4-6). The summary must reflect verified outcomes. Verification failures block completion; there is no override. If a verification tool fails, errors, or returns unexpected output, treat it as failure.
 

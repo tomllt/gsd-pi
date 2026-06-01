@@ -154,12 +154,13 @@ export async function mergeCompletedMilestone(
   // to read it from. Only use the worktree path when git actually knows
   // about it (`getAutoWorktreePath` returns non-null). When the directory
   // exists on disk but isn't a registered git worktree (e.g. a stale
-  // session-status marker dir), fall back to the project root and let the
-  // standalone's mode detection pick branch-mode or skipped — using the
-  // un-registered dir as `worktreeBasePath` would cause `getCurrentBranch`
-  // to fail with a "Worktree HEAD diverged" error.
+  // session-status marker dir), recover through branch mode from the project
+  // root. Letting worktree-mode run from the project root can auto-commit
+  // overlapping root files to the integration branch before the squash merge,
+  // creating a synthetic conflict.
   const registeredWtPath = getAutoWorktreePath(basePath, milestoneId);
   const worktreeBasePath = registeredWtPath ?? basePath;
+  const isolationModeOverride = registeredWtPath ? undefined : "branch";
 
   let result: MergeStandaloneResult;
   try {
@@ -167,6 +168,7 @@ export async function mergeCompletedMilestone(
       originalBasePath: basePath,
       worktreeBasePath,
       milestoneId,
+      isolationModeOverride,
       // Parallel context never runs with degraded isolation — workers only
       // exist when isolation succeeded. Pass `false` explicitly so the
       // standalone's degraded-skip branch is not reached.

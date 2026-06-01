@@ -25,6 +25,7 @@ export {
 	extractToolSearchQuery,
 	isToolSearchToolName,
 	parseToolSearchSelectQuery,
+	type ToolSearchShimOptions,
 } from "./tool-search-shim.js";
 
 /** Claude Code built-in names mapped to Pi built-in tool names. */

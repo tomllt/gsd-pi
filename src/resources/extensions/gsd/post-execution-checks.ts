@@ -318,10 +318,13 @@ export function checkImportResolution(
     const imports = extractRelativeImports(source);
 
     for (const { importPath, lineNum } of imports) {
-      // React Router generated +types modules may not exist on disk during
-      // post-exec checks (generated during framework build). Don't block task
-      // completion on these imports.
-      if (/^\.{1,2}\/\+types\//.test(importPath)) {
+      // Framework-generated type modules may not exist on disk during post-exec
+      // checks (typically generated during framework builds/typegen). Don't
+      // block task completion on these imports.
+      if (
+        /^\.{1,2}\/\+types\//.test(importPath) ||
+        /^(?:\.{1,2}\/)+(?:[^/]+\/)*\$types(?:$|\/)/.test(importPath)
+      ) {
         continue;
       }
 

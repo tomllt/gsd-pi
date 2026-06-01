@@ -285,6 +285,11 @@ test('isInteractiveHeadlessTool: secure_env_collect is interactive', () => {
   assert.equal(isInteractiveHeadlessTool('secure_env_collect'), true)
 })
 
+test('isInteractiveHeadlessTool: MCP-scoped interactive tools are interactive', () => {
+  assert.equal(isInteractiveHeadlessTool('mcp__custom-workflow__ask_user_questions'), true)
+  assert.equal(isInteractiveHeadlessTool('mcp__custom-workflow__secure_env_collect'), true)
+})
+
 test('isInteractiveHeadlessTool: non-interactive tools stay false', () => {
   assert.equal(isInteractiveHeadlessTool('bash'), false)
   assert.equal(isInteractiveHeadlessTool(undefined), false)

@@ -6,37 +6,84 @@ import { resolveModelMcpConfig } from "./preferences-mcp.js";
 
 interface McpJsonFile {
   mcpServers?: Record<string, unknown>;
+  servers?: Record<string, unknown>;
 }
 
 interface ClaudeSettingsFile {
   mcpServers?: Record<string, unknown>;
 }
 
-export function discoverMcpServerNames(projectDir: string): string[] {
+interface DiscoveredMcpServer {
+  name: string;
+  config: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function readJsonFile(path: string, ignoreParseErrors = false): unknown | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as unknown;
+  } catch (err) {
+    if (!ignoreParseErrors) throw err;
+    return undefined;
+  }
+}
+
+function collectServerEntries(servers: unknown): DiscoveredMcpServer[] {
+  if (!isRecord(servers)) return [];
+  return Object.entries(servers).map(([name, config]) => ({ name, config }));
+}
+
+export function discoverMcpServers(projectDir: string): DiscoveredMcpServer[] {
   const mcpJsonPath = resolve(projectDir, ".mcp.json");
   const settingsPath = resolve(projectDir, ".claude", "settings.json");
 
-  let mcpJsonServers: string[] = [];
-  if (existsSync(mcpJsonPath)) {
-    const raw = readFileSync(mcpJsonPath, "utf-8");
-    const parsed = JSON.parse(raw) as McpJsonFile;
-    mcpJsonServers = Object.keys(parsed.mcpServers ?? {});
-  }
+  const mcpJson = readJsonFile(mcpJsonPath) as McpJsonFile | undefined;
+  const settings = readJsonFile(settingsPath, true) as ClaudeSettingsFile | undefined;
 
-  let settingsServers: string[] = [];
-  if (existsSync(settingsPath)) {
-    try {
-      const raw = readFileSync(settingsPath, "utf-8");
-      const parsed = JSON.parse(raw) as ClaudeSettingsFile;
-      if (parsed.mcpServers) {
-        settingsServers = Object.keys(parsed.mcpServers);
-      }
-    } catch {
-      // settings.json parse errors are silently ignored
+  const seen = new Set<string>();
+  const discovered: DiscoveredMcpServer[] = [];
+  for (const entry of [
+    ...collectServerEntries(mcpJson?.mcpServers),
+    ...collectServerEntries(mcpJson?.servers),
+    ...collectServerEntries(settings?.mcpServers),
+  ]) {
+    if (seen.has(entry.name)) continue;
+    seen.add(entry.name);
+    discovered.push(entry);
+  }
+  return discovered;
+}
+
+function isWorkflowMcpServerConfig(config: unknown): boolean {
+  if (!isRecord(config)) return false;
+  const env = config.env;
+  if (isRecord(env)) {
+    if (
+      typeof env.GSD_WORKFLOW_PROJECT_ROOT === "string"
+      || typeof env.GSD_WORKFLOW_EXECUTORS_MODULE === "string"
+      || typeof env.GSD_WORKFLOW_WRITE_GATE_MODULE === "string"
+      || typeof env.GSD_PERSIST_WRITE_GATE_STATE === "string"
+    ) {
+      return true;
     }
   }
 
-  return [...new Set([...mcpJsonServers, ...settingsServers])];
+  const command = typeof config.command === "string" ? config.command : "";
+  if (command.includes("gsd-mcp-server")) return true;
+  const args = Array.isArray(config.args) ? config.args.filter((arg): arg is string => typeof arg === "string") : [];
+  return args.some((arg) => arg.includes("gsd-mcp-server") || arg.includes("packages/mcp-server"));
+}
+
+export function discoverWorkflowMcpServerName(projectDir: string): string | undefined {
+  return discoverMcpServers(projectDir).find((server) => isWorkflowMcpServerConfig(server.config))?.name;
+}
+
+export function discoverMcpServerNames(projectDir: string): string[] {
+  return discoverMcpServers(projectDir).map((server) => server.name);
 }
 
 export function computeMcpDisallowedTools(

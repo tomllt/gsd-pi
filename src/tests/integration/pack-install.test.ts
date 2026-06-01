@@ -13,7 +13,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createGunzip } from "node:zlib";
 import { killChildProcess } from "./child-process-guard.ts";
@@ -62,24 +62,66 @@ function buildQuietNpmEnv(sandbox: NpmSandbox): NodeJS.ProcessEnv {
   };
 }
 
-function runNpmQuiet(args: string[], sandbox: NpmSandbox): void {
-  execFileSync("npm", args, {
+function formatCommand(args: string[]): string {
+  return `npm ${args.join(" ")}`;
+}
+
+function runNpmQuiet(args: string[], sandbox: NpmSandbox): string {
+  try {
+    return execFileSync("npm", args, {
+      cwd: projectRoot,
+      encoding: "utf-8",
+      env: buildQuietNpmEnv(sandbox),
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  } catch (error) {
+    const err = error as {
+      signal?: NodeJS.Signals | null;
+      status?: number | null;
+      stderr?: string | Buffer;
+      stdout?: string | Buffer;
+    };
+    const stdout = Buffer.isBuffer(err.stdout) ? err.stdout.toString("utf-8") : (err.stdout ?? "");
+    const stderr = Buffer.isBuffer(err.stderr) ? err.stderr.toString("utf-8") : (err.stderr ?? "");
+    throw new Error(
+      [
+        `${formatCommand(args)} failed`,
+        `status=${err.status ?? "<none>"} signal=${err.signal ?? "<none>"}`,
+        stdout.trim() ? `stdout:\n${stdout.trim().slice(-4000)}` : "",
+        stderr.trim() ? `stderr:\n${stderr.trim().slice(-4000)}` : "",
+      ].filter(Boolean).join("\n\n"),
+    );
+  }
+}
+
+function runNodeScript(relativePath: string): void {
+  execFileSync(process.execPath, [join(projectRoot, relativePath)], {
     cwd: projectRoot,
-    env: buildQuietNpmEnv(sandbox),
-    stdio: "ignore",
+    stdio: "pipe",
     maxBuffer: 16 * 1024 * 1024,
   });
 }
 
 function packTarball(sandbox: NpmSandbox): string {
-  const pkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
-  const safeName = pkg.name.replace(/^@/, "").replace(/\//g, "-");
-  const tarball = `${safeName}-${pkg.version}.tgz`;
   const packDestination = join(sandbox.rootDir, "pack-output");
 
   mkdirSync(packDestination, { recursive: true });
-  runNpmQuiet(["pack", "--pack-destination", packDestination], sandbox);
-  return join(packDestination, tarball);
+  runNodeScript("scripts/prepack-resolve-workspace.cjs");
+  try {
+    const packOutput = runNpmQuiet(
+      ["pack", "--json", "--ignore-scripts", "--pack-destination", packDestination],
+      sandbox,
+    );
+    const metadata = JSON.parse(packOutput);
+    const filename = Array.isArray(metadata) ? metadata[0]?.filename : undefined;
+    if (typeof filename !== "string" || filename.length === 0) {
+      throw new Error(`npm pack returned no filename metadata: ${packOutput.slice(0, 1000)}`);
+    }
+    return isAbsolute(filename) ? filename : join(packDestination, filename);
+  } finally {
+    runNodeScript("scripts/postpack-restore-workspace.cjs");
+  }
 }
 
 /** List file paths inside a .tgz using Node built-ins only (no tar CLI or npm package). */

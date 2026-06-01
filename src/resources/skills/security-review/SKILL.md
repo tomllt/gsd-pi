@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Threat-model-driven security review of a change, feature, or subsystem. Runs a STRIDE-style pass (Spoofing, Tampering, Repudiation, Info disclosure, Denial of service, Elevation of privilege), examines the actual code, and produces a filing-ready report with severity, exploit scenario, and concrete remediation. Use when asked to "security review", "threat model", "check for vulnerabilities", "audit this for security", "secure this", or before shipping any change that touches auth, input handling, data access, or external surfaces.
+description: Threat-model-driven security review of a change, feature, or subsystem. Runs a STRIDE-style pass over the actual code and produces a filing-ready report with severity, exploit scenario, and remediation. Use when asked to "security review", "threat model", "check for vulnerabilities", "audit for security", "secure this", or before shipping changes touching auth, input handling, data access, or external surfaces.
 ---
 
 <objective>

@@ -201,6 +201,29 @@ export class SessionManager {
   }
 
   /**
+   * Return the only tracked session, if there is exactly one.
+   *
+   * MCP clients occasionally lose the sessionId returned from gsd_execute while
+   * still talking to the same server process. A sole-session fallback lets
+   * read-only status polling recover without guessing across projects.
+   */
+  getOnlySession(): ManagedSession | undefined {
+    let only: ManagedSession | undefined;
+    for (const session of this.sessions.values()) {
+      if (only) return undefined;
+      only = session;
+    }
+    return only;
+  }
+
+  /**
+   * Snapshot tracked sessions for diagnostics and ambiguity errors.
+   */
+  listSessions(): ManagedSession[] {
+    return [...this.sessions.values()];
+  }
+
+  /**
    * Resolve a pending blocker by sending a UI response.
    */
   async resolveBlocker(sessionId: string, response: string): Promise<void> {

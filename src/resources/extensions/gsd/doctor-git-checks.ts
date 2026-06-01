@@ -1,7 +1,7 @@
 // gsd-pi doctor git health checks
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import type { DoctorIssue, DoctorIssueCode } from "./doctor-types.js";
 import { loadFile } from "./files.js";
@@ -56,17 +56,74 @@ function isSameOrNestedPath(candidate: string, container: string): boolean {
     normalizedCandidate.startsWith(`${normalizedContainer}/`);
 }
 
-function hasProjectContentOnDisk(dirPath: string): boolean {
+function normalizeGitPath(path: string): string {
+  return path.replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+function isProjectContentPath(path: string): boolean {
+  const normalized = normalizeGitPath(path);
+  if (!normalized || normalized.endsWith("/")) return false;
+  if (normalized === ".gitignore" || normalized === ".gitattributes") return false;
+  if (normalized.endsWith(".DS_Store")) return false;
+  const parts = normalized.split("/");
+  return !parts.some(part => part === ".git" || part === ".gsd");
+}
+
+function gitLines(basePath: string, args: string[]): string[] {
+  const result = spawnSync("git", args, {
+    cwd: basePath,
+    encoding: "utf-8",
+  });
+  if (result.status !== 0) return [];
+  return result.stdout
+    .split("\n")
+    .map(line => normalizeGitPath(line.trim()))
+    .filter(isProjectContentPath);
+}
+
+function listProjectContentFiles(basePath: string): string[] {
+  return [...new Set([
+    ...gitLines(basePath, ["ls-files"]),
+    ...gitLines(basePath, ["ls-files", "--others", "--exclude-standard"]),
+  ])];
+}
+
+function hasMaterializedProjectContentFallback(dirPath: string): boolean {
   try {
     for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
-      if (entry.name === ".git" || entry.name === ".gsd") continue;
+      if (!isProjectContentPath(entry.name)) continue;
       if (entry.name === ".DS_Store") continue;
+      if (entry.isDirectory()) {
+        if (hasMaterializedProjectContentFallback(join(dirPath, entry.name))) return true;
+        continue;
+      }
       return true;
     }
   } catch {
     return false;
   }
   return false;
+}
+
+function hasProjectContentOnDisk(dirPath: string): boolean {
+  const gitProjectFiles = listProjectContentFiles(dirPath);
+  if (gitProjectFiles.length > 0) {
+    return gitProjectFiles.some(file => existsSync(join(dirPath, file)));
+  }
+  return hasMaterializedProjectContentFallback(dirPath);
+}
+
+function copyProjectRootContentIntoWorktree(projectRoot: string, worktreeRoot: string): number {
+  let copied = 0;
+  for (const relPath of listProjectContentFiles(projectRoot)) {
+    const src = join(projectRoot, relPath);
+    if (!existsSync(src)) continue;
+    const dst = join(worktreeRoot, relPath);
+    mkdirSync(dirname(dst), { recursive: true });
+    cpSync(src, dst, { recursive: true, force: true });
+    copied++;
+  }
+  return copied;
 }
 
 function getSnapshotDiffCheckFailure(basePath: string): string | null {
@@ -176,7 +233,17 @@ export async function checkGitHealth(
             if (reset.status !== 0) {
               throw new Error(reset.stderr || reset.error?.message || "git reset --hard failed");
             }
-            fixesApplied.push(`recreated empty worktree ${wt.path}`);
+            const copied = !hasProjectContentOnDisk(recreated.path) && hasProjectContentOnDisk(basePath)
+              ? copyProjectRootContentIntoWorktree(basePath, recreated.path)
+              : 0;
+            if (!hasProjectContentOnDisk(recreated.path) && hasProjectContentOnDisk(basePath)) {
+              throw new Error("recreated worktree still has no project content");
+            }
+            fixesApplied.push(
+              copied > 0
+                ? `recreated empty worktree ${wt.path} and copied ${copied} project file${copied === 1 ? "" : "s"} from project root`
+                : `recreated empty worktree ${wt.path}`,
+            );
           } catch {
             fixesApplied.push(`failed to recreate empty worktree ${wt.path}`);
           }

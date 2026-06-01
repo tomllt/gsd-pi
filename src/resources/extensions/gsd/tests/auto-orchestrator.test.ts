@@ -15,6 +15,7 @@ import { resolveDispatch, type DispatchContext } from "../auto-dispatch.js";
 import { RuleRegistry, setRegistry, resetRegistry } from "../rule-registry.js";
 import type { UnifiedRule } from "../rule-types.js";
 import { supportsStructuredQuestions } from "../workflow-mcp.js";
+import { closeDatabase, insertMilestone, insertSlice, insertTask, openDatabase } from "../gsd-db.js";
 
 function assertBlockedResult(
   result: Awaited<ReturnType<ReturnType<typeof createAutoOrchestrator>["advance"]>>,
@@ -1274,6 +1275,59 @@ test("wired DispatchAdapter replays pending verification retry dispatch", async 
   assert.equal(session.pendingVerificationRetryDispatch, null);
   assert.equal(session.pendingOrchestrationDispatch?.prompt, "repair slice closeout");
   assert.equal(session.pendingOrchestrationDispatch?.state, stateSnapshot);
+});
+
+test("wired DispatchAdapter clears verification retry state when skipping an already closed retry dispatch", async () => {
+  const stateSnapshot = makeState();
+  const base = mkdtempSync(join(tmpdir(), "gsd-orchestrator-closed-retry-"));
+
+  try {
+    mkdirSync(join(base, ".gsd"), { recursive: true });
+    openDatabase(join(base, ".gsd", "gsd.db"));
+    insertMilestone({ id: "M001", title: "Milestone", status: "active" });
+    insertSlice({ milestoneId: "M001", id: "S01", title: "Slice", status: "active" });
+    insertTask({ milestoneId: "M001", sliceId: "S01", id: "T01", title: "Task", status: "complete" });
+
+    const retryRule: UnifiedRule = {
+      name: "test-closed-verification-retry",
+      when: "dispatch",
+      evaluation: "first-match",
+      where: async () => ({
+        action: "dispatch" as const,
+        unitType: "execute-task",
+        unitId: "M001/S01/T01",
+        prompt: "retry closed task",
+      }),
+      then: (r: unknown) => r,
+    };
+    setRegistry(new RuleRegistry([retryRule]));
+
+    const ctx = { model: {}, modelRegistry: { getAll: () => [] } } as any;
+    const pi = { getActiveTools: () => [] } as any;
+    const session = {
+      basePath: base,
+      pendingOrchestrationDispatch: { stale: true },
+      pendingVerificationRetry: {
+        unitId: "M001/S01/T01",
+        failureContext: "artifact missing",
+        attempt: 1,
+      },
+    } as any;
+    const adapter = createWiredDispatchAdapter(ctx, pi, base, session);
+
+    const result = await adapter.decideNextUnit({ stateSnapshot });
+
+    assert.deepEqual(result, {
+      kind: "skipped",
+      reason: "execute-task M001/S01/T01 is already complete",
+    });
+    assert.equal(session.pendingVerificationRetry, null);
+    assert.equal(session.pendingOrchestrationDispatch, null);
+  } finally {
+    resetRegistry();
+    closeDatabase();
+    rmSync(base, { recursive: true, force: true });
+  }
 });
 
 test("wired DispatchAdapter preserves stop reason as a blocked decision", async () => {

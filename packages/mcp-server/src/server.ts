@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { SessionManager } from './session-manager.js';
+import type { ManagedSession } from './types.js';
 import { isRemoteConfigured, tryRemoteQuestions } from './remote-questions.js';
 import type { RemoteToolResult } from './remote-questions.js';
 import { readProgress } from './readers/state.js';
@@ -164,6 +165,67 @@ function errorContent(message: string): { isError: true; content: Array<{ type: 
 /** Return raw text content without JSON wrapping. */
 function textContent(text: string): { content: Array<{ type: 'text'; text: string }> } {
   return { content: [{ type: 'text' as const, text }] };
+}
+
+function getSessionStatusPayload(session: ManagedSession): Record<string, unknown> {
+  const durationMs = Date.now() - session.startTime;
+  const toolCallCount = session.events.filter(
+    (e) => (e as Record<string, unknown>).type === 'tool_use' ||
+           (e as Record<string, unknown>).type === 'tool_execution_start',
+  ).length;
+
+  return {
+    sessionId: session.sessionId || null,
+    projectDir: session.projectDir,
+    status: session.status,
+    progress: {
+      eventCount: session.events.length,
+      toolCalls: toolCallCount,
+    },
+    recentEvents: session.events.slice(-10),
+    pendingBlocker: session.pendingBlocker
+      ? {
+          id: session.pendingBlocker.id,
+          method: session.pendingBlocker.method,
+          message: session.pendingBlocker.message,
+        }
+      : null,
+    cost: session.cost,
+    durationMs,
+  };
+}
+
+function resolveStatusSession(
+  sessionManager: SessionManager,
+  input: { sessionId?: string; projectDir?: string },
+): { session?: ManagedSession; error?: string } {
+  const sessionId = typeof input.sessionId === 'string' ? input.sessionId.trim() : '';
+  const projectDir = typeof input.projectDir === 'string' ? input.projectDir.trim() : '';
+
+  if (sessionId) {
+    const session = sessionManager.getSession(sessionId);
+    return session ? { session } : { error: `Session not found: ${sessionId}` };
+  }
+
+  if (projectDir) {
+    const session = sessionManager.getSessionByDir(projectDir);
+    return session ? { session } : { error: `Session not found for projectDir: ${projectDir}` };
+  }
+
+  const only = sessionManager.getOnlySession();
+  if (only) return { session: only };
+
+  const sessions = sessionManager.listSessions();
+  if (sessions.length === 0) {
+    return {
+      error: 'No tracked GSD sessions. Call gsd_execute first, or pass projectDir for a session tracked by this server.',
+    };
+  }
+
+  const hints = sessions
+    .map((session) => `${session.sessionId || '(no sessionId)'} ${session.projectDir}`)
+    .join('; ');
+  return { error: `Multiple tracked GSD sessions; pass sessionId or projectDir. Tracked sessions: ${hints}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -928,39 +990,17 @@ export async function createMcpServer(
   // -----------------------------------------------------------------------
   server.tool(
     'gsd_status',
-    'Get the current status of a GSD session including progress, recent events, and pending blockers.',
+    'Get the current status of a GSD session including progress, recent events, and pending blockers. Provide sessionId, projectDir, or omit both when this server tracks exactly one session.',
     {
-      sessionId: z.string().describe('Session ID returned from gsd_execute'),
+      sessionId: z.string().optional().describe('Session ID returned from gsd_execute. Optional when projectDir is provided or this server tracks exactly one session.'),
+      projectDir: z.string().optional().describe('Absolute path to the project directory (fallback when sessionId is unavailable)'),
     },
     async (args: Record<string, unknown>) => {
-      const { sessionId } = args as { sessionId: string };
+      const { sessionId, projectDir } = args as { sessionId?: string; projectDir?: string };
       try {
-        const session = sessionManager.getSession(sessionId);
-        if (!session) return errorContent(`Session not found: ${sessionId}`);
-
-        const durationMs = Date.now() - session.startTime;
-        const toolCallCount = session.events.filter(
-          (e) => (e as Record<string, unknown>).type === 'tool_use' ||
-                 (e as Record<string, unknown>).type === 'tool_execution_start'
-        ).length;
-
-        return jsonContent({
-          status: session.status,
-          progress: {
-            eventCount: session.events.length,
-            toolCalls: toolCallCount,
-          },
-          recentEvents: session.events.slice(-10),
-          pendingBlocker: session.pendingBlocker
-            ? {
-                id: session.pendingBlocker.id,
-                method: session.pendingBlocker.method,
-                message: session.pendingBlocker.message,
-              }
-            : null,
-          cost: session.cost,
-          durationMs,
-        });
+        const resolved = resolveStatusSession(sessionManager, { sessionId, projectDir });
+        if (!resolved.session) return errorContent(resolved.error ?? 'Session not found');
+        return jsonContent(getSessionStatusPayload(resolved.session));
       } catch (err) {
         return errorContent(err instanceof Error ? err.message : String(err));
       }
@@ -1336,7 +1376,13 @@ export async function createMcpServer(
     },
   );
 
-  registerWorkflowTools(server);
+  // Advertise backwards-compatibility aliases by default so external clients
+  // (especially Claude Code CLI) can call every gsd_* tool name the native LLM
+  // path recognizes. Set GSD_MCP_HIDE_ALIASES=1 to trim duplicate schemas when
+  // a client is known to use only canonical names.
+  registerWorkflowTools(server, {
+    advertiseAliases: process.env.GSD_MCP_HIDE_ALIASES !== '1',
+  });
 
   return { server };
 }

@@ -459,10 +459,11 @@ test("budget fields validate correctly", () => {
 
 test("notification fields validate correctly", () => {
   const { preferences, errors } = validatePreferences({
-    notifications: { enabled: true, on_complete: false, on_error: true, on_budget: true },
+    notifications: { enabled: true, local_bell: true, on_complete: false, on_error: true, on_budget: true },
   });
   assert.equal(errors.length, 0);
   assert.equal(preferences.notifications?.enabled, true);
+  assert.equal(preferences.notifications?.local_bell, true);
   assert.equal(preferences.notifications?.on_complete, false);
 });
 

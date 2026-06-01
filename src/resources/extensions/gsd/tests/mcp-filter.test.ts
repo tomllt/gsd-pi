@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { discoverMcpServerNames, computeMcpDisallowedTools } from "../mcp-filter.ts";
+import { discoverMcpServerNames, discoverWorkflowMcpServerName, computeMcpDisallowedTools } from "../mcp-filter.ts";
 import type { ClaudeCodeMcpConfig } from "../preferences-types.ts";
 
 // ─── discoverMcpServerNames ────────────────────────────────────────────────
@@ -56,6 +56,24 @@ describe("discoverMcpServerNames", () => {
     );
     const result = discoverMcpServerNames(dir);
     assert.deepEqual(result, ["only-server"]);
+  });
+
+  it("discovers workflow server names by config signature", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mcp-filter-test-"));
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          "custom-workflow": {
+            command: "node",
+            args: ["custom-cli.js"],
+            env: { GSD_WORKFLOW_PROJECT_ROOT: dir },
+          },
+          unrelated: { command: "npx", args: ["other"] },
+        },
+      }),
+    );
+    assert.equal(discoverWorkflowMcpServerName(dir), "custom-workflow");
   });
 });
 

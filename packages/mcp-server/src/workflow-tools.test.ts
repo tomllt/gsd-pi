@@ -3,11 +3,12 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 
 import { symlinkSync, realpathSync } from "node:fs";
 
@@ -15,6 +16,7 @@ import {
   _getAdapter,
   closeDatabase,
   getSliceTasks,
+  insertDecision,
   insertMilestone,
   insertSlice,
   openDatabase,
@@ -27,6 +29,8 @@ import {
   _buildImportCandidates,
   registerWorkflowTools,
   WORKFLOW_TOOL_NAMES,
+  CANONICAL_WORKFLOW_TOOL_NAMES,
+  WORKFLOW_TOOL_ALIAS_NAMES,
   validateProjectDir,
 } from "./workflow-tools.ts";
 
@@ -173,6 +177,22 @@ describe("workflow MCP tools", () => {
     assert.deepEqual(server.tools.map((t) => t.name), [...WORKFLOW_TOOL_NAMES]);
   });
 
+  it("omits backwards-compatibility aliases when advertiseAliases is false", () => {
+    const server = makeMockServer();
+    registerWorkflowTools(server as any, { advertiseAliases: false });
+
+    const toolNames = server.tools.map((t) => t.name);
+    assert.equal(toolNames.length, CANONICAL_WORKFLOW_TOOL_NAMES.length);
+    assert.deepEqual(toolNames, [...CANONICAL_WORKFLOW_TOOL_NAMES]);
+    for (const alias of WORKFLOW_TOOL_ALIAS_NAMES) {
+      assert.ok(!toolNames.includes(alias), `alias ${alias} should not be advertised`);
+    }
+    // Every canonical tool is still present.
+    for (const canonical of CANONICAL_WORKFLOW_TOOL_NAMES) {
+      assert.ok(toolNames.includes(canonical), `canonical ${canonical} must be registered`);
+    }
+  });
+
   it("registers task reopen in the workflow MCP tool surface", () => {
     const server = makeMockServer();
     registerWorkflowTools(server as any);
@@ -187,6 +207,45 @@ describe("workflow MCP tools", () => {
     assert.ok("sliceId" in taskReopen.params);
     assert.ok("taskId" in taskReopen.params);
     assert.ok("reason" in taskReopen.params);
+  });
+
+  it("registers gsd_checkpoint_db and flushes the open WAL", async () => {
+    const base = makeTmpBase();
+    try {
+      const server = makeMockServer();
+      registerWorkflowTools(server as any);
+      const tool = server.tools.find((t) => t.name === "gsd_checkpoint_db");
+      assert.ok(tool, "gsd_checkpoint_db must be registered");
+      assert.ok("projectDir" in tool.params);
+
+      const dbPath = join(base, ".gsd", "gsd.db");
+      openDatabase(dbPath);
+      insertDecision({
+        id: "D001",
+        when_context: "test",
+        scope: "global",
+        decision: "Expose checkpoint tool over MCP",
+        choice: "register gsd_checkpoint_db",
+        rationale: "MCP clients need to flush WAL before staging gsd.db",
+        revisable: "yes",
+        made_by: "agent",
+        superseded_by: null,
+      });
+
+      const walPath = `${dbPath}-wal`;
+      assert.ok(existsSync(walPath), "WAL file should exist after a write");
+      assert.ok(statSync(walPath).size > 0, "WAL file should be non-empty after a write");
+
+      const result = await tool.handler({ projectDir: base });
+      const record = result as { content?: Array<{ text?: string }>; structuredContent?: Record<string, unknown> };
+      assert.equal(record.content?.[0]?.text, "WAL checkpoint complete. gsd.db is now up to date and safe to stage with git add.");
+      assert.deepEqual(record.structuredContent, { operation: "checkpoint_db", status: "ok" });
+
+      const walSizeAfter = existsSync(walPath) ? statSync(walPath).size : 0;
+      assert.equal(walSizeAfter, 0, "WAL file should be truncated to 0 after MCP checkpoint");
+    } finally {
+      cleanup(base);
+    }
   });
 
   it("prefers source TypeScript for generic local module imports", () => {
@@ -270,6 +329,28 @@ describe("workflow MCP tools", () => {
         new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
         "script should run relative to the requested projectDir",
       );
+    } finally {
+      cleanup(base);
+    }
+  });
+
+  it("gsd_exec accepts command alias without an explicit runtime", async () => {
+    const base = makeTmpBase();
+    try {
+      const server = makeMockServer();
+      registerWorkflowTools(server as any);
+      const tool = server.tools.find((t) => t.name === "gsd_exec");
+      assert.ok(tool, "exec tool should be registered");
+
+      const result = await tool!.handler({
+        projectDir: base,
+        command: "echo mcp-command-alias-defaults-to-bash",
+      });
+
+      const record = result as any;
+      assert.equal(record.isError, false);
+      assert.equal(record.structuredContent.runtime, "bash");
+      assert.match(record.content[0].text as string, /mcp-command-alias-defaults-to-bash/);
     } finally {
       cleanup(base);
     }
@@ -2141,6 +2222,28 @@ export const executeTaskComplete = async (params, projectDir) => {
       assert.equal(gateRows.length, 1);
       assert.equal(gateRows[0]["status"], "complete");
       assert.equal(gateRows[0]["verdict"], "pass");
+
+      const gateInputSchema = z.object(gateTool!.params as any);
+      const inferredGateArgs = gateInputSchema.parse({
+        projectDir: base,
+        gateId: "Q4",
+        verdict: "omitted",
+        rationale: "No existing requirements are touched by this slice.",
+        findings: "",
+      });
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(inferredGateArgs, "milestoneId"),
+        false,
+        "MCP input schema must allow gate result calls before milestoneId is inferred",
+      );
+      const inferredGateResult = await gateTool!.handler(inferredGateArgs);
+      assert.match((inferredGateResult as any).content[0].text as string, /Gate Q4 result saved/);
+      const inferredGateRows = _getAdapter()!.prepare(
+        "SELECT status, verdict, rationale FROM quality_gates WHERE milestone_id = ? AND slice_id = ? AND gate_id = ?",
+      ).all("M006", "S06", "Q4") as Array<Record<string, unknown>>;
+      assert.equal(inferredGateRows.length, 1);
+      assert.equal(inferredGateRows[0]["status"], "complete");
+      assert.equal(inferredGateRows[0]["verdict"], "omitted");
 
       await taskTool!.handler({
         projectDir: base,

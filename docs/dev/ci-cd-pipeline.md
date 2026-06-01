@@ -136,9 +136,9 @@ The pipeline only triggers after `ci.yml` passes. Key gating tests include:
 ### Approving a Prod Release
 
 1. A version reaches the Test stage automatically
-2. In GitHub Actions, run **NPM Publish** with `channel=latest`; the `prod-release` job will show "Waiting for review"
+2. In GitHub Actions, run **NPM Publish** with `channel=latest`; the workflow plans the release, builds all five native binaries, then the `prod-release` job will show "Waiting for review"
 3. Click **Review deployments** → select `prod` → **Approve**
-4. The version is promoted to `@latest` and a GitHub Release is created
+4. The workflow publishes the matching `@opengsd/engine-*` packages, verifies they are visible on npm, publishes `@opengsd/gsd-pi@latest`, pushes the release commit/tag, and creates a GitHub Release
 
 To enable live LLM tests during Prod promotion:
 - Set the `RUN_LIVE_TESTS` environment variable to `true` on the `prod` environment
@@ -167,7 +167,7 @@ For `@dev` or `@next` rollbacks, the next successful merge will overwrite the ta
 | Environment: `dev` | No protection rules |
 | Environment: `test` | No protection rules |
 | Environment: `prod` | Required reviewers: maintainers |
-| Secret: `NPM_TOKEN` | Not required for trusted publishing; set for token-fallback bootstrap (`build-native.yml` → `publish_auth=token`) |
+| Secret: `NPM_TOKEN` | Not required for trusted publishing; set for token-fallback bootstrap/manual native publishes (`publish_auth=token`) |
 | Secret: `ANTHROPIC_API_KEY` | Prod environment only |
 | Secret: `OPENAI_API_KEY` | Prod environment only |
 | Variable: `RUN_LIVE_TESTS` | `false` (set to `true` to enable live LLM tests) |
@@ -200,15 +200,15 @@ Configure **every** package on [npm package settings](https://www.npmjs.com/sett
 | npm package | Trusted Publisher workflow |
 |-------------|---------------------------|
 | `@opengsd/gsd-pi` | `npm-publish.yml` |
-| `@opengsd/engine-darwin-arm64` | `build-native.yml` |
-| `@opengsd/engine-darwin-x64` | `build-native.yml` |
-| `@opengsd/engine-linux-x64-gnu` | `build-native.yml` |
-| `@opengsd/engine-linux-arm64-gnu` | `build-native.yml` |
-| `@opengsd/engine-win32-x64-msvc` | `build-native.yml` |
+| `@opengsd/engine-darwin-arm64` | `npm-publish.yml` |
+| `@opengsd/engine-darwin-x64` | `npm-publish.yml` |
+| `@opengsd/engine-linux-x64-gnu` | `npm-publish.yml` |
+| `@opengsd/engine-linux-arm64-gnu` | `npm-publish.yml` |
+| `@opengsd/engine-win32-x64-msvc` | `npm-publish.yml` |
 
 For all packages: repository **`open-gsd/gsd-pi`**, environment **(none)**.
 
-After trusted publishing is configured, use `publish_auth=trusted` (default) for routine native publishes.
+After trusted publishing is configured, use **NPM Publish** with `channel=latest` and `publish_auth=trusted` (default) for routine production publishes. The standalone **Build Native Binaries** workflow remains useful for manual binary builds and token-based bootstrap publishes, but trusted production native package publishing belongs to `npm-publish.yml` so the prod workflow can publish a single coherent version end to end.
 
 ### Docker Images
 

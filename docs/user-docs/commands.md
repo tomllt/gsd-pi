@@ -8,12 +8,14 @@
 | `/gsd next` | Explicit step mode (same as `/gsd`) |
 | `/gsd auto` | Autonomous mode — research, plan, execute, commit, repeat |
 | `/gsd quick` | Execute a quick task with GSD guarantees (atomic commits, state tracking) without full planning overhead |
+| `/gsd do <text>` | Route freeform text to the right GSD command |
 | `/gsd stop` | Stop auto mode gracefully |
 | `/gsd pause` | Pause auto-mode (preserves state, `/gsd auto` to resume) |
 | `/gsd steer` | Hard-steer plan documents during execution |
 | `/gsd discuss` | Discuss architecture and decisions (stop auto-mode first with `/gsd stop`) |
 | `/gsd status` | Open workflow visualizer |
 | `/gsd widget` | Cycle dashboard widget: full / small / min / off |
+| `/gsd notifications` | View, filter, and clear persistent notification history |
 | `/gsd queue` | Queue and reorder future milestones (`pending`, `queued`, and legacy `planned`; safe during auto mode) |
 | `/gsd capture` | Fire-and-forget thought capture (works during auto mode) |
 | `/gsd triage` | Manually trigger triage of pending captures |
@@ -23,9 +25,13 @@
 | `/gsd debug continue <slug>` | Resume an existing debug session slug |
 | `/gsd debug --diagnose` | Inspect malformed artifacts and session health (`--diagnose [<slug> | <issue text>]`) |
 | `/gsd dispatch` | Dispatch a specific phase directly (research, plan, execute, complete, reassess, uat, replan) |
+| `/gsd verdict <pass\|needs-attention\|needs-remediation>` | Override the recorded milestone validation verdict with an explicit rationale |
 | `/gsd history` | View execution history (supports `--cost`, `--phase`, `--model` filters) |
+| `/gsd usage` | Show current LLM context-window usage and session token totals |
+| `/gsd session-report` | Show session cost, tokens, and work summary (`--json`, `--save`) |
 | `/gsd forensics` | Full-access GSD debugger — structured anomaly detection, unit traces, and LLM-guided root-cause analysis for auto-mode failures |
 | `/gsd cleanup` | Clean up GSD state files and stale worktrees |
+| `/gsd closeout` | Recover failed git closeout actions (`status`, `retry`, `resolve`) |
 | `/gsd worktree` (`/gsd wt`) | Manage GSD worktrees from the TUI |
 | `/gsd visualize` | Open workflow visualizer (progress, timeline, deps, metrics, health, agent, changes, knowledge, captures, export) |
 | `/gsd brief <mode> [topic] [--slides]` | Generate a self-contained visual HTML brief. Modes: `diagram`, `plan`, `diff`, `recap`, `table`, `slides`. |
@@ -33,7 +39,9 @@
 | `/gsd report --html` | Generate self-contained HTML report for current or completed milestone |
 | `/gsd report --html --all` | Generate retrospective reports for all milestones at once |
 | `/gsd update` | Update GSD to the latest version in-session |
+| `/gsd upgrade` | Alias for `/gsd update` |
 | `/gsd knowledge` | Add persistent project knowledge. Rules remain manually maintained in `KNOWLEDGE.md`; patterns and lessons are memory-backed and projected into the file on the next session start. |
+| `/gsd memory` | Query and forget project memories |
 | `/gsd eval-review <sliceId>` | Audit a slice's AI evaluation strategy and write a scored `<sliceId>-EVAL-REVIEW.md`. Flags: `--force` overwrites; `--show` prints the existing audit. See [eval-review](eval-review.md). |
 | `/gsd extract-learnings <MID>` | Extract structured Decisions, Lessons, Patterns, and Surprises from a completed milestone — writes `<MID>-LEARNINGS.md` audit trail, persists durable knowledge through the memory/decision stores, and projects reviewable knowledge into `.gsd/KNOWLEDGE.md` on the next session start. Runs automatically at milestone completion. |
 | `/gsd fast` | Toggle service tier for supported models (prioritized API routing) |
@@ -73,13 +81,18 @@ After writing the file, GSD attempts to open it in a browser using the local pla
 | Command | Description |
 |---------|-------------|
 | `/gsd prefs` | Model selection, timeouts, budget ceiling |
+| `/gsd model` | Switch the active session model or open a picker |
 | `/gsd mode` | Switch workflow mode (solo/team) with coordinated defaults for milestone IDs, git commit behavior, and documentation |
 | `/gsd config` | Re-run the provider setup wizard (LLM provider + tool keys) |
 | `/gsd keys` | API key manager — list, add, remove, test, rotate, doctor |
 | `/gsd doctor` | Runtime health checks with auto-fix — issues surface in real time across widget, visualizer, and HTML reports (v2.40) |
 | `/gsd inspect` | Show SQLite DB diagnostics |
+| `/gsd show-config` | Show effective configuration, including models, routing, and toggles |
 | `/gsd init` | Project init wizard — detect, configure, bootstrap `.gsd/`; if `.gsd/` already exists, opens an "Already Initialized" menu with `Re-configure preferences`, `Suggest & install skills`, or `Cancel` |
 | `/gsd setup` | Global setup status and configuration |
+| `/gsd onboarding` | Re-run the setup wizard (`--resume`, `--reset`, `--step <name>`) |
+| `/gsd mcp` | Manage MCP servers (`status`, `check`, `test`, `enable`, `disable`, `import`, `delete`, `init`) |
+| `/gsd context` | Show a context breakdown chart for skills, injections, history, and MCP tool schema usage |
 | `/gsd skill-health` | Skill lifecycle dashboard — usage stats, success rates, token trends, staleness warnings |
 | `/gsd skill-health <name>` | Detailed view for a single skill |
 | `/gsd skill-health --declining` | Show only skills flagged for declining performance |
@@ -88,6 +101,7 @@ After writing the file, GSD attempts to open it in a browser using the local pla
 | `/gsd run-hook` | Manually trigger a specific hook |
 | `/gsd migrate` | Migrate a v1 `.planning` directory to `.gsd` format |
 | `/gsd recover` | Explicitly reset database hierarchy plus persisted validation and quality-gate state, then reconstruct from rendered markdown after database loss or corruption |
+| `/gsd language <language\|off\|clear>` | Set or clear the global response language |
 
 ## Milestone Management
 
@@ -101,6 +115,7 @@ After writing the file, GSD attempts to open it in a browser using the local pla
 | `/gsd reset-slice` | Reset a slice and all its tasks (DB + markdown) |
 | `/gsd park` | Park a milestone — skip without deleting |
 | `/gsd unpark` | Reactivate a parked milestone |
+| `/gsd rethink` | Conversational project reorganization — reorder, park, discard, or add milestones |
 | Discard milestone | Available via `/gsd` wizard → "Milestone actions" → "Discard" |
 
 Milestone and slice titles created during planning must not contain forward slash (`/`), en dash, or em dash characters. GSD reserves those characters as state-document delimiters, so `plan-milestone` rejects titles that include them.
@@ -117,6 +132,17 @@ Milestone and slice titles created during planning must not contain forward slas
 | `/gsd parallel merge [MID]` | Merge completed milestones back to main |
 
 See [Parallel Orchestration](./parallel-orchestration.md) for full documentation.
+
+## Shipping, Backlog, And Codebase Helpers
+
+| Command | Description |
+|---------|-------------|
+| `/gsd ship` | Create a PR from milestone artifacts and open it for review (`--dry-run`, `--draft`, `--base`, `--force`) |
+| `/gsd pr-branch` | Create a clean PR branch filtering `.gsd/` commits (`--dry-run`, `--name`) |
+| `/gsd backlog` | Manage backlog items (`add`, `promote`, `remove`, `list`) |
+| `/gsd add-tests` | Generate tests for completed slices |
+| `/gsd scan` | Run a rapid codebase assessment (`--focus tech`, `arch`, `quality`, `concerns`, `tech+arch`) |
+| `/gsd codebase` | Generate, refresh, and inspect the `.gsd/CODEBASE.md` cache (`generate`, `update`, `stats`) |
 
 ## Workflow Templates (v2.42)
 

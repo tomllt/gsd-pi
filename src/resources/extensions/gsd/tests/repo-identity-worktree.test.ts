@@ -255,4 +255,31 @@ test('ensureGsdSymlink prefers marker directory when marker/computed identities 
     rmSync(repo, { recursive: true, force: true });
 });
 
+test('repoIdentity/externalGsdRoot stay marker-stable when git remote read transiently fails (#276)', () => {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), "gsd-remote-transient-")));
+    run("git init -b main", repo);
+    run('git config user.name "Pi Test"', repo);
+    run('git config user.email "pi@example.com"', repo);
+    run('git remote add origin git@github.com:example/transient.git', repo);
+    writeFileSync(join(repo, "README.md"), "# Transient Remote Test\n", "utf-8");
+    run("git add README.md", repo);
+    run('git commit -m "init"', repo);
+
+    const stableExternal = ensureGsdSymlink(repo);
+    const stableIdentity = repoIdentity(repo);
+    assert.deepStrictEqual(externalGsdRoot(repo), stableExternal, "externalGsdRoot initially resolves canonical state directory");
+
+    const gitConfigPath = join(repo, ".git", "config");
+    const gitConfigBakPath = join(repo, ".git", "config.bak");
+    renameSync(gitConfigPath, gitConfigBakPath);
+
+    try {
+      assert.deepStrictEqual(repoIdentity(repo), stableIdentity, "repoIdentity remains anchored to .gsd-id marker during transient git remote read failure");
+      assert.deepStrictEqual(externalGsdRoot(repo), stableExternal, "externalGsdRoot remains marker-resolved during transient git remote read failure");
+    } finally {
+      renameSync(gitConfigBakPath, gitConfigPath);
+      rmSync(repo, { recursive: true, force: true });
+    }
+});
+
 });

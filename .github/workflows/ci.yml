@@ -459,7 +459,7 @@ jobs:
 
   docker-e2e:
     name: docker-e2e
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [fast-gates, build]
     if: >-
       needs.fast-gates.outputs.heavy-code-changed == 'true' &&

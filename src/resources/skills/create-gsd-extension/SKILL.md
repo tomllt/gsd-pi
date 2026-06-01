@@ -1,6 +1,6 @@
 ---
 name: create-gsd-extension
-description: Create, debug, and iterate on GSD extensions (TypeScript modules that add tools, commands, event hooks, custom UI, and providers to GSD). Use when asked to build an extension, add a tool the LLM can call, register a slash command, hook into GSD events, create custom TUI components, or modify GSD behavior. Triggers on "create extension", "build extension", "add a tool", "register command", "hook into gsd", "custom tool", "gsd plugin", "gsd extension".
+description: Create, debug, and iterate on GSD extensions (TypeScript modules adding tools, commands, event hooks, custom UI, and providers). Use when asked to build an extension, add a tool the LLM can call, register a slash command, hook into GSD events, create custom TUI components, or modify GSD behavior. Triggers on "create/build extension", "add a tool", "register command", "hook into gsd", "gsd plugin".
 ---
 
 <essential_principles>

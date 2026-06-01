@@ -52,6 +52,9 @@ export interface RpcClientOptions {
 
 export type RpcEventListener = (event: SdkAgentEvent) => void;
 
+/** Cap on retained stderr tail (bytes) to bound heap for long-lived agents. */
+const MAX_STDERR_BYTES = 64 * 1024;
+
 // ============================================================================
 // RPC Client
 // ============================================================================
@@ -98,9 +101,14 @@ export class RpcClient {
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 
-		// Collect stderr for debugging
+		// Collect stderr for debugging. The agent process can run for hours/days,
+		// so cap the retained tail to avoid unbounded heap growth — only the most
+		// recent output is useful for error messages.
 		this._stderrHandler = (data: Buffer) => {
 			this.stderr += data.toString();
+			if (this.stderr.length > MAX_STDERR_BYTES) {
+				this.stderr = this.stderr.slice(-MAX_STDERR_BYTES);
+			}
 		};
 		this.process.stderr?.on("data", this._stderrHandler);
 

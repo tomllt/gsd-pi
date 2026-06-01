@@ -43,5 +43,6 @@ test("complete milestone prompt renders compact verification and completion guid
   assert.match(prompt, /self-diff/i);
   assert.match(prompt, /GSD-(?:Task|Unit)/);
   assert.match(prompt, /Milestone M001 complete/);
+  assert.match(prompt, /Do not add a second final-status block/);
   assert.doesNotMatch(prompt, /\{\{[a-zA-Z][a-zA-Z0-9_]*\}\}/);
 });

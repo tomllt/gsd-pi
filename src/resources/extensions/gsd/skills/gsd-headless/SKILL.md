@@ -1,6 +1,6 @@
 ---
 name: gsd-headless
-description: Orchestrate GSD (Git Ship Done) projects programmatically via headless CLI. Use when an agent needs to create milestones from specs, execute software development workflows, monitor task progress, check project status, or control GSD execution (pause/stop/skip/steer). Triggers on requests to "run gsd", "create milestone", "execute project", "check gsd status", "orchestrate development", "run headless workflow", or any programmatic interaction with the GSD project management system. Essential for building orchestrators that coordinate multiple GSD workers.
+description: Orchestrate GSD (Git Ship Done) projects programmatically via headless CLI. Use when an agent needs to create milestones from specs, execute dev workflows, monitor progress, check status, or control execution (pause/stop/skip/steer). Triggers on "run gsd", "create milestone", "execute project", "check gsd status", "orchestrate development", "run headless workflow", or building orchestrators that coordinate multiple GSD workers.
 ---
 
 # GSD Headless Orchestration
