@@ -574,6 +574,43 @@ test("completeActiveUnit allows a different next unit to advance", async () => {
   assert.deepEqual(second.unit, { unitType: "execute-task", unitId: "T02" });
 });
 
+test("completeActiveUnit guard survives an intervening advance and blocks X→Y→X re-dispatch", async () => {
+  // Regression test for issue #415: lastFinalizedUnitKey was wiped on every advance(),
+  // allowing completed units to be re-dispatched after any interleaving unit (X→Y→X).
+  let nextTaskId = "T01";
+  const { deps } = makeDeps({
+    dispatch: {
+      async decideNextUnit() {
+        return { unitType: "execute-task", unitId: nextTaskId, reason: "ready", preconditions: [] };
+      },
+    },
+  });
+  const orchestrator = createAutoOrchestrator(deps);
+
+  // Step 1: advance X (T01)
+  const first = await orchestrator.advance();
+  assert.equal(first.kind, "advanced");
+  if (first.kind !== "advanced") throw new Error("expected first advance");
+
+  // Step 2: complete X (T01) — sets lastFinalizedUnitKey = 'execute-task:T01'
+  await orchestrator.completeActiveUnit(first.unit);
+
+  // Step 3: advance Y (T02) — must NOT clear lastFinalizedUnitKey
+  nextTaskId = "T02";
+  const second = await orchestrator.advance();
+  assert.equal(second.kind, "advanced");
+  if (second.kind !== "advanced") throw new Error("expected second advance (T02)");
+  assert.deepEqual(second.unit, { unitType: "execute-task", unitId: "T02" });
+
+  // Step 4: re-select X (T01) — must be blocked because T01 was finalized
+  nextTaskId = "T01";
+  const third = await orchestrator.advance();
+  assert.equal(third.kind, "blocked");
+  if (third.kind !== "blocked") throw new Error("expected X→Y→X re-dispatch to be blocked");
+  assert.equal(third.action, "stop");
+  assert.equal(third.reason, "state did not advance after finalized execute-task T01");
+});
+
 test("retryActiveUnit clears in-flight idempotency without marking the unit finalized", async () => {
   const { deps, calls } = makeDeps();
   const orchestrator = createAutoOrchestrator(deps);

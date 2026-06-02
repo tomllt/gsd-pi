@@ -277,7 +277,6 @@ export class AutoOrchestrator implements AutoOrchestrationModule {
       this.status.activeUnit = { unitType: decision.unitType, unitId: decision.unitId };
       this.status.phase = "running";
       this.lastAdvanceKey = nextKey;
-      this.lastFinalizedUnitKey = null;
       this.bumpTransition();
 
       await this.deps.runtime.journalTransition({
