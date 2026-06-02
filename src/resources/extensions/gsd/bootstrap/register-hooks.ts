@@ -1039,9 +1039,8 @@ export function registerHooks(
     if (result.block) return result;
   });
 
-  // ── Safety harness: evidence collection + destructive command warnings ──
+  // ── Safety harness: evidence collection + destructive command blocking ──
   pi.on("tool_call", async (event, ctx) => {
-    if (!isAutoActive()) return;
     markToolStart(event.toolCallId, event.toolName);
     safetyRecordToolCall(event.toolCallId, event.toolName, event.input as Record<string, unknown>);
 
@@ -1058,17 +1057,28 @@ export function registerHooks(
       }
     }
 
-    // Destructive command classification (warn only, never block)
+    // Destructive command classification + hard gate in all modes.
     if (isToolCallEventType("bash", event)) {
       const classification = classifyCommand(event.input.command);
       if (classification.destructive) {
+        const reason = [
+          "HARD BLOCK: destructive Bash command requires explicit human confirmation.",
+          `Detected: ${classification.labels.join(", ")}`,
+          "Run this via ask_user_questions, wait for the user's response,",
+          "then issue the command only when confirmed in the current turn.",
+        ].join(" ");
         safetyLogWarning("safety", `destructive command: ${classification.labels.join(", ")}`, {
           command: String(event.input.command).slice(0, 200),
         });
-        ctx.ui.notify(
-          `Destructive command detected: ${classification.labels.join(", ")}`,
-          "warning",
-        );
+        if (ctx) {
+          await maybePauseAutoForApprovalGate(
+            ctx,
+            pi,
+            isAutoActive(),
+            "Depth confirmation is waiting for your answer — pausing auto-mode.",
+          );
+        }
+        return { block: true, reason };
       }
     }
   });

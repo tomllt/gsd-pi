@@ -10,6 +10,7 @@ import {
   resetWriteGateState,
   shouldBlockContextArtifactSave,
 } from "../bootstrap/write-gate.ts";
+import { classifyCommand } from "../safety/destructive-guard.ts";
 import { toRoundResultResponse } from "../../remote-questions/manager.ts";
 
 function makeTempDir(prefix: string): string {
@@ -34,6 +35,40 @@ async function armDepthGate(
     await handler({ toolName, args: input });
   }
 }
+
+test("destructive guard classifies infrastructure mutation commands", () => {
+  assert.deepEqual(classifyCommand("terraform destroy -auto-approve").labels, ["IaC apply/destroy"]);
+  assert.deepEqual(classifyCommand("terragrunt apply").labels, ["IaC apply/destroy"]);
+  assert.deepEqual(classifyCommand("aws s3 delete-bucket --bucket example").labels, ["AWS mutation"]);
+  assert.deepEqual(classifyCommand("kubectl delete namespace prod").labels, ["kubectl mutation"]);
+});
+
+test("register-hooks hard-blocks destructive bash commands outside auto-mode", async () => {
+  const handlers = new Map<string, Array<(event: any, ctx?: any) => Promise<any> | any>>();
+  const pi = {
+    on(event: string, handler: (event: any, ctx?: any) => Promise<any> | any) {
+      const existing = handlers.get(event) ?? [];
+      existing.push(handler);
+      handlers.set(event, existing);
+    },
+  } as any;
+
+  registerHooks(pi, []);
+
+  let block: any;
+  for (const handler of handlers.get("tool_call") ?? []) {
+    const result = await handler({
+      toolCallId: "call-1",
+      toolName: "bash",
+      input: { command: "terraform apply -auto-approve" },
+    });
+    if (result?.block) block = result;
+  }
+
+  assert.equal(block?.block, true);
+  assert.match(block?.reason ?? "", /HARD BLOCK: destructive Bash command requires explicit human confirmation/);
+  assert.match(block?.reason ?? "", /IaC apply\/destroy/);
+});
 
 test("register-hooks unlocks milestone depth verification from question id without guided-flow state (#4047)", async (t) => {
   const dir = makeTempDir("manual");

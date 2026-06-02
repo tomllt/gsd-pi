@@ -24,6 +24,9 @@ const DESTRUCTIVE_PATTERNS: readonly DestructivePattern[] = [
   { pattern: /\btruncate\s+table\b/i, label: "SQL truncate" },
   { pattern: /\bchmod\s+777\b/, label: "world-writable permissions" },
   { pattern: /\bcurl\s.*\|\s*(bash|sh|zsh)\b/, label: "pipe to shell" },
+  { pattern: /\bterra(form|grunt)\s+(apply|destroy)/i, label: "IaC apply/destroy" },
+  { pattern: /\baws\s+\w+\s+(delete|create|put|remove|terminate)\b/i, label: "AWS mutation" },
+  { pattern: /\bkubectl\s+(delete|apply)\b/i, label: "kubectl mutation" },
 ];
 
 // ─── Public API ─────────────────────────────────────────────────────────────
