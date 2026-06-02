@@ -101,6 +101,7 @@ export interface ReconciliationDeps {
     basePath: string,
     opts?: DeriveStateOptions,
   ) => Promise<GSDState>;
+  clearParseCache?: () => void;
   /**
    * Override of the drift handler catalog. Defaults to DRIFT_REGISTRY. Each
    * handler is parameterized over its own DriftRecord variant; the union of
