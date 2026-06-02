@@ -2311,10 +2311,20 @@ export function createWiredAutoOrchestrationModule(
       async reconcileBeforeDispatch() {
         const activeBasePath = getLiveDispatchBasePath();
         const result = await reconcileBeforeDispatch(activeBasePath);
-        if (result.blockers.length > 0) {
+        // Failure-path summaries written by gsd_summary_save create
+        // artifact-db-status-divergence blockers for tasks that are still
+        // pending (gsd_task_complete never ran). These tasks can still be
+        // dispatched and the drift self-heals once they complete successfully.
+        const hardBlockers = result.blockers.filter(
+          (b) =>
+            !b.includes("has SUMMARY artifact while DB status is") &&
+            !b.includes("has SUMMARY on disk while DB status is") &&
+            !b.includes("has task SUMMARY artifacts but no DB tasks"),
+        );
+        if (hardBlockers.length > 0) {
           return {
             ok: false,
-            reason: result.blockers[0],
+            reason: hardBlockers[0],
             stateSnapshot: result.stateSnapshot,
           };
         }
