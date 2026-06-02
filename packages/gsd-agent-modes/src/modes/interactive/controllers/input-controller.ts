@@ -14,6 +14,11 @@ function consumePendingImages(host: InteractiveModeStateHost): ImageContent[] | 
 	return images;
 }
 
+function markEditorSubmitLatency(host: InteractiveModeStateHost, images: ImageContent[] | undefined): void {
+	host.session.beginTurnLatency?.({ source: "tui", trigger: "editor_submit" });
+	host.session.markTurnLatency?.("tui.editor_submit", { images: images?.length ?? 0 });
+}
+
 export function setupEditorSubmitHandler(host: InteractiveModeStateHost & {
 	getSlashCommandContext: () => any;
 	handleBashCommand: (command: string, excludeFromContext?: boolean) => Promise<void>;
@@ -121,6 +126,7 @@ export function setupEditorSubmitHandler(host: InteractiveModeStateHost & {
 		if (host.options?.submitPromptsDirectly) {
 			host.editor.addToHistory?.(text);
 			try {
+				markEditorSubmitLatency(host, images);
 				await host.session.prompt(text, { images });
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -130,9 +136,10 @@ export function setupEditorSubmitHandler(host: InteractiveModeStateHost & {
 		}
 
 		host.editor.addToHistory?.(text);
-		// submitPromptsDirectly is false — still dispatch via session.prompt so user input
+		// submitPromptsDirectly is false; still dispatch via session.prompt so user input
 		// is not silently discarded.
 		try {
+			markEditorSubmitLatency(host, images);
 			await host.session.prompt(text, { images });
 		} catch (error: unknown) {
 			const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

@@ -14,6 +14,7 @@ import type {
 	AfterToolCallResult,
 	AgentContext,
 	AgentEvent,
+	AgentLatencyMarkSink,
 	AgentLoopConfig,
 	AgentLoopTurnUpdate,
 	AgentMessage,
@@ -98,6 +99,8 @@ export interface AgentOptions {
 	convertToLlm?: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
 	transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => Promise<AgentMessage[]>;
 	streamFn?: StreamFn;
+	/** @internal Diagnostic hook for low-level turn latency marks. */
+	latencyMark?: AgentLatencyMarkSink;
 	getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 	onPayload?: SimpleStreamOptions["onPayload"];
 	onResponse?: SimpleStreamOptions["onResponse"];
@@ -172,6 +175,8 @@ export class Agent {
 	public convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
 	public transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => Promise<AgentMessage[]>;
 	public streamFn: StreamFn;
+	/** @internal Diagnostic hook for low-level turn latency marks. */
+	public latencyMark?: AgentLatencyMarkSink;
 	public getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 	public onPayload?: SimpleStreamOptions["onPayload"];
 	public onResponse?: SimpleStreamOptions["onResponse"];
@@ -203,6 +208,7 @@ export class Agent {
 		this.convertToLlm = options.convertToLlm ?? defaultConvertToLlm;
 		this.transformContext = options.transformContext;
 		this.streamFn = options.streamFn ?? streamSimple;
+		this.latencyMark = options.latencyMark;
 		this.getApiKey = options.getApiKey;
 		this.onPayload = options.onPayload;
 		this.onResponse = options.onResponse;
@@ -436,6 +442,7 @@ export class Agent {
 			prepareNextTurn: this.prepareNextTurn ? async () => await this.prepareNextTurn?.(this.signal) : undefined,
 			convertToLlm: this.convertToLlm,
 			transformContext: this.transformContext,
+			latencyMark: this.latencyMark,
 			getApiKey: this.getApiKey,
 			getSteeringMessages: async () => {
 				if (skipInitialSteeringPoll) {

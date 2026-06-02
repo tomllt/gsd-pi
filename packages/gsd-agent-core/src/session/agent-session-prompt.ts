@@ -14,12 +14,22 @@ export class AgentSessionPromptModule {
 	constructor(readonly host: AgentSessionHost) {}
 
 	async runAgentPrompt(messages: AgentMessage | AgentMessage[]): Promise<void> {
+		const previousLatencyMark = this.host.agent.latencyMark;
+		this.host.agent.latencyMark = (phase, data) => {
+			previousLatencyMark?.(phase, data);
+			if (phase === "agent_loop.first_stream_activity") {
+				this.host.markFirstStreamActivity(String(data?.eventType ?? "unknown"), data);
+			} else {
+				this.host.markTurnLatency(phase, data);
+			}
+		};
 		try {
 			await this.host.agent.prompt(messages);
 			while (await this.handlePostAgentRun()) {
 				await this.host.agent.continue();
 			}
 		} finally {
+			this.host.agent.latencyMark = previousLatencyMark;
 			this.host.flushPendingBashMessages();
 		}
 	}
@@ -49,32 +59,47 @@ export class AgentSessionPromptModule {
 	}
 
 	async prompt(text: string, options?: PromptOptions): Promise<void> {
+		const source = options?.source ?? "interactive";
+		const latency = this.host.beginTurnLatency({ source, trigger: "session.prompt" });
+		let latencyStatus: "completed" | "queued" | "handled" | "error" = "completed";
 		const expandPromptTemplates = options?.expandPromptTemplates ?? true;
 		const preflightResult = options?.preflightResult;
 		let messages: AgentMessage[] | undefined;
 
 		try {
+			this.host.markTurnLatency("session.prompt.enter", {
+				source,
+				hasImages: !!options?.images?.length,
+				expandPromptTemplates,
+			});
 			// Handle extension commands first (execute immediately, even during streaming)
 			// Extension commands manage their own LLM interaction via pi.sendMessage()
 			if (expandPromptTemplates && text.startsWith("/")) {
+				this.host.markTurnLatency("session.extension_command.start");
 				const handled = await this.tryExecuteExtensionCommand(text);
 				if (handled) {
 					// Extension command executed, no prompt to send
+					this.host.markTurnLatency("session.extension_command.handled");
+					latencyStatus = "handled";
 					preflightResult?.(true);
 					return;
 				}
+				this.host.markTurnLatency("session.extension_command.miss");
 			}
 
 			// Emit input event for extension interception (before skill/template expansion)
 			let currentText = text;
 			let currentImages = options?.images;
 			if (this.host._extensionRunner.hasHandlers("input")) {
+				this.host.markTurnLatency("session.input_handlers.start");
 				const inputResult = await this.host._extensionRunner.emitInput(
 					currentText,
 					currentImages,
 					options?.source ?? "interactive",
 				);
 				if (inputResult.action === "handled") {
+					this.host.markTurnLatency("session.input_handlers.handled");
+					latencyStatus = "handled";
 					preflightResult?.(true);
 					return;
 				}
@@ -82,13 +107,18 @@ export class AgentSessionPromptModule {
 					currentText = inputResult.text;
 					currentImages = inputResult.images ?? currentImages;
 				}
+				this.host.markTurnLatency("session.input_handlers.end", { action: inputResult.action });
 			}
 
 			// Expand skill commands (/skill:name args) and prompt templates (/template args)
 			let expandedText = currentText;
 			if (expandPromptTemplates) {
+				this.host.markTurnLatency("session.prompt_expansion.start");
 				expandedText = this.expandSkillCommand(expandedText);
 				expandedText = expandPromptTemplate(expandedText, [...this.host.promptTemplates]);
+				this.host.markTurnLatency("session.prompt_expansion.end", {
+					changed: expandedText !== currentText,
+				});
 			}
 
 			// If streaming, queue via steer() or followUp() based on option
@@ -103,14 +133,18 @@ export class AgentSessionPromptModule {
 				} else {
 					await this.queueSteer(expandedText, currentImages);
 				}
+				this.host.markTurnLatency("session.prompt.queued", { mode: options.streamingBehavior });
+				latencyStatus = "queued";
 				preflightResult?.(true);
 				return;
 			}
 
 			// Flush any pending bash messages before the new prompt
 			this.host.flushPendingBashMessages();
+			this.host.markTurnLatency("session.pending_bash_flushed");
 
 			// Validate model
+			this.host.markTurnLatency("session.model_auth_check.start");
 			if (!this.host.model) {
 				throw new Error(formatNoModelSelectedMessage());
 			}
@@ -126,19 +160,27 @@ export class AgentSessionPromptModule {
 				}
 				throw new Error(formatNoApiKeyFoundMessage(this.host.model.provider));
 			}
+			this.host.markTurnLatency("session.model_auth_check.end", {
+				provider: this.host.model.provider,
+				model: this.host.model.id,
+			});
 
 			// Check if we need to compact before sending (catches aborted responses)
 			const lastAssistant = this.host.findLastAssistantMessage();
+			this.host.markTurnLatency("session.compaction_check.start", { hasLastAssistant: !!lastAssistant });
 			if (lastAssistant && (await this.host.checkCompaction(lastAssistant, false))) {
 				try {
+					this.host.markTurnLatency("session.compaction_continue.start");
 					await this.host.agent.continue();
 					while (await this.handlePostAgentRun()) {
 						await this.host.agent.continue();
 					}
+					this.host.markTurnLatency("session.compaction_continue.end");
 				} finally {
 					this.host.flushPendingBashMessages();
 				}
 			}
+			this.host.markTurnLatency("session.compaction_check.end");
 
 			// Build messages array (custom message if any, then user message)
 			messages = [];
@@ -161,6 +203,7 @@ export class AgentSessionPromptModule {
 			this.host._pendingNextTurnMessages = [];
 
 			// Emit before_agent_start extension event
+			this.host.markTurnLatency("session.before_agent_start.start");
 			const result = await this.host._extensionRunner.emitBeforeAgentStart(
 				expandedText,
 				currentImages,
@@ -187,9 +230,18 @@ export class AgentSessionPromptModule {
 				// Ensure we're using the base prompt (in case previous turn had modifications)
 				this.host.agent.state.systemPrompt = this.host._baseSystemPrompt;
 			}
+			this.host.markTurnLatency("session.before_agent_start.end", {
+				customMessages: result?.messages?.length ?? 0,
+				systemPromptChanged: !!result?.systemPrompt,
+			});
 		} catch (error) {
+			latencyStatus = "error";
 			preflightResult?.(false);
 			throw error;
+		} finally {
+			if (latencyStatus !== "completed" || !messages) {
+				this.host.finishTurnLatency(latencyStatus);
+			}
 		}
 
 		if (!messages) {
@@ -197,7 +249,19 @@ export class AgentSessionPromptModule {
 		}
 
 		preflightResult?.(true);
-		await this.runAgentPrompt(messages);
+		try {
+			this.host.markTurnLatency("session.agent_run.start", { messages: messages.length });
+			await this.runAgentPrompt(messages);
+			this.host.markTurnLatency("session.agent_run.end");
+		} catch (error) {
+			latencyStatus = "error";
+			this.host.markTurnLatency("session.agent_run.error", {
+				error: error instanceof Error ? error.name : typeof error,
+			});
+			throw error;
+		} finally {
+			this.host.finishTurnLatency(latencyStatus);
+		}
 	}
 
 	async tryExecuteExtensionCommand(text: string): Promise<boolean> {

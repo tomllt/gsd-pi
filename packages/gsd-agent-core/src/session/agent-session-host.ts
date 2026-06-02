@@ -39,6 +39,12 @@ import type {
 	ToolDefinitionEntry,
 } from "./agent-session-types.js";
 import type { SessionStartEvent } from "@gsd/pi-coding-agent/core/extensions/index.js";
+import type {
+	BeginTurnLatencyOptions,
+	TurnLatencyRecord,
+	TurnLatencyStatus,
+	TurnLatencyVisibleKind,
+} from "../turn-latency.js";
 
 /**
  * Internal surface shared by AgentSession submodule classes.
@@ -91,6 +97,7 @@ export interface AgentSessionHost {
 	_baseSystemPrompt: string;
 	_baseSystemPromptOptions: BuildSystemPromptOptions;
 	_lastAssistantMessage: AssistantMessage | undefined;
+	_activeTurnLatency: TurnLatencyRecord | undefined;
 
 	// Read-only derived state
 	readonly model: Model<any> | undefined;
@@ -111,6 +118,11 @@ export interface AgentSessionHost {
 	// Cross-module internal API
 	emit(event: AgentSessionEvent): void;
 	emitQueueUpdate(): void;
+	beginTurnLatency(options?: BeginTurnLatencyOptions): TurnLatencyRecord | undefined;
+	markTurnLatency(phase: string, data?: Record<string, unknown>): void;
+	markFirstStreamActivity(kind: string, data?: Record<string, unknown>): void;
+	markFirstVisibleTurnLatency(kind: TurnLatencyVisibleKind, data?: Record<string, unknown>): void;
+	finishTurnLatency(status: TurnLatencyStatus): void;
 	disconnectFromAgent(): void;
 	reconnectToAgent(): void;
 	isRetryableError(message: AssistantMessage): boolean;

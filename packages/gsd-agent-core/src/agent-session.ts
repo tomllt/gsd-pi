@@ -56,6 +56,20 @@ import {
 	type ToolDefinitionEntry,
 	parseSkillBlock,
 } from "./session/agent-session-types.js";
+import {
+	beginTurnLatency,
+	finishTurnLatency,
+	formatTurnLatencyRecords,
+	getTurnLatencyRecords,
+	markFirstStreamActivity,
+	markFirstVisibleTurnLatency,
+	markTurnLatency,
+	updateTurnLatencyModel,
+	type BeginTurnLatencyOptions,
+	type TurnLatencyRecord,
+	type TurnLatencyStatus,
+	type TurnLatencyVisibleKind,
+} from "./turn-latency.js";
 import type { AgentSessionHost } from "./session/agent-session-host.js";
 import { AgentSessionEventsModule } from "./session/agent-session-events.js";
 import { AgentSessionPromptModule } from "./session/agent-session-prompt.js";
@@ -133,6 +147,7 @@ export class AgentSession implements AgentSessionHost {
 	_baseSystemPrompt = "";
 	_baseSystemPromptOptions!: BuildSystemPromptOptions;
 	_lastAssistantMessage: AssistantMessage | undefined = undefined;
+	_activeTurnLatency: TurnLatencyRecord | undefined = undefined;
 
 	private readonly _events = new AgentSessionEventsModule(this);
 	private readonly _prompt = new AgentSessionPromptModule(this);
@@ -235,6 +250,43 @@ export class AgentSession implements AgentSessionHost {
 
 	get pendingMessageCount(): number {
 		return this._steeringMessages.length + this._followUpMessages.length;
+	}
+
+	beginTurnLatency(options: BeginTurnLatencyOptions = {}): TurnLatencyRecord | undefined {
+		if (this._activeTurnLatency && this._activeTurnLatency.endedAtMs === undefined) {
+			updateTurnLatencyModel(this._activeTurnLatency, options.model ?? this.model);
+			if (options.trigger) {
+				markTurnLatency(this._activeTurnLatency, "turn.trigger", { trigger: options.trigger });
+			}
+			return this._activeTurnLatency;
+		}
+		this._activeTurnLatency = beginTurnLatency({ ...options, model: options.model ?? this.model });
+		return this._activeTurnLatency;
+	}
+
+	markTurnLatency(phase: string, data?: Record<string, unknown>): void {
+		markTurnLatency(this._activeTurnLatency, phase, data);
+	}
+
+	markFirstStreamActivity(kind: string, data?: Record<string, unknown>): void {
+		markFirstStreamActivity(this._activeTurnLatency, kind, data);
+	}
+
+	markFirstVisibleTurnLatency(kind: TurnLatencyVisibleKind, data?: Record<string, unknown>): void {
+		markFirstVisibleTurnLatency(this._activeTurnLatency, kind, data);
+	}
+
+	finishTurnLatency(status: TurnLatencyStatus): void {
+		finishTurnLatency(this._activeTurnLatency, status);
+		this._activeTurnLatency = undefined;
+	}
+
+	getTurnLatencyRecords(): readonly TurnLatencyRecord[] {
+		return getTurnLatencyRecords();
+	}
+
+	formatTurnLatencyRecords(): string {
+		return formatTurnLatencyRecords();
 	}
 
 	get resourceLoader(): ResourceLoader {

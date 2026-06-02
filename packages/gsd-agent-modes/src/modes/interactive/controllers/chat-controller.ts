@@ -102,6 +102,7 @@ function registerPendingToolComponent(
 	const component = createComponent();
 	component.setExpanded(host.toolOutputExpanded);
 	host.chatContainer.addChild(component);
+	markFirstVisibleAssistantOutput(host, "tool", { toolName, source });
 	host.pendingTools.set(toolCallId, component);
 	toolRegistrationSources.set(component, new Set([source]));
 	return { component, created: true };
@@ -127,6 +128,22 @@ function startLoadingAnimation(host: InteractiveModeStateHost): void {
 		}
 		host.pendingWorkingMessage = undefined;
 	}
+}
+
+function markTuiLatency(
+	host: InteractiveModeStateHost,
+	phase: string,
+	data?: Record<string, unknown>,
+): void {
+	host.session.markTurnLatency?.(phase, data);
+}
+
+function markFirstVisibleAssistantOutput(
+	host: InteractiveModeStateHost,
+	kind: "text" | "thinking" | "tool" | "message_end_only",
+	data?: Record<string, unknown>,
+): void {
+	host.session.markFirstVisibleTurnLatency?.(kind, data);
 }
 
 function getVisibleTextLikeBlockType(block: any): "text" | "thinking" | undefined {
@@ -642,6 +659,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 			}
 			host.statusContainer.clear();
 			startLoadingAnimation(host);
+			markTuiLatency(host, "tui.loader_visible");
 			host.ui.requestRender();
 			break;
 
@@ -658,6 +676,10 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				// External-tool providers can stream multiple assistant turns through
 				// one response. Delay component creation until visible assistant text
 				// arrives so tool outputs keep chronological ordering.
+				markTuiLatency(host, "tui.assistant_message_start", {
+					provider: event.message.provider,
+					model: event.message.model,
+				});
 				host.ui.requestRender();
 			}
 			break;
@@ -895,6 +917,9 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 									connectedToUser,
 								);
 								host.chatContainer.addChild(comp);
+								markFirstVisibleAssistantOutput(host, seg.contentType, {
+									contentIndex: seg.startIndex,
+								});
 								renderedSegments.push({
 									kind: "text-run",
 									startIndex: seg.startIndex,
@@ -1134,6 +1159,10 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 								continue;
 							}
 							host.chatContainer.addChild(comp);
+							markFirstVisibleAssistantOutput(host, seg.contentType, {
+								contentIndex: seg.startIndex,
+								source: "message_end_rebuild",
+							});
 							renderedSegments.push({
 								kind: "text-run",
 								startIndex: seg.startIndex,
@@ -1158,6 +1187,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 							connectedToUser,
 						);
 						host.chatContainer.addChild(host.streamingComponent);
+						markFirstVisibleAssistantOutput(host, "message_end_only");
 						reconcileChatTurnConnections(host.chatContainer.children);
 					}
 					if (host.streamingComponent) {

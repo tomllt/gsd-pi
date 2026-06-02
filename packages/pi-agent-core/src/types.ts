@@ -132,6 +132,8 @@ export interface AgentLoopTurnUpdate {
 
 export interface PrepareNextTurnContext extends ShouldStopAfterTurnContext {}
 
+export type AgentLatencyMarkSink = (phase: string, data?: Record<string, unknown>) => void;
+
 export interface AgentLoopConfig extends SimpleStreamOptions {
 	model: Model<any>;
 
@@ -194,6 +196,9 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * Contract: must not throw or reject. Return undefined when no key is available.
 	 */
 	getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
+
+	/** @internal Diagnostic hook for low-level turn latency marks. */
+	latencyMark?: AgentLatencyMarkSink;
 
 	/**
 	 * Called after each turn fully completes and `turn_end` has been emitted.

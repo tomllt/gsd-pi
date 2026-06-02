@@ -71,3 +71,10 @@ export {
 } from "./sdk.js";
 export { ContextualTips } from "./contextual-tips.js";
 export * from "./agent-session-runtime.js";
+export {
+	formatTurnLatencyRecords,
+	getTurnLatencyRecords,
+	type TurnLatencyRecord,
+	type TurnLatencyStatus,
+	type TurnLatencyVisibleKind,
+} from "./turn-latency.js";

@@ -119,37 +119,43 @@ export async function handleClearCommand(host: InteractiveModeDelegateHost): Pro
 	}
 
 export function handleDebugCommand(host: InteractiveModeDelegateHost): void {
-		const width = host.ui.terminal.columns;
-		const height = host.ui.terminal.rows;
-		const allLines = host.ui.render(width);
+	const width = host.ui.terminal.columns;
+	const height = host.ui.terminal.rows;
+	const allLines = host.ui.render(width);
+	const turnLatency = typeof host.session.formatTurnLatencyRecords === "function"
+		? host.session.formatTurnLatencyRecords()
+		: "TUI turn latency records unavailable.";
 
-		const debugLogPath = getDebugLogPath();
-		const debugData = [
-			`Debug output at ${new Date().toISOString()}`,
-			`Terminal: ${width}x${height}`,
-			`Total lines: ${allLines.length}`,
-			"",
-			"=== All rendered lines with visible widths ===",
-			...allLines.map((line, idx) => {
-				const vw = visibleWidth(line);
-				const escaped = JSON.stringify(line);
-				return `[${idx}] (w=${vw}) ${escaped}`;
-			}),
-			"",
-			"=== Agent messages (JSONL) ===",
-			...host.session.messages.map((msg) => JSON.stringify(msg)),
-			"",
-		].join("\n");
+	const debugLogPath = getDebugLogPath();
+	const debugData = [
+		`Debug output at ${new Date().toISOString()}`,
+		`Terminal: ${width}x${height}`,
+		`Total lines: ${allLines.length}`,
+		"",
+		"=== TUI turn latency ===",
+		turnLatency,
+		"",
+		"=== All rendered lines with visible widths ===",
+		...allLines.map((line, idx) => {
+			const vw = visibleWidth(line);
+			const escaped = JSON.stringify(line);
+			return `[${idx}] (w=${vw}) ${escaped}`;
+		}),
+		"",
+		"=== Agent messages (JSONL) ===",
+		...host.session.messages.map((msg) => JSON.stringify(msg)),
+		"",
+	].join("\n");
 
-		fs.mkdirSync(path.dirname(debugLogPath), { recursive: true });
-		fs.writeFileSync(debugLogPath, debugData);
+	fs.mkdirSync(path.dirname(debugLogPath), { recursive: true });
+	fs.writeFileSync(debugLogPath, debugData);
 
-		host.chatContainer.addChild(new Spacer(1));
-		host.chatContainer.addChild(
-			new Text(`${theme.fg("accent", "✓ Debug log written")}\n${theme.fg("muted", debugLogPath)}`, 1, 1),
-		);
-		host.ui.requestRender();
-	}
+	host.chatContainer.addChild(new Spacer(1));
+	host.chatContainer.addChild(
+		new Text(`${theme.fg("accent", "✓ Debug log written")}\n${theme.fg("muted", debugLogPath)}`, 1, 1),
+	);
+	host.ui.requestRender();
+}
 
 export function handleDaxnuts(host: InteractiveModeDelegateHost): void {
 		host.chatContainer.addChild(new Spacer(1));

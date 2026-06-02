@@ -169,6 +169,41 @@ describe("Agent", () => {
 		expect(agent.state.isStreaming).toBe(false);
 	});
 
+	it("forwards latency marks to the agent loop", async () => {
+		const marks: Array<{ phase: string; data?: Record<string, unknown> }> = [];
+		const agent = new Agent({
+			latencyMark: (phase, data) => {
+				marks.push({ phase, data });
+			},
+			streamFn: () => {
+				const stream = new MockAssistantStream();
+				queueMicrotask(() => {
+					stream.push({ type: "done", reason: "stop", message: createAssistantMessage("ok") });
+				});
+				return stream;
+			},
+		});
+
+		await agent.prompt("hello");
+
+		const phases = marks.map((mark) => mark.phase);
+		expect(phases).toEqual(
+			expect.arrayContaining([
+				"agent_loop.context_transform.skipped",
+				"agent_loop.convert_to_llm.start",
+				"agent_loop.convert_to_llm.end",
+				"agent_loop.api_key.start",
+				"agent_loop.api_key.end",
+				"agent_loop.stream_create.start",
+				"agent_loop.stream_create.end",
+				"agent_loop.first_stream_activity",
+			]),
+		);
+		expect(marks.find((mark) => mark.phase === "agent_loop.first_stream_activity")?.data).toMatchObject({
+			eventType: "done",
+		});
+	});
+
 	it("waitForIdle should wait for async subscribers", async () => {
 		const barrier = createDeferred();
 		const agent = new Agent({

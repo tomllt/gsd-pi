@@ -338,11 +338,17 @@ async function streamAssistantResponse(
 	// Apply context transform if configured (AgentMessage[] → AgentMessage[])
 	let messages = context.messages;
 	if (config.transformContext) {
+		const stop = startLatencyTimer(config, "agent_loop.context_transform");
 		messages = await config.transformContext(messages, signal);
+		stop({ inputMessages: context.messages.length, outputMessages: messages.length });
+	} else {
+		markLatency(config, "agent_loop.context_transform.skipped", { inputMessages: context.messages.length });
 	}
 
 	// Convert to LLM-compatible messages (AgentMessage[] → Message[])
+	const stopConvert = startLatencyTimer(config, "agent_loop.convert_to_llm");
 	const llmMessages = await config.convertToLlm(messages);
+	stopConvert({ inputMessages: messages.length, outputMessages: llmMessages.length });
 
 	// Build LLM context
 	const llmContext: Context = {
@@ -354,21 +360,39 @@ async function streamAssistantResponse(
 	const streamFunction = streamFn || streamSimple;
 
 	// Resolve API key (important for expiring tokens)
+	const stopApiKey = startLatencyTimer(config, "agent_loop.api_key");
 	const resolvedApiKey =
 		(config.getApiKey ? await config.getApiKey(config.model.provider) : undefined) || config.apiKey;
+	stopApiKey({ provider: config.model.provider, resolved: !!resolvedApiKey });
 
+	const stopStreamCreate = startLatencyTimer(config, "agent_loop.stream_create");
 	const response = await streamFunction(config.model, llmContext, {
 		...config,
 		apiKey: resolvedApiKey,
 		signal,
 	});
+	stopStreamCreate({
+		provider: config.model.provider,
+		model: config.model.id,
+		contextMessages: llmMessages.length,
+		tools: llmContext.tools?.length ?? 0,
+	});
 
 	let partialMessage: AssistantMessage | null = null;
 	let addedPartial = false;
+	let sawStreamActivity = false;
 
 	for await (const event of response) {
+		if (!sawStreamActivity) {
+			sawStreamActivity = true;
+			markLatency(config, "agent_loop.first_stream_activity", { eventType: event.type });
+		}
 		switch (event.type) {
 			case "start":
+				markLatency(config, "agent_loop.assistant_start", {
+					provider: event.partial.provider,
+					model: event.partial.model,
+				});
 				partialMessage = event.partial;
 				context.messages.push(partialMessage);
 				addedPartial = true;
@@ -421,6 +445,24 @@ async function streamAssistantResponse(
 	}
 	await emit({ type: "message_end", message: finalMessage });
 	return finalMessage;
+}
+
+function markLatency(config: AgentLoopConfig, phase: string, data?: Record<string, unknown>): void {
+	config.latencyMark?.(phase, data);
+}
+
+function startLatencyTimer(
+	config: AgentLoopConfig,
+	phase: string,
+): (data?: Record<string, unknown>) => void {
+	const start = performance.now();
+	markLatency(config, `${phase}.start`);
+	return (data?: Record<string, unknown>) => {
+		markLatency(config, `${phase}.end`, {
+			elapsedMs: Math.round((performance.now() - start) * 100) / 100,
+			...(data ?? {}),
+		});
+	};
 }
 
 /**
