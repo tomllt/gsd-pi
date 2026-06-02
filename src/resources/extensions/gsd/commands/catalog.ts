@@ -14,7 +14,7 @@ export interface GsdCommandDefinition {
 type CompletionMap = Record<string, readonly GsdCommandDefinition[]>;
 
 export const GSD_COMMAND_DESCRIPTION =
-  "GSD — Git Ship Done: /gsd help|start|templates|next|auto|stop|pause|status|widget|visualize|brief|report|queue|quick|discuss|capture|triage|dispatch|verdict|history|undo|undo-task|reset-slice|rate|skip|export|cleanup|closeout|model|mode|prefs|config|keys|hooks|run-hook|skill-health|doctor|debug|logs|forensics|changelog|migrate|remote|steer|knowledge|memory|new-milestone|new-project|parallel|cmux|park|unpark|init|setup|onboarding|inspect|extensions|update|upgrade|fast|mcp|rethink|workflow|codebase|notifications|ship|do|usage|context|session-report|backlog|pr-branch|add-tests|scan|language|worktree|eval-review";
+  "GSD — Git Ship Done: /gsd help|start|templates|next|auto|stop|pause|status|widget|visualize|brief|report|queue|quick|discuss|capture|triage|dispatch|verdict|history|undo|undo-task|reset-slice|rate|skip|export|cleanup|closeout|rebuild|model|mode|prefs|config|keys|hooks|run-hook|skill-health|doctor|debug|logs|forensics|changelog|migrate|remote|steer|knowledge|memory|new-milestone|new-project|parallel|cmux|park|unpark|init|setup|onboarding|inspect|extensions|update|upgrade|fast|mcp|rethink|workflow|codebase|notifications|ship|do|usage|context|session-report|backlog|pr-branch|add-tests|scan|language|worktree|eval-review";
 
 export const TOP_LEVEL_SUBCOMMANDS: readonly GsdCommandDefinition[] = [
   { cmd: "help", desc: "Categorized command reference with descriptions" },
@@ -44,6 +44,7 @@ export const TOP_LEVEL_SUBCOMMANDS: readonly GsdCommandDefinition[] = [
   { cmd: "export", desc: "Alias for /gsd report" },
   { cmd: "cleanup", desc: "Remove merged branches or snapshots" },
   { cmd: "closeout", desc: "Recover failed git closeout actions (status, retry, resolve)" },
+  { cmd: "rebuild", desc: "Rebuild markdown projections from the canonical DB" },
   { cmd: "model", desc: "Switch the active session model or open a picker" },
   { cmd: "mode", desc: "Switch workflow mode (solo/team)" },
   { cmd: "prefs", desc: "Manage preferences (model selection, timeouts, etc.)" },
@@ -213,6 +214,10 @@ const NESTED_COMPLETIONS: CompletionMap = {
     { cmd: "status", desc: "Show unresolved git closeout failures" },
     { cmd: "retry", desc: "Retry the latest failed closeout git action" },
     { cmd: "resolve", desc: "Mark closeout resolved after the worktree is clean" },
+  ],
+  rebuild: [
+    { cmd: "markdown", desc: "Rebuild markdown projections from the canonical DB" },
+    { cmd: "database", desc: "Reserved for DB-native rebuilds; does not import markdown" },
   ],
   knowledge: [
     { cmd: "rule", desc: "Add a project rule (always/never do X)" },

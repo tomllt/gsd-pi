@@ -254,7 +254,12 @@ import {
   postUnitPreVerification,
   postUnitPostVerification,
 } from "./auto-post-unit.js";
-import { bootstrapAutoSession, openProjectDbIfPresent, type BootstrapDeps } from "./auto-start.js";
+import {
+  bootstrapAutoSession,
+  openProjectDbIfPresent,
+  reconcileMergedMilestonesFromJournal,
+  type BootstrapDeps,
+} from "./auto-start.js";
 import { initHealthWidget } from "./health-widget.js";
 import { runLegacyAutoLoop, runUokKernelLoop } from "./auto/loop.js";
 import { resolveAgentEnd, resolveAgentEndCancelled, _resetPendingResolve, isSessionSwitchInFlight } from "./auto/resolve.js";
@@ -2102,6 +2107,28 @@ export function createWiredDispatchAdapter(
     return null;
   }
 
+  function shouldAdoptActiveMilestone(
+    state: GSDState,
+    activeSession: AutoSession | undefined,
+    activeDispatchBasePath: string,
+  ): boolean {
+    const activeMilestoneId = state.activeMilestone?.id;
+    const currentMilestoneId = activeSession?.currentMilestoneId;
+    if (!activeSession || !activeMilestoneId || !currentMilestoneId || activeMilestoneId === currentMilestoneId) {
+      return false;
+    }
+
+    const scopedWorktreeMilestone =
+      (activeSession.basePath ? detectWorktreeName(activeSession.basePath) : null) ??
+      detectWorktreeName(activeDispatchBasePath);
+    if (scopedWorktreeMilestone && scopedWorktreeMilestone !== activeMilestoneId) {
+      return false;
+    }
+
+    const currentMilestone = state.registry.find((milestone) => milestone.id === currentMilestoneId);
+    return !!currentMilestone && isClosedStatus(currentMilestone.status);
+  }
+
   return {
     async decideNextUnit(input) {
       const state = input.stateSnapshot;
@@ -2110,6 +2137,9 @@ export function createWiredDispatchAdapter(
 
       const activeSession = input.session ?? session;
       const activeDispatchBasePath = activeSession?.basePath || dispatchBasePath;
+      if (activeSession && shouldAdoptActiveMilestone(state, activeSession, activeDispatchBasePath)) {
+        activeSession.currentMilestoneId = active.id;
+      }
       const prefs = loadEffectiveGSDPreferences(activeDispatchBasePath)?.preferences;
 
       // Derive session-derived dispatch inputs the same way phases.ts:runDispatch does
@@ -2955,6 +2985,7 @@ export async function startAuto(
     if (!getLedger()) initMetrics(base);
     if (s.currentMilestoneId) setActiveMilestoneId(base, s.currentMilestoneId);
     await openProjectDbIfPresent(base);
+    reconcileMergedMilestonesFromJournal(base);
     registerAutoWorkerForSession(s, base);
 
     // Re-register health level notification callback lost across process restart
