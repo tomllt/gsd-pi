@@ -41,7 +41,7 @@ import {
 	discoverWorkflowMcpServerName,
 	computeMcpDisallowedTools,
 } from "../gsd/mcp-filter.js";
-import { RUN_UAT_CLAUDE_NATIVE_TOOL_NAMES, RUN_UAT_FORBIDDEN_TOOL_NAMES, resolveToolPresentationPlan } from "../gsd/tool-presentation-plan.js";
+import { RUN_UAT_CLAUDE_NATIVE_TOOL_NAMES, RUN_UAT_FORBIDDEN_TOOL_NAMES, RUN_UAT_WORKFLOW_TOOL_NAMES, resolveToolPresentationPlan } from "../gsd/tool-presentation-plan.js";
 import { showInterviewRound, type Question, type RoundResult } from "../shared/tui.js";
 import type {
 	BetaRawMessageStreamEvent,
@@ -1582,7 +1582,9 @@ function resolveExactWorkflowMcpToolsForPhase(
 	workflowExplicitlyBlocked: boolean,
 ): string[] {
 	if (!gsdPhase || !workflowServerName || workflowExplicitlyBlocked) return [];
-	const requiredTools = getRequiredWorkflowToolsForAutoUnit(gsdPhase);
+	const requiredTools = gsdPhase === "run-uat"
+		? [...RUN_UAT_WORKFLOW_TOOL_NAMES]
+		: getRequiredWorkflowToolsForAutoUnit(gsdPhase);
 	const supportTools = gsdPhase === "run-uat" ? [] : ["gsd_milestone_status"];
 	const requestedToolNames = [...new Set([...requiredTools, ...supportTools])];
 	if (requestedToolNames.length === 0) return [];

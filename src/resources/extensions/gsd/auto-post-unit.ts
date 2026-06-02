@@ -2134,8 +2134,8 @@ export async function postUnitPostVerification(pctx: PostUnitContext): Promise<"
               await renderPlanCheckboxes(s.canonicalProjectRoot, mid, sid);
             } catch (dbErr) {
               // DB unavailable — fail explicitly rather than silently reverting to markdown mutation.
-              // Use 'gsd recover' to rebuild DB state from disk if needed.
-              logError("engine", `retry state-reset failed (DB unavailable): ${(dbErr as Error).message}. Run 'gsd recover' to reconcile.`);
+              // Use 'gsd recover --confirm' to import markdown into the DB if needed.
+              logError("engine", `retry state-reset failed (DB unavailable): ${(dbErr as Error).message}. Run 'gsd recover --confirm' to import markdown into the DB.`);
             }
           }
 

@@ -256,7 +256,6 @@ async function resolveMcpRuntimeStatus(
     error,
   };
 }
-
 // ─── Command handler ────────────────────────────────────────────────────────
 
 /**
