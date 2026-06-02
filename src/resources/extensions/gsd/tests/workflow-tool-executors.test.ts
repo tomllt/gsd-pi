@@ -541,14 +541,14 @@ test("executeUatResultSave accepts gsd_uat_exec evidence written in a milestone 
       verdict: "PASS",
       checks: [{
         id: "UAT-01",
-        description: "Runtime UAT evidence was captured in the active worktree",
+        description: "Runtime path C:\\tmp|uat evidence was captured in the active worktree",
         mode: "runtime",
         result: "PASS",
         evidence: [
           { kind: "gsd_uat_exec", ref: evidenceId },
           { kind: "browser", ref: browserTimelinePath },
         ],
-        notes: "Worktree-local gsd_uat_exec metadata should resolve.",
+        notes: "Worktree-local gsd_uat_exec metadata should resolve with backslash \\ and pipe |.",
       }],
       presentation: {
         surface: "mcp",
@@ -575,6 +575,12 @@ test("executeUatResultSave accepts gsd_uat_exec evidence written in a milestone 
       existsSync(join(base, ".gsd", "uat", "M001", "S02", "attempt-1.json")),
       "attempt JSON should be persisted under the authoritative project .gsd",
     );
+    const assessment = readFileSync(
+      join(base, ".gsd", "milestones", "M001", "slices", "S02", "S02-ASSESSMENT.md"),
+      "utf-8",
+    );
+    assert.match(assessment, /Runtime path C:\\\\tmp\\\|uat evidence/);
+    assert.match(assessment, /backslash \\\\ and pipe \\\|/);
   } finally {
     closeDatabase();
     cleanup(base);

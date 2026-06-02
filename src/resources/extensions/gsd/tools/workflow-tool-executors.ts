@@ -1203,6 +1203,12 @@ function nextUatAttempt(basePath: string, milestoneId: string, sliceId: string):
   return max + 1;
 }
 
+function escapeMarkdownTableCell(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[\\|]/g, (char) => `\\${char}`)
+    .replace(/\r?\n/g, "<br>");
+}
+
 function renderUatAssessment(params: UatResultSaveParams, attempt: number, gateVerdict: "pass" | "flag"): string {
   const lines = [
     "---",
@@ -1221,7 +1227,7 @@ function renderUatAssessment(params: UatResultSaveParams, attempt: number, gateV
     "|-------|------|--------|----------|-------|",
     ...params.checks.map((check) => {
       const evidence = (check.evidence ?? []).map((entry) => `${entry.kind}:${entry.ref}`).join("<br>") || "-";
-      return `| ${check.description.replace(/\|/g, "\\|")} | ${check.mode} | ${check.result} | ${evidence.replace(/\|/g, "\\|")} | ${(check.notes ?? "").replace(/\|/g, "\\|")} |`;
+      return `| ${escapeMarkdownTableCell(check.description)} | ${escapeMarkdownTableCell(check.mode)} | ${escapeMarkdownTableCell(check.result)} | ${escapeMarkdownTableCell(evidence)} | ${escapeMarkdownTableCell(check.notes)} |`;
     }),
     "",
     "## Overall Verdict",
