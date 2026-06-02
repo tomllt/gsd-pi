@@ -254,7 +254,12 @@ import {
   postUnitPreVerification,
   postUnitPostVerification,
 } from "./auto-post-unit.js";
-import { bootstrapAutoSession, openProjectDbIfPresent, type BootstrapDeps } from "./auto-start.js";
+import {
+  bootstrapAutoSession,
+  openProjectDbIfPresent,
+  reconcileMergedMilestonesFromJournal,
+  type BootstrapDeps,
+} from "./auto-start.js";
 import { initHealthWidget } from "./health-widget.js";
 import { runLegacyAutoLoop, runUokKernelLoop } from "./auto/loop.js";
 import { resolveAgentEnd, resolveAgentEndCancelled, _resetPendingResolve, isSessionSwitchInFlight } from "./auto/resolve.js";
@@ -2955,6 +2960,7 @@ export async function startAuto(
     if (!getLedger()) initMetrics(base);
     if (s.currentMilestoneId) setActiveMilestoneId(base, s.currentMilestoneId);
     await openProjectDbIfPresent(base);
+    reconcileMergedMilestonesFromJournal(base);
     registerAutoWorkerForSession(s, base);
 
     // Re-register health level notification callback lost across process restart
