@@ -906,6 +906,51 @@ test("ADR-017 (#5704): registered milestone (DB row present) → no drift", asyn
 
 // ─── #5705: roadmap-divergence drift ─────────────────────────────────────────
 
+test("ADR-017 (#391): roadmap-divergence skips slices before task planning completes", async (t) => {
+  const base = mkdtempSync(join(tmpdir(), "gsd-adr017-roadmap-unplanned-"));
+  const milestoneDir = join(base, ".gsd", "milestones", "M001");
+  const roadmapPath = join(milestoneDir, "M001-ROADMAP.md");
+  mkdirSync(milestoneDir, { recursive: true });
+  const originalRoadmap = [
+    "# M001: Test",
+    "",
+    "**Vision:** Verify transient milestone planning state",
+    "",
+    "## Slices",
+    "",
+    "- [ ] **S01: Foundation** `risk:medium` `depends:[]`",
+    "- [ ] **S02: Feature** `risk:medium` `depends:[S01]`",
+    "",
+  ].join("\n");
+  writeFileSync(roadmapPath, originalRoadmap);
+  t.after(() => {
+    try { closeDatabase(); } catch { /* noop */ }
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  openDatabase(join(base, ".gsd", "gsd.db"));
+  insertMilestone({ id: "M001", title: "Test", status: "active" });
+  insertSlice({ id: "S01", milestoneId: "M001", title: "Foundation", status: "pending", risk: "medium", depends: [], demo: "", sequence: 1 });
+  insertSlice({ id: "S02", milestoneId: "M001", title: "Feature", status: "pending", risk: "medium", depends: [], demo: "", sequence: 2 });
+
+  assert.equal(getSliceTasks("M001", "S01").length, 0, "pre: S01 has not been planned");
+  assert.equal(getSliceTasks("M001", "S02").length, 0, "pre: S02 has not been planned");
+
+  const result = await reconcileBeforeDispatch(base, {
+    invalidateStateCache: () => {},
+    deriveState: async () => makeState(),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    result.repaired.some((d) => d.kind === "roadmap-divergence"),
+    false,
+    "unplanned slices should not trigger roadmap-divergence repair",
+  );
+  assert.equal(readFileSync(roadmapPath, "utf-8"), originalRoadmap);
+  assert.deepEqual(getSlice("M001", "S02")?.depends, [], "DB remains unchanged");
+});
+
 test("ADR-017 (#5705): roadmap-divergence re-renders projection without syncing depends into DB", async (t) => {
   const base = mkdtempSync(join(tmpdir(), "gsd-adr017-roadmap-"));
   const milestoneDir = join(base, ".gsd", "milestones", "M001");
@@ -936,6 +981,8 @@ test("ADR-017 (#5705): roadmap-divergence re-renders projection without syncing 
   // Seed DB with S02 depending on []  — diverges from ROADMAP.md
   insertSlice({ id: "S01", milestoneId: "M001", title: "Foundation", status: "pending", risk: "medium", depends: [], demo: "", sequence: 1 });
   insertSlice({ id: "S02", milestoneId: "M001", title: "Feature", status: "pending", risk: "medium", depends: [], demo: "", sequence: 2 });
+  insertTask({ id: "T01", sliceId: "S01", milestoneId: "M001", title: "Plan S01", status: "pending" });
+  insertTask({ id: "T01", sliceId: "S02", milestoneId: "M001", title: "Plan S02", status: "pending" });
 
   assert.deepEqual(getSlice("M001", "S02")?.depends, [], "pre: DB has S02.depends = []");
 
@@ -987,6 +1034,7 @@ test("ADR-017 (#5705): ROADMAP-only slice is removed from projection and not ins
   insertMilestone({ id: "M001", title: "Test", status: "active" });
   // Only insert S01 — S02 is intentionally absent from the DB.
   insertSlice({ id: "S01", milestoneId: "M001", title: "Foundation", status: "pending", risk: "medium", depends: [], demo: "", sequence: 1 });
+  insertTask({ id: "T01", sliceId: "S01", milestoneId: "M001", title: "Plan S01", status: "pending" });
 
   assert.equal(getSlice("M001", "S02"), null, "pre: S02 has no DB row");
 
@@ -1035,6 +1083,8 @@ test("ADR-017 (#5705): ROADMAP sequence drift re-renders from DB order without m
   insertMilestone({ id: "M001", title: "Test", status: "active" });
   insertSlice({ id: "S01", milestoneId: "M001", title: "Foundation", status: "pending", risk: "medium", depends: [], demo: "", sequence: 1 });
   insertSlice({ id: "S02", milestoneId: "M001", title: "Feature", status: "pending", risk: "medium", depends: [], demo: "", sequence: 2 });
+  insertTask({ id: "T01", sliceId: "S01", milestoneId: "M001", title: "Plan S01", status: "pending" });
+  insertTask({ id: "T01", sliceId: "S02", milestoneId: "M001", title: "Plan S02", status: "pending" });
 
   const result = await reconcileBeforeDispatch(base, {
     invalidateStateCache: () => {},
@@ -1078,6 +1128,7 @@ test("ADR-017 (#5705): ROADMAP checkbox drift re-renders from DB status without 
   openDatabase(join(base, ".gsd", "gsd.db"));
   insertMilestone({ id: "M001", title: "Test", status: "active" });
   insertSlice({ id: "S01", milestoneId: "M001", title: "Foundation", status: "pending", risk: "medium", depends: [], demo: "", sequence: 1 });
+  insertTask({ id: "T01", sliceId: "S01", milestoneId: "M001", title: "Plan S01", status: "pending" });
 
   const result = await reconcileBeforeDispatch(base, {
     invalidateStateCache: () => {},
@@ -1119,6 +1170,7 @@ test("ADR-017 (#5705): in-sync ROADMAP and DB → no roadmap-divergence drift", 
   openDatabase(join(base, ".gsd", "gsd.db"));
   insertMilestone({ id: "M001", title: "Test", status: "active" });
   insertSlice({ id: "S01", milestoneId: "M001", title: "Foundation", status: "pending", risk: "low", depends: [], demo: "", sequence: 1 });
+  insertTask({ id: "T01", sliceId: "S01", milestoneId: "M001", title: "Plan S01", status: "pending" });
 
   const result = await reconcileBeforeDispatch(base, {
     invalidateStateCache: () => {},
