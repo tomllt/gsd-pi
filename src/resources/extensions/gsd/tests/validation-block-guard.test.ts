@@ -54,6 +54,8 @@ test("validation block allows recovery, diagnostics, and unrelated commands", ()
     "status",
     "verdict pass --rationale ok",
     "validate-milestone",
+    "dispatch reassess",
+    "dispatch reassess-roadmap",
     "dispatch validate",
     "dispatch validate-milestone",
     "park M006",
@@ -121,4 +123,23 @@ test("validation block message includes attempted command and recovery options",
   assert.match(message, /\/gsd validate-milestone/);
   assert.match(message, /\/gsd verdict pass --rationale/);
   assert.match(message, /\/gsd park M006/);
+});
+
+test("validation block message can guide remediation through dispatch reassess", () => {
+  const message = formatValidationBlockedMessage({
+    ...blockedState(),
+    blockers: [
+      [
+        "Milestone M006 is blocked because milestone validation returned needs-remediation, but all slices are complete.",
+        "Fix options:",
+        "1. Run `/gsd dispatch reassess` to add remediation slices, then run `/gsd auto`",
+        "2. If the finding is acceptable, override it: `/gsd verdict pass --rationale \"why this is okay\"`",
+        "3. If this should wait, defer it explicitly: `/gsd park M006`",
+      ].join("\n"),
+    ],
+  }, "auto");
+
+  assert.ok(message);
+  assert.match(message, /\/gsd dispatch reassess/);
+  assert.doesNotMatch(message, /gsd_reassess_roadmap/);
 });

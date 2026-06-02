@@ -126,6 +126,14 @@ export const WORKFLOW_TOOL_CONTRACTS = [
 		auditEvent: "workflow.gate.save_result",
 	},
 	{
+		canonicalName: "gsd_uat_result_save",
+		aliases: [],
+		schemaId: "workflow.uat.result.save",
+		executorId: "executeUatResultSave",
+		writePolicy: "write",
+		auditEvent: "workflow.uat.result.save",
+	},
+	{
 		canonicalName: "gsd_summary_save",
 		aliases: ["gsd_save_summary"],
 		schemaId: "workflow.summary.save",
@@ -188,6 +196,14 @@ export const WORKFLOW_TOOL_CONTRACTS = [
 		executorId: "executeJournalQuery",
 		writePolicy: "read",
 		auditEvent: "workflow.journal.query",
+	},
+	{
+		canonicalName: "gsd_uat_exec",
+		aliases: [],
+		schemaId: "workflow.uat.exec",
+		executorId: "executeUatExec",
+		writePolicy: "write",
+		auditEvent: "workflow.uat.exec",
 	},
 	{
 		canonicalName: "gsd_exec",

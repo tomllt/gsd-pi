@@ -32,6 +32,16 @@ test("run-uat prompt branches on dynamic UAT mode and supports runtime evidence"
   assert.doesNotMatch(prompt, /uatType:\s*artifact-driven/);
 });
 
+test("run-uat prompt lists canonical gsd_uat_exec intent values", () => {
+  const prompt = readPrompt("run-uat");
+  assert.match(prompt, /`uat-artifact-check`/);
+  assert.match(prompt, /`uat-runtime-check`/);
+  assert.match(prompt, /`uat-browser-check`/);
+  assert.match(prompt, /`uat-service-start`/);
+  assert.match(prompt, /`uat-log-inspection`/);
+  assert.match(prompt, /do not use `artifact`, `runtime`, or `human-follow-up` as `intent`/i);
+});
+
 test("workflow-start prompt defaults to autonomy instead of per-phase confirmation", () => {
   const prompt = readPrompt("workflow-start");
   assert.match(prompt, /Keep moving by default/i);

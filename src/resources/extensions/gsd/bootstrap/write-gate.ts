@@ -679,6 +679,7 @@ const PLANNING_SUBAGENT_TOOLS = new Set(["subagent", "task"]);
  * manifests still declare per-unit subsets via ToolsPolicy.allowedSubagents.
  */
 const PLANNING_DISPATCH_AGENT_REGISTRY = {
+  mnemo: { readOnlySpecialist: true },
   scout: { readOnlySpecialist: true },
   planner: { readOnlySpecialist: true },
   reviewer: { readOnlySpecialist: true },
@@ -692,7 +693,7 @@ export const ALLOWED_PLANNING_DISPATCH_AGENTS = new Set<string>(
     .map(([agentId]) => agentId),
 );
 
-let warnedMissingPlanningDispatchAgentClasses = false;
+let warnedMissingControlledDispatchAgentClasses = false;
 
 function isReadOnlySpecialist(agentId: string): boolean {
   const metadata = PLANNING_DISPATCH_AGENT_REGISTRY[agentId as keyof typeof PLANNING_DISPATCH_AGENT_REGISTRY];
@@ -703,11 +704,20 @@ function allowedPlanningDispatchAgentsList(): string {
   return [...ALLOWED_PLANNING_DISPATCH_AGENTS].join(", ");
 }
 
-function warnMissingPlanningDispatchAgentClasses(unitType: string, mode: string, toolName: string): void {
-  if (warnedMissingPlanningDispatchAgentClasses) return;
-  warnedMissingPlanningDispatchAgentClasses = true;
+function allowsControlledSubagentDispatch(
+  policy: ToolsPolicy,
+): policy is ToolsPolicy & { readonly allowedSubagents: readonly string[] } {
+  return (
+    (policy.mode === "planning-dispatch" || policy.mode === "verification") &&
+    Array.isArray((policy as { readonly allowedSubagents?: unknown }).allowedSubagents)
+  );
+}
+
+function warnMissingControlledDispatchAgentClasses(unitType: string, mode: string, toolName: string): void {
+  if (warnedMissingControlledDispatchAgentClasses) return;
+  warnedMissingControlledDispatchAgentClasses = true;
   // TODO(#5060): Remove this migration shim once all subagent/task callers are verified to forward agent identities.
-  const message = `[write-gate] planning-dispatch: shouldBlockPlanningUnit called for tool "${toolName}" ` +
+  const message = `[write-gate] controlled-dispatch: shouldBlockPlanningUnit called for tool "${toolName}" ` +
     `on unit "${unitType}" without agentClasses - stale caller; blocking dispatch.`;
   console.warn(message);
   logWarning("intercept", message, {
@@ -777,8 +787,9 @@ function blockReason(unitType: string, mode: string, what: string): string {
  *   - "docs"       → like "planning" but also allows writes to paths
  *                    matching `allowedPathGlobs` relative to basePath.
  *   - "verification"
- *                  → allows Bash for project verification commands, but keeps
- *                    writes restricted to .gsd/ and blocks subagent dispatch.
+ *                  → allows Bash for project verification commands, keeps
+ *                    writes restricted to .gsd/, and permits subagent dispatch
+ *                    only when the manifest declares allowedSubagents.
  *
  * `pathOrCommand` is the file path for write/edit-shaped tools and the
  * shell command for bash. Other tools ignore this argument.
@@ -825,7 +836,7 @@ export function shouldBlockPlanningUnit(
   if (tool.startsWith("gsd_")) return { block: false };
 
   if (PLANNING_SUBAGENT_TOOLS.has(tool)) {
-    if (policy.mode === "planning-dispatch") {
+    if (allowsControlledSubagentDispatch(policy)) {
       const requested = (agentClasses ?? []).map(a => a.trim()).filter(Boolean);
       const dispatchContract = compileSubagentPermissionContract(policy);
       const allowedSubagents = dispatchContract.allowedSubagents;
@@ -834,7 +845,7 @@ export function shouldBlockPlanningUnit(
       // agent identities yet. Block and warn so stale callers surface in telemetry
       // instead of silently bypassing the gate.
       if (agentClasses === undefined) {
-        warnMissingPlanningDispatchAgentClasses(unitType, policy.mode, tool);
+        warnMissingControlledDispatchAgentClasses(unitType, policy.mode, tool);
         return {
           block: true,
           reason: blockReason(
@@ -857,7 +868,7 @@ export function shouldBlockPlanningUnit(
           reason: blockReason(
             unitType,
             policy.mode,
-            `subagent dispatch of "${globallyDisallowed}" not permitted; only read-only specialists (${allowedPlanningDispatchAgentsList()}) may be dispatched from planning-dispatch units`,
+            `subagent dispatch of "${globallyDisallowed}" not permitted; only read-only specialists (${allowedPlanningDispatchAgentsList()}) may be dispatched from ${policy.mode} units`,
           ),
         };
       }

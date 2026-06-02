@@ -6,11 +6,51 @@ import stripAnsi from "strip-ansi";
 import {
 	findLatestPinnableText,
 	handleAgentEvent,
+	isProvisionalPreToolProse,
 	isRedundantDiscussRestatement,
 	priorAssistantTextFromSession,
 	textInvitesUserReply,
 } from "./chat-controller.js";
 import { initTheme } from "@gsd/pi-coding-agent/theme/theme.js";
+
+function createStreamingHost(chatContainer: Container): any {
+	return {
+		isInitialized: true,
+		footer: { invalidate() {} },
+		settingsManager: {
+			getTimestampFormat() {
+				return "date-time-iso";
+			},
+			getShowImages() {
+				return false;
+			},
+		},
+		getMarkdownThemeWithSettings() {
+			return undefined;
+		},
+		getRegisteredToolDefinition() {
+			return undefined;
+		},
+		formatWebSearchResult() {
+			return "";
+		},
+		session: { messages: [], retryAttempt: 0 },
+		chatContainer,
+		pendingTools: new Map(),
+		pendingMessagesContainer: { clear() {} },
+		pinnedMessageContainer: new Container(),
+		statusContainer: new Container(),
+		hideThinkingBlock: true,
+		toolOutputExpanded: false,
+		loadingAnimation: undefined,
+		pendingWorkingMessage: undefined,
+		defaultWorkingMessage: "Working...",
+		ui: {
+			terminal: { rows: 60, columns: 100 },
+			requestRender() {},
+		},
+	};
+}
 
 test("textInvitesUserReply: detects question handoff", () => {
 	assert.equal(textInvitesUserReply("What do you want to build for M006?"), true);
@@ -54,6 +94,18 @@ test("isRedundantDiscussRestatement: keeps short new follow-up questions", () =>
 	const prior = "What do you want to build for M006?";
 	const next = "I found 3 modules. Should I add docs?";
 	assert.equal(isRedundantDiscussRestatement(prior, next), false);
+});
+
+test("isProvisionalPreToolProse: only treats transient tool scaffolding as disposable", () => {
+	assert.equal(isProvisionalPreToolProse("I'll inspect the current state and then patch it."), true);
+	assert.equal(isProvisionalPreToolProse("Running the focused tests now."), true);
+	assert.equal(
+		isProvisionalPreToolProse(
+			"I'm still waiting on your actual answer, and I want to be transparent about what I'm seeing.",
+		),
+		false,
+	);
+	assert.equal(isProvisionalPreToolProse("What do you want to build next?"), false);
 });
 
 test("findLatestPinnableText: empty content returns empty string", () => {
@@ -277,6 +329,78 @@ test("handleAgentEvent: standalone completed tool events roll up incrementally",
 	assert.doesNotMatch(rendered, /^\s*│?\s*read\s+success ·/m);
 	assert.doesNotMatch(rendered, /^\s*│?\s*edit\s+success ·/m);
 	assert.ok(renderCount > 0);
+});
+
+test("handleAgentEvent: Claude Code MCP post-tool text does not erase user-facing pre-tool prose", async () => {
+	initTheme("dark", false);
+	const chatContainer = new Container();
+	const preToolText =
+		"I'm still waiting on your actual answer, and I want to be transparent about what I'm seeing.";
+	const postToolText = "I'll stay parked here until the missing project description arrives.";
+	function makeMessage(content: any[]): any {
+		return {
+			id: "a-mcp",
+			role: "assistant",
+			provider: "claude-code",
+			model: "claude-opus-4-8",
+			timestamp: 1,
+			stopReason: "stop",
+			content,
+		};
+	}
+	const host = createStreamingHost(chatContainer);
+	const toolBlock = { type: "serverToolUse", id: "mcp-1", name: "mcp__gsd__status", input: {} };
+	const first = makeMessage([{ type: "text", text: preToolText }, toolBlock]);
+
+	await handleAgentEvent(host, { type: "message_start", message: makeMessage([]) } as any);
+	await handleAgentEvent(host, {
+		type: "message_update",
+		message: first,
+		assistantMessageEvent: { type: "server_tool_use", contentIndex: 1, partial: first },
+	} as any);
+
+	assert.match(stripAnsi(chatContainer.render(100).join("\n")), /still waiting on your actual answer/);
+
+	const final = makeMessage([{ type: "text", text: preToolText }, toolBlock, { type: "text", text: postToolText }]);
+	await handleAgentEvent(host, {
+		type: "message_update",
+		message: final,
+		assistantMessageEvent: { type: "text_delta", contentIndex: 2, delta: postToolText, partial: final },
+	} as any);
+	await handleAgentEvent(host, { type: "message_end", message: final } as any);
+
+	const rendered = stripAnsi(chatContainer.render(100).join("\n"));
+	assert.match(rendered, /still waiting on your actual answer/);
+	assert.match(rendered, /stay parked here/);
+});
+
+test("handleAgentEvent: message_end keeps the current handoff reply visible", async () => {
+	initTheme("dark", false);
+	const chatContainer = new Container();
+	const text = "What do you want to build next?";
+	const message = {
+		id: "a-question",
+		role: "assistant",
+		provider: "claude-code",
+		model: "claude-opus-4-8",
+		timestamp: 1,
+		stopReason: "stop",
+		content: [{ type: "text", text }],
+	};
+	const host = createStreamingHost(chatContainer);
+
+	await handleAgentEvent(host, { type: "message_start", message: { ...message, content: [] } } as any);
+	await handleAgentEvent(host, {
+		type: "message_update",
+		message,
+		assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: text, partial: message },
+	} as any);
+
+	assert.match(stripAnsi(chatContainer.render(100).join("\n")), /What do you want to build next/);
+
+	await handleAgentEvent(host, { type: "message_end", message } as any);
+
+	assert.match(stripAnsi(chatContainer.render(100).join("\n")), /What do you want to build next/);
 });
 
 test("handleAgentEvent: agent_end finalizes orphaned pending tool cards", async () => {

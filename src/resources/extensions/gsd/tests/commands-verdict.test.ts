@@ -399,8 +399,12 @@ test("handleVerdict needs-remediation override with --rationale rewrites verdict
     assert.match(rewritten, /found missing slice/);
 
     assert.ok(
-      calls.some((c) => /gsd_reassess_roadmap/.test(c.message)),
-      "needs-remediation override should suggest gsd_reassess_roadmap follow-up",
+      calls.some((c) => /\/gsd dispatch reassess/.test(c.message)),
+      "needs-remediation override should suggest the reassess dispatch follow-up",
+    );
+    assert.ok(
+      calls.every((c) => !/gsd_reassess_roadmap/.test(c.message)),
+      "needs-remediation override should not expose the internal tool name",
     );
   } finally {
     closeDatabase();

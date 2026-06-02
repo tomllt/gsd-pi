@@ -32,6 +32,7 @@ export interface RetrySettings {
 
 export interface TerminalSettings {
 	showImages?: boolean; // default: true (only relevant if terminal supports images)
+	toolsExpanded?: boolean; // default: true (tool output cards start expanded)
 	imageWidthCells?: number; // default: 60 (preferred inline image width in terminal cells)
 	clearOnShrink?: boolean; // default: false (clear empty rows when content shrinks)
 	showTerminalProgress?: boolean; // default: false (OSC 9;4 terminal progress indicators)
@@ -970,6 +971,19 @@ export class SettingsManager {
 		}
 		this.globalSettings.terminal.showImages = show;
 		this.markModified("terminal", "showImages");
+		this.save();
+	}
+
+	getToolsExpanded(): boolean {
+		return this.settings.terminal?.toolsExpanded ?? true;
+	}
+
+	setToolsExpanded(expanded: boolean): void {
+		if (!this.globalSettings.terminal) {
+			this.globalSettings.terminal = {};
+		}
+		this.globalSettings.terminal.toolsExpanded = expanded;
+		this.markModified("terminal", "toolsExpanded");
 		this.save();
 	}
 

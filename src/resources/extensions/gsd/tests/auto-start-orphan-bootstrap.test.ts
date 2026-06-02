@@ -531,8 +531,13 @@ test("bootstrap honors explicit solo milestone lock when recovering stranded tar
     assert.equal(ready, true);
     assert.deepEqual(adoptCalls, [{ milestoneId: "M002", mode: "worktree" }]);
     assert.equal(s.currentMilestoneId, "M002");
-    assert.match(messages, /Recovering stranded work for M002/);
+    assert.match(messages, /Resuming saved milestone work for M002/);
     assert.doesNotMatch(messages, /blocks auto-mode before M001/);
+    assert.doesNotMatch(messages, /Stranded work for in-progress milestone M002/);
+    assert.ok(
+      notifications.some((entry) => entry.level === "info" && entry.message.includes("Resuming saved milestone work for M002")),
+      "active recovery should be presented as an info-level resume",
+    );
   } finally {
     if (previousLock === undefined) delete process.env.GSD_MILESTONE_LOCK;
     else process.env.GSD_MILESTONE_LOCK = previousLock;
@@ -624,7 +629,11 @@ test("bootstrap adopts stranded active branch even when isolation is none", asyn
     assert.equal(s.strandedRecoveryIsolationMode, "branch");
     assert.match(
       notifications.map((entry) => entry.message).join("\n"),
-      /Recovering stranded work for M001/,
+      /Resuming saved milestone work for M001/,
+    );
+    assert.ok(
+      notifications.every((entry) => entry.level !== "warning" || !entry.message.includes("Stranded work for in-progress milestone M001")),
+      "adopting the active milestone should not emit a scary stranded-work warning",
     );
   } finally {
     try {
@@ -713,7 +722,11 @@ test("bootstrap adopts stranded active branch before deep project setup", async 
     assert.equal(s.strandedRecoveryIsolationMode, "branch");
     assert.match(
       notifications.map((entry) => entry.message).join("\n"),
-      /Recovering stranded work for M001/,
+      /Resuming saved milestone work for M001/,
+    );
+    assert.ok(
+      notifications.every((entry) => entry.level !== "warning" || !entry.message.includes("Stranded work for in-progress milestone M001")),
+      "adopting the active milestone should not emit a scary stranded-work warning",
     );
   } finally {
     try {

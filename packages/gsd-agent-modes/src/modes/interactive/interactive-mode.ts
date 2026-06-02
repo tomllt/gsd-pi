@@ -206,6 +206,7 @@ export class InteractiveMode {
 		this.footerDataProvider = new FooterDataProvider(process.cwd());
 		this.footer = new FooterComponent(session, this.footerDataProvider);
 		this.footer.setAutoCompactEnabled(session.autoCompactionEnabled);
+		this.toolOutputExpanded = this.settingsManager.getToolsExpanded();
 		this.hideThinkingBlock = this.settingsManager.getHideThinkingBlock();
 		setRegisteredThemes(this.session.resourceLoader.getThemes().themes);
 		initTheme(this.settingsManager.getTheme(), true);

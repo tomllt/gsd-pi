@@ -7,12 +7,17 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { visibleWidth } from "@gsd/pi-tui";
 
-import { setCompletionProgressWidget, updateProgressWidget } from "../auto-dashboard.ts";
+import {
+  _resetWidgetModeForTests,
+  setCompletionProgressWidget,
+  setWidgetMode,
+  updateProgressWidget,
+} from "../auto-dashboard.ts";
 import type { GSDState } from "../types.ts";
 
 interface CapturedSetHeader {
@@ -143,10 +148,18 @@ test("updateProgressWidget gracefully no-ops when ctx.ui lacks setHeader/setStat
 
 // ── NEXT-mode footer guidance ───────────────────────────────────────────
 
-test("auto-dashboard widget render output includes /gsd next guidance when isStepMode is true", (t) => {
+test("auto-dashboard full widget render output includes /gsd next guidance when isStepMode is true", (t) => {
   const dir = makeTempDir("step-hint");
   mkdirSync(join(dir, ".gsd"), { recursive: true });
-  t.after(() => cleanup(dir));
+  const projectPrefsPath = join(dir, ".gsd", "preferences.md");
+  const globalPrefsPath = join(dir, ".gsd", "global-preferences.md");
+  writeFileSync(projectPrefsPath, "---\nversion: 1\n---\n", "utf-8");
+  _resetWidgetModeForTests();
+  setWidgetMode("full", projectPrefsPath, globalPrefsPath);
+  t.after(() => {
+    _resetWidgetModeForTests();
+    cleanup(dir);
+  });
 
   let widgetFactory: ((tui: unknown, theme: unknown) => any) | undefined;
 
@@ -173,6 +186,7 @@ test("auto-dashboard widget render output includes /gsd next guidance when isSte
     bold: (text: string) => text,
   };
   const component = widgetFactory!(fakeTui, fakeTheme);
+  t.after(() => component.dispose?.());
   const lines = component.render(120);
 
   const hasStepHint = lines.some((line: string) => line.includes("/gsd next to advance one step"));
@@ -181,10 +195,18 @@ test("auto-dashboard widget render output includes /gsd next guidance when isSte
   if (component.dispose) component.dispose();
 });
 
-test("auto-dashboard widget render output omits /gsd next guidance when isStepMode is false", (t) => {
+test("auto-dashboard full widget render output omits /gsd next guidance when isStepMode is false", (t) => {
   const dir = makeTempDir("no-step-hint");
   mkdirSync(join(dir, ".gsd"), { recursive: true });
-  t.after(() => cleanup(dir));
+  const projectPrefsPath = join(dir, ".gsd", "preferences.md");
+  const globalPrefsPath = join(dir, ".gsd", "global-preferences.md");
+  writeFileSync(projectPrefsPath, "---\nversion: 1\n---\n", "utf-8");
+  _resetWidgetModeForTests();
+  setWidgetMode("full", projectPrefsPath, globalPrefsPath);
+  t.after(() => {
+    _resetWidgetModeForTests();
+    cleanup(dir);
+  });
 
   let widgetFactory: ((tui: unknown, theme: unknown) => any) | undefined;
 
@@ -211,6 +233,7 @@ test("auto-dashboard widget render output omits /gsd next guidance when isStepMo
     bold: (text: string) => text,
   };
   const component = widgetFactory!(fakeTui, fakeTheme);
+  t.after(() => component.dispose?.());
   const lines = component.render(120);
 
   const hasStepHint = lines.some((line: string) => line.includes("/gsd next to advance one step"));

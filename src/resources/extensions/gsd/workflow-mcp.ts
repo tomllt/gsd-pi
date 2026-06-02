@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { RUN_UAT_WORKFLOW_TOOL_NAMES } from "./tool-presentation-plan.js";
 
 type WorkflowExecutorsModule = typeof import("./tools/workflow-tool-executors.js");
 
@@ -100,6 +101,8 @@ const MCP_WORKFLOW_TOOL_SURFACE = new Set([
   "gsd_task_complete",
   "gsd_task_reopen",
   "gsd_update_requirement",
+  "gsd_uat_exec",
+  "gsd_uat_result_save",
   "gsd_validate_milestone",
 ]);
 
@@ -462,8 +465,9 @@ export function getRequiredWorkflowToolsForAutoUnit(unitType: string): string[] 
       ];
     case "research-milestone":
     case "research-slice":
-    case "run-uat":
       return ["gsd_summary_save"];
+    case "run-uat":
+      return [...RUN_UAT_WORKFLOW_TOOL_NAMES];
     case "plan-milestone":
       return ["gsd_plan_milestone"];
     case "plan-slice":

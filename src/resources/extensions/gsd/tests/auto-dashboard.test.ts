@@ -16,11 +16,13 @@ import {
   buildPhaseHandoffOutcome,
   updateProgressWidget,
   setAutoOutcomeWidget,
+  setAutoActiveStatus,
   setCompletionProgressWidget,
   getRoadmapSlicesSync,
   clearSliceProgressCache,
   getWidgetMode,
   cycleWidgetMode,
+  setWidgetMode,
   _resetWidgetModeForTests,
   _resetLastCommitCacheForTests,
   _refreshLastCommitForTests,
@@ -76,6 +78,26 @@ test("unitVerb returns raw type for unknown types", () => {
 test("unitVerb handles hook types", () => {
   assert.equal(unitVerb("hook/verify-code"), "hook: verify-code");
   assert.equal(unitVerb("hook/"), "hook: ");
+});
+
+test("setAutoActiveStatus clears stale outcome surfaces", () => {
+  const statusCalls: Array<[string, string]> = [];
+  const widgetCalls: Array<[string, unknown]> = [];
+
+  setAutoActiveStatus({
+    hasUI: true,
+    ui: {
+      setStatus: (key: string, value: string) => {
+        statusCalls.push([key, value]);
+      },
+      setWidget: (key: string, value: unknown) => {
+        widgetCalls.push([key, value]);
+      },
+    },
+  } as any, "next");
+
+  assert.deepEqual(statusCalls, [["gsd-auto", "next"]]);
+  assert.deepEqual(widgetCalls, [["gsd-outcome", undefined]]);
 });
 
 // ─── unitPhaseLabel ───────────────────────────────────────────────────────
@@ -571,13 +593,20 @@ test("updateProgressWidget refreshes slice progress cache immediately", (t) => {
 test("updateProgressWidget full mode keeps footer-owned signals out of auto deck", (t) => {
   const dir = makeTempDir("command-deck");
   mkdirSync(join(dir, ".gsd"), { recursive: true });
+  const projectPrefsPath = join(dir, ".gsd", "preferences.md");
+  const globalPrefsPath = join(dir, ".gsd", "global-preferences.md");
+  writeFileSync(projectPrefsPath, "---\nversion: 1\n---\n", "utf-8");
   let widget: { render(width: number): string[]; dispose?: () => void } | null = null;
 
   t.after(() => {
     widget?.dispose?.();
+    _resetWidgetModeForTests();
     clearSliceProgressCache();
     cleanup(dir);
   });
+
+  _resetWidgetModeForTests();
+  setWidgetMode("full", projectPrefsPath, globalPrefsPath);
 
   updateProgressWidget(
     {
@@ -811,4 +840,26 @@ test("widget mode respects project preference precedence and persists there", (t
   const globalPrefs = readFileSync(globalPrefsPath, "utf-8");
   assert.match(projectPrefs, /widget_mode:\s*min/);
   assert.match(globalPrefs, /widget_mode:\s*off/);
+});
+
+test("widget mode defaults to small when preferences do not set it", (t) => {
+  const homeDir = makeTempDir("home-no-widget-pref");
+  const projectDir = makeTempDir("project-no-widget-pref");
+  const globalPrefsPath = join(homeDir, ".gsd", "preferences.md");
+  const projectPrefsPath = join(projectDir, ".gsd", "preferences.md");
+
+  mkdirSync(join(homeDir, ".gsd"), { recursive: true });
+  mkdirSync(join(projectDir, ".gsd"), { recursive: true });
+  writeFileSync(globalPrefsPath, "---\nversion: 1\n---\n", "utf-8");
+  writeFileSync(projectPrefsPath, "---\nversion: 1\n---\n", "utf-8");
+
+  t.after(() => {
+    cleanup(homeDir);
+    cleanup(projectDir);
+    _resetWidgetModeForTests();
+  });
+
+  _resetWidgetModeForTests();
+
+  assert.equal(getWidgetMode(projectPrefsPath, globalPrefsPath), "small");
 });

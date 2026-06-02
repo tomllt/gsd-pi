@@ -53,6 +53,24 @@ test('runExecSandbox: captures stdout, persists artifacts, returns digest', asyn
   }
 });
 
+test('runExecSandbox: persists optional request metadata', async () => {
+  const base = freshBase();
+  try {
+    const result = await runExecSandbox(
+      {
+        runtime: 'bash',
+        script: 'echo metadata-ok',
+        metadata: { kind: 'uat_exec', intent: 'uat-artifact-check' },
+      },
+      baseOpts(base),
+    );
+    const meta = JSON.parse(readFileSync(result.meta_path, 'utf-8')) as Record<string, unknown>;
+    assert.deepEqual(meta.metadata, { kind: 'uat_exec', intent: 'uat-artifact-check' });
+  } finally {
+    cleanup(base);
+  }
+});
+
 test('runExecSandbox: enforces stdout cap and marks truncation', async () => {
   const base = freshBase();
   try {

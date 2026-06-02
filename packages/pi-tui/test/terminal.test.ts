@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { ProcessTerminal } from "../src/terminal.ts";
+import { ProcessTerminal, shouldEnableMouseReporting } from "../src/terminal.ts";
 
 describe("ProcessTerminal dimensions", () => {
 	it("falls back to COLUMNS and LINES before default dimensions", () => {
@@ -41,5 +41,16 @@ describe("ProcessTerminal dimensions", () => {
 				process.env.LINES = previousLines;
 			}
 		}
+	});
+});
+
+describe("shouldEnableMouseReporting", () => {
+	it("keeps native terminal selection by default", () => {
+		assert.equal(shouldEnableMouseReporting({}), false);
+		assert.equal(shouldEnableMouseReporting({ PI_TUI_MOUSE: "0" }), false);
+	});
+
+	it("enables terminal mouse reporting only when explicitly requested", () => {
+		assert.equal(shouldEnableMouseReporting({ PI_TUI_MOUSE: "1" }), true);
 	});
 });

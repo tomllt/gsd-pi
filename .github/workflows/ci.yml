@@ -356,6 +356,9 @@ jobs:
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
       - name: Generate merged coverage report (report-only)
         run: pnpm run test:coverage:full
 
@@ -408,9 +411,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
       - uses: ./.github/actions/restore-ci-build-artifacts
 
       - uses: ./.github/actions/cache-nextjs
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
 
       - name: Run integration tests
         run: pnpm run test:integration
@@ -452,7 +461,17 @@ jobs:
       - uses: ./.github/actions/setup-linux-native-build-deps
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if pnpm install --frozen-lockfile; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
 
       - uses: ./.github/actions/restore-ci-build-artifacts
 

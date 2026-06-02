@@ -26,6 +26,57 @@ async function loadContextModePreferences(baseDir: string) {
 
 export function registerExecTools(pi: ExtensionAPI): void {
   pi.registerTool({
+    name: "gsd_uat_exec",
+    label: "UAT Exec",
+    description:
+      "Run a UAT-scoped bash/node/python check with milestone/slice/check metadata. " +
+      "Uses the same capped .gsd/exec evidence store as gsd_exec, but rejects commands that mutate dependencies, git state, credentials, or destructive files.",
+    promptSnippet: "Run one UAT check and save typed evidence under .gsd/exec",
+    promptGuidelines: [
+      "Use gsd_uat_exec for each automated UAT check.",
+      "Every PASS/FAIL check saved by gsd_uat_result_save must reference objective evidence from this tool or another approved GSD evidence path.",
+      "Do not install packages, mutate git state, edit source files, or dump credentials during UAT.",
+    ],
+    parameters: Type.Object({
+      milestoneId: Type.String({ description: "Milestone ID (e.g. M001)" }),
+      sliceId: Type.String({ description: "Slice ID (e.g. S01)" }),
+      checkId: Type.String({ description: "Stable check ID from the UAT spec (e.g. UAT-01)" }),
+      intent: Type.String({
+        description:
+          "UAT command intent. Use one canonical value: uat-artifact-check, uat-runtime-check, " +
+          "uat-browser-check, uat-service-start, or uat-log-inspection. Short aliases such as artifact, " +
+          "runtime, browser, service-start, and log-inspection are accepted.",
+      }),
+      runtime: Type.Optional(
+        Type.String({
+          description:
+            "Optional interpreter. Defaults to bash. Supported: bash, node, python; sh/shell, js/nodejs, and py/python3 aliases are accepted.",
+        }),
+      ),
+      script: Type.Optional(Type.String({ description: "Script body. Keep output small (log the finding, not the data)." })),
+      command: Type.Optional(Type.String({ description: "Alias for script; defaults to bash when runtime is omitted." })),
+      cmd: Type.Optional(Type.String({ description: "Short alias for script." })),
+      code: Type.Optional(Type.String({ description: "Alias for script, useful for node/python snippets." })),
+      expected: Type.Optional(Type.String({ description: "Expected outcome for this UAT check." })),
+      timeout_ms: Type.Optional(
+        Type.Number({
+          description: "Per-invocation timeout (ms). Capped at 600000. Default from preferences.",
+          minimum: 1_000,
+          maximum: 600_000,
+        }),
+      ),
+    }),
+    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      const { executeUatExec } = await import("../tools/exec-tool.js");
+      const baseDir = resolveCtxCwd(_ctx);
+      return executeUatExec(params as Parameters<typeof executeUatExec>[0], {
+        baseDir,
+        preferences: await loadContextModePreferences(baseDir),
+      });
+    },
+  });
+
+  pi.registerTool({
     name: "gsd_exec",
     label: "Exec (Sandboxed)",
     description:

@@ -40,10 +40,12 @@ function makeMockCtx(base: string): {
   calls: NotifyCall[];
   widgets: Array<[string, unknown]>;
   statuses: Array<[string, string | undefined]>;
+  newSessions: Array<{ workspaceRoot?: string }>;
 } {
   const calls: NotifyCall[] = [];
   const widgets: Array<[string, unknown]> = [];
   const statuses: Array<[string, string | undefined]> = [];
+  const newSessions: Array<{ workspaceRoot?: string }> = [];
   return {
     ctx: {
       cwd: base,
@@ -58,10 +60,15 @@ function makeMockCtx(base: string): {
           statuses.push([key, value]);
         },
       },
+      newSession: async (options?: { workspaceRoot?: string }) => {
+        newSessions.push(options ?? {});
+        return { cancelled: false };
+      },
     },
     calls,
     widgets,
     statuses,
+    newSessions,
   };
 }
 
@@ -77,7 +84,10 @@ function makeMockPi(): { pi: any; messages: SentMessage[] } {
   };
 }
 
-function seedValidationBlockedMilestone(base: string): void {
+function seedValidationBlockedMilestone(
+  base: string,
+  status: "needs-attention" | "needs-remediation" = "needs-attention",
+): void {
   openDatabase(join(base, ".gsd", "gsd.db"));
   insertMilestone({ id: "M006", title: "Mark All Complete", status: "active" });
   insertSlice({
@@ -91,9 +101,9 @@ function seedValidationBlockedMilestone(base: string): void {
   insertAssessment({
     path: "milestones/M006/M006-VALIDATION.md",
     milestoneId: "M006",
-    status: "needs-attention",
+    status,
     scope: "milestone-validation",
-    fullContent: "verdict: needs-attention",
+    fullContent: `verdict: ${status}`,
   });
   invalidateStateCache();
 }
@@ -152,6 +162,31 @@ test("dispatcher blocks workflow-advancing aliases while validation is blocked",
       invalidateStateCache();
       cleanup(base);
     }
+  }
+});
+
+test("dispatcher allows reassess dispatch while validation needs remediation", async () => {
+  const base = makeBase();
+  try {
+    seedValidationBlockedMilestone(base, "needs-remediation");
+    const { ctx, calls, newSessions } = makeMockCtx(base);
+    const { pi, messages } = makeMockPi();
+
+    await handleGSDCommand("dispatch reassess", ctx, pi);
+
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].customType, "gsd-dispatch");
+    assert.equal(messages[0].display, false);
+    assert.match(messages[0].content, /UNIT: Reassess Roadmap/);
+    assert.ok(
+      calls.some((call) => call.kind === "info" && /Dispatching reassess-roadmap for M006\/S01/.test(call.message)),
+      `expected reassess dispatch notification, got: ${JSON.stringify(calls)}`,
+    );
+    assert.deepEqual(newSessions, [{ workspaceRoot: base }]);
+  } finally {
+    closeDatabase();
+    invalidateStateCache();
+    cleanup(base);
   }
 });
 

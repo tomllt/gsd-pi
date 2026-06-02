@@ -88,7 +88,7 @@ import { resolveManifest } from "../unit-context-manifest.js";
 import { createWorktreeSafetyModule, type WorktreeSafetyResult } from "../worktree-safety.js";
 import { isSuspiciousGhostCompletion } from "../auto-unit-closeout.js";
 import { decideVerificationRetry, verificationRetryKey } from "./verification-retry-policy.js";
-import { buildPhaseHandoffOutcome, setAutoOutcomeWidget } from "../auto-dashboard.js";
+import { buildPhaseHandoffOutcome, setAutoActiveStatus, setAutoOutcomeWidget } from "../auto-dashboard.js";
 import { getConsecutiveDispatchBlocker } from "../dispatch-guard.js";
 import {
   captureRootDirtySnapshot,
@@ -2092,7 +2092,7 @@ export async function runUnitPhase(
   const nextDispatchCount = (s.unitDispatchCount.get(dispatchKey) ?? 0) + 1;
 
   // Status bar (widget + preconditions deferred until after model selection — see #2899)
-  ctx.ui.setStatus("gsd-auto", s.stepMode ? "next" : "auto");
+  setAutoActiveStatus(ctx, s.stepMode ? "next" : "auto");
   if (mid)
     deps.updateSliceProgressCache(s.basePath, mid, state.activeSlice?.id);
 

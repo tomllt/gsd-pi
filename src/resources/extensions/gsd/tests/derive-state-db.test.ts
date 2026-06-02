@@ -868,6 +868,14 @@ describe('derive-state-db', async () => {
         dbState.blockers.some(b => b.includes('needs-remediation') && b.includes('M001')),
         'remediation-stuck-db: blocker message mentions milestone and verdict',
       );
+      assert.ok(
+        dbState.blockers.some(b => b.includes('/gsd dispatch reassess')),
+        'remediation-stuck-db: blocker message points users to the reassess command',
+      );
+      assert.ok(
+        dbState.blockers.every(b => !b.includes('gsd_reassess_roadmap')),
+        'remediation-stuck-db: blocker message does not expose the internal tool name',
+      );
 
       closeDatabase();
     } finally {

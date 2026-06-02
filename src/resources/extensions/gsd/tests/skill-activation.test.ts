@@ -144,6 +144,29 @@ test("buildSkillActivationBlock includes skill_rules matches and task-plan skill
   }
 });
 
+test("buildSkillActivationBlock matches skill_rules against exact unit type context", () => {
+  const base = makeTempBase();
+  try {
+    writeSkill(base, "complete-slice-policies", "Use for complete-slice closeout policy checks.");
+    writeSkill(base, "slice-broad", "Use for broad slice work.");
+    loadOnlyTestSkills(base);
+
+    const result = buildBlock(base, {
+      unitType: "complete-slice",
+    }, {
+      skill_rules: [
+        { when: "complete-slice", use: ["complete-slice-policies"] },
+        { when: "slice", use: ["slice-broad"] },
+      ],
+    });
+
+    assert.match(result, /Call Skill\(\{ skill: 'complete-slice-policies' \}\)/);
+    assert.doesNotMatch(result, /slice-broad/);
+  } finally {
+    cleanup(base);
+  }
+});
+
 test("buildSkillActivationBlock honors avoid_skills against always_use_skills", () => {
   const base = makeTempBase();
   try {

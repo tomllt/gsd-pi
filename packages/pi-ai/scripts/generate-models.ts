@@ -1555,15 +1555,25 @@ async function generateModels() {
 		}
 	}
 
-	const minimaxDirectSupportedIds = new Set(["MiniMax-M2.7", "MiniMax-M2.7-highspeed"]);
+	const minimaxDirectModelOverrides = new Map([
+		["MiniMax-M2.7", { contextWindow: 204800, maxTokens: 131072 }],
+		["MiniMax-M2.7-highspeed", { contextWindow: 204800, maxTokens: 131072 }],
+		// MiniMax's API overview advertises a 1M context window for M3; models.dev
+		// currently reports the documented guaranteed 512K floor.
+		["MiniMax-M3", { contextWindow: 1000000, maxTokens: 131072 }],
+	]);
+	const minimaxDirectSupportedIds = new Set(minimaxDirectModelOverrides.keys());
 
 	for (const candidate of allModels) {
 		if (
 			(candidate.provider === "minimax" || candidate.provider === "minimax-cn") &&
 			minimaxDirectSupportedIds.has(candidate.id)
 		) {
-			candidate.contextWindow = 204800;
-			candidate.maxTokens = 131072;
+			const override = minimaxDirectModelOverrides.get(candidate.id);
+			if (override) {
+				candidate.contextWindow = override.contextWindow;
+				candidate.maxTokens = override.maxTokens;
+			}
 		}
 	}
 

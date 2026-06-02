@@ -22,23 +22,31 @@ import { tmpdir } from "node:os";
 
 import { loadSkills } from "@gsd/pi-coding-agent";
 import {
-  buildResearchSlicePrompt,
+  buildCompleteSlicePrompt,
   buildParallelResearchSlicesPrompt,
+  buildResearchSlicePrompt,
 } from "../auto-prompts.ts";
 
 const SKILL_NAME = "testskill";
+const COMPLETE_SLICE_SKILL_NAME = "complete-slice-policies";
 const SKILL_ACTIVATION_SUBSTRING = `Call Skill({ skill: '${SKILL_NAME}' })`;
+const COMPLETE_SLICE_SKILL_ACTIVATION_SUBSTRING = `Call Skill({ skill: '${COMPLETE_SLICE_SKILL_NAME}' })`;
 
 const tmpDirs: string[] = [];
 let savedCwd: string | undefined;
 
-function setupProjectWithSkill(): string {
+function setupProjectWithSkill(options: {
+  skillName?: string;
+  preferencesLines?: string[];
+} = {}): string {
+  const skillName = options.skillName ?? SKILL_NAME;
   const base = mkdtempSync(join(tmpdir(), "gsd-worker-skill-int-"));
   tmpDirs.push(base);
 
   // Milestone roadmap — buildResearchSlicePrompt inlines the roadmap excerpt.
   const milestoneDir = join(base, ".gsd", "milestones", "M001");
-  mkdirSync(join(milestoneDir, "slices", "S01"), { recursive: true });
+  const sliceOneDir = join(milestoneDir, "slices", "S01");
+  mkdirSync(join(sliceOneDir, "tasks"), { recursive: true });
   mkdirSync(join(milestoneDir, "slices", "S02"), { recursive: true });
   writeFileSync(
     join(milestoneDir, "M001-ROADMAP.md"),
@@ -55,27 +63,41 @@ function setupProjectWithSkill(): string {
     ].join("\n"),
     "utf-8",
   );
+  writeFileSync(
+    join(sliceOneDir, "S01-PLAN.md"),
+    [
+      "# S01: Alpha",
+      "",
+      "**Goal:** Verify worker x skill prompt plumbing.",
+      "**Demo:** Rendered prompts include the skill activation block.",
+      "",
+      "## Tasks",
+      "- [x] **T01: Task** `est:10m`",
+      "",
+    ].join("\n"),
+    "utf-8",
+  );
 
   // Project preferences — buildSkillActivationBlock picks these up via
   // loadEffectiveGSDPreferences(), which reads from `${cwd}/.gsd/PREFERENCES.md`.
   writeFileSync(
     join(base, ".gsd", "PREFERENCES.md"),
-    ["---", `always_use_skills:`, `  - ${SKILL_NAME}`, "---", ""].join("\n"),
+    ["---", ...(options.preferencesLines ?? [`always_use_skills:`, `  - ${skillName}`]), "---", ""].join("\n"),
     "utf-8",
   );
 
   // Project-scoped skill — resolveSkillReference scans `${cwd}/.agents/skills/`.
-  const skillDir = join(base, ".agents", "skills", SKILL_NAME);
+  const skillDir = join(base, ".agents", "skills", skillName);
   mkdirSync(skillDir, { recursive: true });
   writeFileSync(
     join(skillDir, "SKILL.md"),
     [
       "---",
-      `name: ${SKILL_NAME}`,
+      `name: ${skillName}`,
       `description: Integration-test skill for worker × skill prompt plumbing.`,
       "---",
       "",
-      `# ${SKILL_NAME}`,
+      `# ${skillName}`,
       "",
       "Test skill body.",
     ].join("\n"),
@@ -119,6 +141,31 @@ test("worker prompt (buildResearchSlicePrompt) includes <skill_activation> from 
   assert.ok(
     prompt.includes(SKILL_ACTIVATION_SUBSTRING),
     `research-slice prompt should reference the always-used skill '${SKILL_NAME}'`,
+  );
+});
+
+test("complete-slice prompt includes <skill_activation> from unit-specific skill_rules", async () => {
+  const base = setupProjectWithSkill({
+    skillName: COMPLETE_SLICE_SKILL_NAME,
+    preferencesLines: [
+      "skill_rules:",
+      "  - when: complete-slice",
+      "    use:",
+      `      - ${COMPLETE_SLICE_SKILL_NAME}`,
+    ],
+  });
+  savedCwd = process.cwd();
+  process.chdir(base);
+
+  const prompt = await buildCompleteSlicePrompt("M001", "Test Milestone", "S01", "Alpha", base, "minimal");
+
+  assert.ok(
+    prompt.includes("<skill_activation>"),
+    "complete-slice prompt should contain a <skill_activation> block",
+  );
+  assert.ok(
+    prompt.includes(COMPLETE_SLICE_SKILL_ACTIVATION_SUBSTRING),
+    `complete-slice prompt should reference the skill-rule skill '${COMPLETE_SLICE_SKILL_NAME}'`,
   );
 });
 

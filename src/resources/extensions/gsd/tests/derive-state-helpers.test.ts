@@ -555,6 +555,14 @@ describe('derive-state-helpers', () => {
         state.blockers.some(b => b.includes('needs-remediation') && b.includes('M001')),
         'remediation-stuck: blocker message mentions milestone and verdict',
       );
+      assert.ok(
+        state.blockers.some(b => b.includes('/gsd dispatch reassess')),
+        'remediation-stuck: blocker message points users to the reassess command',
+      );
+      assert.ok(
+        state.blockers.every(b => !b.includes('gsd_reassess_roadmap')),
+        'remediation-stuck: blocker message does not expose the internal tool name',
+      );
     } finally {
       closeDatabase();
       cleanup(base);

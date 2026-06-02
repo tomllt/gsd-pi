@@ -23,6 +23,9 @@ import {
 import { loadFile, saveFile, splitFrontmatter, parseFrontmatterMap } from "./files.js";
 import { runClaudeImportFlow } from "./claude-import.js";
 
+const DEFAULT_WIDGET_MODE = "small";
+const WIDGET_MODE_OPTIONS = [DEFAULT_WIDGET_MODE, "full", "min", "off"] as const;
+
 /** Extract body content after frontmatter closing delimiter, or null if none. */
 function extractBodyAfterFrontmatter(content: string): string | null {
   const closingIdx = content.indexOf("\n---", content.indexOf("---"));
@@ -1558,7 +1561,7 @@ async function configureAdvanced(ctx: ExtensionCommandContext, prefs: Record<str
     prefs.min_request_interval_ms = minRequestInterval;
   }
 
-  const widget = await promptEnum(ctx, "Auto-mode widget display", prefs.widget_mode, ["full", "small", "min", "off"], "full");
+  const widget = await promptEnum(ctx, "Auto-mode widget display", prefs.widget_mode, WIDGET_MODE_OPTIONS, DEFAULT_WIDGET_MODE);
   if (widget !== undefined) prefs.widget_mode = widget;
 
   const experimental = (prefs.experimental as Record<string, unknown> | undefined) ?? {};

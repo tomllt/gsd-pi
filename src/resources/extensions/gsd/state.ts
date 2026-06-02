@@ -83,7 +83,7 @@ function formatNeedsRemediationBlocker(milestoneId: string): string {
   return [
     `Milestone ${milestoneId} is blocked because milestone validation returned needs-remediation, but all slices are complete.`,
     `Fix options:`,
-    `1. Add remediation slices with \`gsd_reassess_roadmap\`, then run \`/gsd auto\``,
+    `1. Run \`/gsd dispatch reassess\` to add remediation slices, then run \`/gsd auto\``,
     `2. If the finding is acceptable, override it: \`/gsd verdict pass --rationale "why this is okay"\``,
     `3. If this should wait, defer it explicitly: \`/gsd park ${milestoneId}\``,
   ].join("\n");

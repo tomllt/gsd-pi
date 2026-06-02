@@ -50,6 +50,16 @@ function tokenizeSkillContext(...parts: Array<string | null | undefined>): Set<s
   return tokens;
 }
 
+function tokenizeUnitType(unitType: string | undefined): Set<string> {
+  const tokens = new Set<string>();
+  const value = unitType?.trim().toLowerCase();
+  if (!value) return tokens;
+  tokens.add(value);
+  tokens.add(value.replace(/[-_]+/g, " "));
+  tokens.add(value.replace(/[-_\s]+/g, ""));
+  return tokens;
+}
+
 function skillMatchesContext(skill: Skill, contextTokens: Set<string>): boolean {
   const haystacks = [
     skill.name.toLowerCase(),
@@ -79,17 +89,25 @@ function ruleMatchesContext(when: string, contextTokens: Set<string>): boolean {
   );
 }
 
+function ruleMatchesUnitType(when: string, unitType: string | undefined): boolean {
+  if (!unitType) return false;
+  const whenTokens = tokenizeSkillContext(when);
+  const unitTokens = tokenizeUnitType(unitType);
+  return [...unitTokens].some(token => whenTokens.has(token));
+}
+
 function resolveSkillRuleMatches(
   prefs: GSDPreferences | undefined,
   contextTokens: Set<string>,
   base: string,
+  unitType?: string,
 ): { include: string[]; avoid: string[] } {
   if (!prefs?.skill_rules?.length) return { include: [], avoid: [] };
 
   const include: string[] = [];
   const avoid: string[] = [];
   for (const rule of prefs.skill_rules) {
-    if (!ruleMatchesContext(rule.when, contextTokens)) continue;
+    if (!ruleMatchesContext(rule.when, contextTokens) && !ruleMatchesUnitType(rule.when, unitType)) continue;
     include.push(...resolvePreferenceSkillNames([...(rule.use ?? []), ...(rule.prefer ?? [])], base));
     avoid.push(...resolvePreferenceSkillNames(rule.avoid ?? [], base));
   }
@@ -196,7 +214,7 @@ export function buildSkillActivationBlock(params: {
     matched.add(name);
   }
 
-  const ruleMatches = resolveSkillRuleMatches(prefs, contextTokens, params.base);
+  const ruleMatches = resolveSkillRuleMatches(prefs, contextTokens, params.base, params.unitType);
   for (const name of ruleMatches.include) matched.add(name);
   for (const name of ruleMatches.avoid) avoided.add(name);
 

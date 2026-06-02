@@ -75,7 +75,7 @@ export function showHelp(ctx: ExtensionCommandContext, args = ""): void {
     "  /gsd new-milestone  Create milestone from headless context (used by gsd headless)",
     "  /gsd new-project    Bootstrap a new project (use --deep for staged project-level discovery)",
     "  /gsd quick          Execute a quick task without full planning overhead",
-    "  /gsd dispatch       Dispatch a specific phase directly  [research|plan|execute|complete|uat|replan]",
+    "  /gsd dispatch       Dispatch a specific phase directly  [research|plan|execute|complete|validate|reassess|uat|replan]",
     "  /gsd verdict <v>    Override milestone validation verdict  [pass|needs-attention|needs-remediation] [--milestone Mxxx] [--rationale \"...\"]",
     "  /gsd parallel       Parallel milestone orchestration  [start|status|stop|pause|resume|merge|watch]",
     "  /gsd workflow       Custom workflow lifecycle  [new|run|list|validate|pause|resume]",

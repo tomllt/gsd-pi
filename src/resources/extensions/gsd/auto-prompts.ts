@@ -2719,6 +2719,15 @@ export async function buildCompleteSlicePrompt(
     sliceSummaryPath,
     sliceUatPath,
     gatesToClose,
+    skillActivation: buildSkillActivationBlock({
+      base,
+      milestoneId: mid,
+      milestoneTitle: midTitle,
+      sliceId: sid,
+      sliceTitle: sTitle,
+      extraContext: [inlinedContext],
+      unitType: "complete-slice",
+    }),
   });
 }
 

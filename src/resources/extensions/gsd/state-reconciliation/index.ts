@@ -6,6 +6,7 @@ import {
   deriveState as defaultDeriveState,
   invalidateStateCache as defaultInvalidate,
 } from "../state.js";
+import { clearParseCache as defaultClearParseCache } from "../files.js";
 import type { GSDState } from "../types.js";
 
 import {
@@ -37,6 +38,7 @@ const MAX_PASSES = 2;
 const defaultDeps: ReconciliationDeps = {
   invalidateStateCache: defaultInvalidate,
   deriveState: defaultDeriveState,
+  clearParseCache: defaultClearParseCache,
 };
 
 /**
@@ -58,6 +60,7 @@ export async function reconcileBeforeDispatch(
   deps: ReconciliationDeps = defaultDeps,
 ): Promise<ReconciliationResult> {
   const registry = deps.registry ?? DRIFT_REGISTRY;
+  const clearParseCache = deps.clearParseCache ?? defaultClearParseCache;
   const repaired: DriftRecord[] = [];
 
   for (let pass = 0; pass < MAX_PASSES; pass++) {
@@ -103,6 +106,9 @@ export async function reconcileBeforeDispatch(
       }
     }
 
+    if (repairedThisPass) {
+      clearParseCache();
+    }
     if (blockers.length > 0) {
       let blockerState = stateSnapshot;
       if (repairedThisPass) {

@@ -50,6 +50,14 @@ type ToolRegistrationSource = "content" | "standalone";
 // Invocation matching only reconciles IDs reported by different event streams.
 // Same-source identical invocations are separate concurrent tool calls.
 const toolRegistrationSources = new WeakMap<ToolExecutionComponent, Set<ToolRegistrationSource>>();
+const PROVISIONAL_PRE_TOOL_ACTIONS =
+	"check|inspect|look(?:\\s+into)?|read|open|search|grep|scan|run|verify|test|trace|review|investigate|reproduce|use|gather|find|pull|query|take a look|update|patch|edit|change|modify|write|create|add|remove|apply";
+const FIRST_PERSON_PROVISIONAL_PRE_TOOL_RE = new RegExp(
+	`^(?:i(?:'ll| will)|i(?:'m| am) going to|let me|i need to)\\s+(?:${PROVISIONAL_PRE_TOOL_ACTIONS})\\b`,
+	"i",
+);
+const GERUND_PROVISIONAL_PRE_TOOL_RE =
+	/^(?:checking|inspecting|reading|searching|running|verifying|testing|tracing|reviewing|investigating|scanning|updating|patching|editing|writing|creating|applying)\b/i;
 
 function findPendingToolByInvocation(
 	pendingTools: Map<string, ToolExecutionComponent>,
@@ -315,6 +323,73 @@ function buildDesiredSegments(
 	closeRun();
 
 	return desired;
+}
+
+function isToolUseBlock(block: any): boolean {
+	return block?.type === "toolCall" || block?.type === "serverToolUse";
+}
+
+function isMcpToolBlock(block: any): boolean {
+	if (!isToolUseBlock(block)) return false;
+	const toolName = typeof block?.name === "string" ? block.name : "";
+	return typeof block?.mcpServer === "string" || toolName.startsWith("mcp__");
+}
+
+function hasPostToolText(blocks: Array<any>, firstToolIdx: number): boolean {
+	if (firstToolIdx < 0) return false;
+	return blocks.some(
+		(b: any, idx: number) => (
+			idx > firstToolIdx
+			&& b?.type === "text"
+			&& typeof b?.text === "string"
+			&& b.text.trim().length > 0
+		),
+	);
+}
+
+function normalizeProvisionalText(text: string): string {
+	return text
+		.trim()
+		.replace(/[’`]/g, "'")
+		.replace(/\s+/g, " ");
+}
+
+export function isProvisionalPreToolProse(text: string): boolean {
+	const normalized = normalizeProvisionalText(text);
+	if (!normalized) return false;
+	if (textInvitesUserReply(normalized)) return false;
+	if (/\?\s*$/.test(normalized)) return false;
+
+	return FIRST_PERSON_PROVISIONAL_PRE_TOOL_RE.test(normalized)
+		|| GERUND_PROVISIONAL_PRE_TOOL_RE.test(normalized);
+}
+
+function getProvisionalPreToolPrunePlan(message: { provider?: string; content: Array<any> }): {
+	shouldPrune: boolean;
+	firstToolIdx: number;
+} {
+	const blocks = message.content;
+	const firstToolIdx = blocks.findIndex(isToolUseBlock);
+	return {
+		firstToolIdx,
+		shouldPrune:
+			message.provider === "claude-code"
+			&& firstToolIdx >= 0
+			&& blocks.some(isMcpToolBlock)
+			&& hasPostToolText(blocks, firstToolIdx),
+	};
+}
+
+function buildDesiredSegmentsForMessage(message: { provider?: string; content: Array<any> }): DesiredSegment[] {
+	const { shouldPrune, firstToolIdx } = getProvisionalPreToolPrunePlan(message);
+	return buildDesiredSegments(message.content, {
+		shouldSkipTextBlock: (block: any, index: number) => {
+			if (!shouldPrune || firstToolIdx < 0 || index >= firstToolIdx) return false;
+			if (getVisibleTextLikeBlockType(block) !== "text") return false;
+			const textValue = typeof block?.text === "string" ? block.text : "";
+			return isProvisionalPreToolProse(textValue);
+		},
+	});
 }
 
 function hasVisibleAssistantContent(message: { content: Array<any> }): boolean {
@@ -716,47 +791,25 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				// Build desired segment plan from content[].
 				{
 					const blocks = host.streamingMessage.content;
-					const isClaudeCodeProvider = host.streamingMessage.provider === "claude-code";
-					const hasMcpToolBlock = blocks.some((b: any) => {
-						if (b?.type === "toolCall") {
-							return typeof b?.mcpServer === "string" || String(b?.name ?? "").startsWith("mcp__");
-						}
-						if (b?.type === "serverToolUse") {
-							return typeof b?.mcpServer === "string" || String(b?.name ?? "").startsWith("mcp__");
-						}
-						return false;
-					});
-					const firstToolIdx = blocks.findIndex((b: any) => b.type === "toolCall" || b.type === "serverToolUse");
-					const hasPostToolText = firstToolIdx >= 0
-						&& blocks.some(
-							(b: any, idx: number) => (
-								idx > firstToolIdx
-								&& b?.type === "text"
-								&& typeof b?.text === "string"
-								&& b.text.trim().length > 0
-							),
-						);
 					// Only prune provisional pre-tool prose after post-tool prose exists,
 					// so MCP tool-only windows do not blank the assistant content.
-					const shouldDropPreToolProse = isClaudeCodeProvider && hasMcpToolBlock && hasPostToolText;
-					let desired = buildDesiredSegments(blocks, {
-						shouldSkipTextBlock: (block: any, index: number) => {
-							if (!shouldDropPreToolProse || firstToolIdx < 0 || index >= firstToolIdx) return false;
-							if (getVisibleTextLikeBlockType(block) !== "text") return false;
-							const textValue = typeof block?.text === "string" ? block.text : "";
-							return !/\?\s*$/.test(textValue.trim());
-						},
-					});
+					const { shouldPrune: shouldPruneProvisionalPreToolProse } =
+						getProvisionalPreToolPrunePlan(host.streamingMessage);
+					let desired = buildDesiredSegmentsForMessage(host.streamingMessage);
 					desired = filterRedundantDiscussTextRuns(desired, blocks);
 
 					// Claude Code MCP can emit provisional pre-tool prose that gets
 					// superseded by post-tool output. Prune stale text-run segments so
 					// the final assistant output remains below tool output.
-					if (shouldDropPreToolProse && firstToolIdx >= 0) {
+					if (shouldPruneProvisionalPreToolProse) {
 						if (orphanedSegments.length > 0) {
 							const remainingOrphans: RenderedSegment[] = [];
 							for (const orphan of orphanedSegments) {
-								if (orphan.kind === "text-run" && orphan.contentType === "text") {
+								if (
+									orphan.kind === "text-run"
+									&& orphan.contentType === "text"
+									&& isProvisionalPreToolProse(orphan.cachedText ?? "")
+								) {
 									host.chatContainer.removeChild(orphan.component);
 									if (host.streamingComponent === orphan.component) {
 										host.streamingComponent = undefined;
@@ -987,7 +1040,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 						host.session.messages,
 						extractAssistantText(host.streamingMessage),
 						orphanedSegments,
-						renderedSegments,
+						[],
 					);
 
 					// The final message_end payload can contain additional text/thinking
@@ -997,7 +1050,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					if (renderedSegments.length > 0) {
 						const finalBlocks = host.streamingMessage.content;
 						const desired = filterRedundantDiscussTextRuns(
-							buildDesiredSegments(finalBlocks),
+							buildDesiredSegmentsForMessage(host.streamingMessage),
 							finalBlocks,
 						);
 

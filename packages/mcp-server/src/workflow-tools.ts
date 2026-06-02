@@ -199,6 +199,20 @@ type WorkflowToolExecutors = {
     },
     basePath?: string,
   ) => Promise<unknown>;
+  executeUatResultSave: (
+    params: {
+      milestoneId: string;
+      sliceId: string;
+      uatType: string;
+      verdict: "PASS" | "FAIL" | "PARTIAL";
+      checks: Array<Record<string, unknown>>;
+      presentation: Record<string, unknown>;
+      notes?: string;
+      attempt?: number | "auto";
+      previousAttemptId?: string;
+    },
+    basePath?: string,
+  ) => Promise<unknown>;
   executeSummarySave: (
     params: {
       milestone_id?: string;
@@ -514,6 +528,7 @@ function isWorkflowToolExecutors(value: unknown): value is WorkflowToolExecutors
     "executeReassessRoadmap",
     "executeSaveGateResult",
     "executeSummarySave",
+    "executeUatResultSave",
     "executeTaskComplete",
     "executeTaskReopen",
     "executeSliceReopen",
@@ -1688,6 +1703,73 @@ const execParams = {
 };
 const execSchema = z.object(execParams);
 
+const uatExecIntentSchema = z.enum([
+  "uat-artifact-check",
+  "uat-runtime-check",
+  "uat-browser-check",
+  "uat-service-start",
+  "uat-log-inspection",
+]);
+const uatExecParams = {
+  projectDir: projectDirParam,
+  milestoneId: nonEmptyString("milestoneId").describe("Milestone ID (e.g. M001)"),
+  sliceId: nonEmptyString("sliceId").describe("Slice ID (e.g. S01)"),
+  checkId: nonEmptyString("checkId").describe("Stable check ID from the UAT spec"),
+  intent: uatExecIntentSchema.describe("UAT command intent"),
+  runtime: execRuntimeSchema
+    .optional()
+    .describe("Optional interpreter. Defaults to bash. Supported: bash, node, python; sh/shell, js/nodejs, and py/python3 aliases are accepted."),
+  script: z.string().optional().describe("Script body. Keep output small; capped stdout/stderr are persisted under .gsd/exec."),
+  command: z.string().optional().describe("Alias for script; defaults to bash when runtime is omitted."),
+  cmd: z.string().optional().describe("Short alias for script."),
+  code: z.string().optional().describe("Alias for script, useful for node/python snippets."),
+  expected: z.string().optional().describe("Expected outcome for this UAT check."),
+  timeout_ms: z.number().int().min(1_000).max(600_000).optional().describe("Per-invocation timeout in milliseconds."),
+};
+const uatExecSchema = z.object(uatExecParams);
+
+const uatEvidenceRefSchema = z.object({
+  kind: z.enum(["gsd_uat_exec", "gsd_exec", "screenshot", "log", "url", "browser"]),
+  ref: nonEmptyString("ref"),
+  note: z.string().optional(),
+});
+const uatCheckSchema = z.object({
+  id: nonEmptyString("id"),
+  description: nonEmptyString("description"),
+  mode: z.enum(["artifact", "runtime", "browser", "human-follow-up"]),
+  result: z.enum(["PASS", "FAIL", "NEEDS-HUMAN"]),
+  evidence: z.array(uatEvidenceRefSchema).optional(),
+  notes: z.string().optional(),
+  nonAutomatable: z.boolean().optional(),
+});
+const uatPresentationSchema = z.object({
+  surface: z.enum(["provider-tools", "claude-code-sdk", "mcp", "hybrid"]),
+  model: z.object({
+    provider: z.string().optional(),
+    api: z.string().optional(),
+    id: z.string().optional(),
+  }).optional(),
+  presentedTools: z.array(z.string()),
+  blockedTools: z.array(z.object({ name: z.string(), reason: z.string() })),
+  aliases: z.array(z.object({ requested: z.string(), canonical: z.string() })).optional(),
+  fallbackToolsUsed: z.array(z.string()).optional(),
+  toolPresentationPlanId: z.string().optional(),
+  notes: z.string().optional(),
+});
+const uatResultSaveParams = {
+  projectDir: projectDirParam,
+  milestoneId: nonEmptyString("milestoneId").describe("Milestone ID (e.g. M001)"),
+  sliceId: nonEmptyString("sliceId").describe("Slice ID (e.g. S01)"),
+  uatType: z.enum(["artifact-driven", "browser-executable", "runtime-executable", "live-runtime", "mixed", "human-experience"]).describe("Declared UAT mode"),
+  verdict: z.enum(["PASS", "FAIL", "PARTIAL"]).describe("Overall UAT verdict"),
+  checks: z.array(uatCheckSchema).min(1).describe("Structured check results"),
+  presentation: uatPresentationSchema.describe("Tool-presentation evidence"),
+  notes: z.string().optional().describe("Overall verdict rationale"),
+  attempt: z.union([z.number().int().min(1), z.literal("auto")]).optional().describe("Attempt number or auto"),
+  previousAttemptId: z.string().optional(),
+};
+const uatResultSaveSchema = z.object(uatResultSaveParams);
+
 const execSearchParams = {
   projectDir: projectDirParam,
   query: z.string().optional().describe("Substring matched against id and purpose, case-insensitive."),
@@ -2147,6 +2229,21 @@ export function registerWorkflowTools(
   );
 
   server.tool(
+    "gsd_uat_result_save",
+    "Save structured UAT checks, evidence, verdict, and tool-presentation proof. Writes ASSESSMENT, attempt history, and aggregate UAT gate.",
+    uatResultSaveParams,
+    async (args: Record<string, unknown>) => {
+      const parsed = parseWorkflowArgs(uatResultSaveSchema, args);
+      const { projectDir, ...params } = parsed;
+      await enforceWorkflowWriteGate("gsd_uat_result_save", projectDir, params.milestoneId);
+      const { executeUatResultSave } = await getWorkflowToolExecutors();
+      return adaptExecutorResult(
+        await runSerializedWorkflowOperation(() => executeUatResultSave(params, projectDir)),
+      );
+    },
+  );
+
+  server.tool(
     "gsd_summary_save",
     "Save a GSD summary/research/context/assessment artifact to the database and disk. Omit milestone_id only for root-level PROJECT/PROJECT-DRAFT/REQUIREMENTS/REQUIREMENTS-DRAFT artifacts.",
     summarySaveParams,
@@ -2335,6 +2432,27 @@ export function registerWorkflowTools(
         return { content: [{ type: "text" as const, text: "No matching journal entries found." }] };
       }
       return { content: [{ type: "text" as const, text: JSON.stringify(entries, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "gsd_uat_exec",
+    "Run one UAT-scoped bash/node/python check with milestone/slice/check metadata. Evidence persists under .gsd/exec with kind=uat_exec.",
+    uatExecParams,
+    async (args: Record<string, unknown>) => {
+      const { projectDir, ...params } = parseWorkflowArgs(uatExecSchema, args);
+      await enforceWorkflowWriteGate("gsd_uat_exec", projectDir);
+      const { executeUatExec } = await importLocalModule<any>(
+        "../../../src/resources/extensions/gsd/tools/exec-tool.js",
+      );
+      return adaptExecutorResult(
+        await runSerializedWorkflowOperation(async () =>
+          executeUatExec(params, {
+            baseDir: projectDir,
+            preferences: await loadProjectPreferences(projectDir),
+          }),
+        ),
+      );
     },
   );
 

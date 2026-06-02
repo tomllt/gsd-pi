@@ -71,6 +71,6 @@ test("tool expansion startup hint reflects the default expansion state", () => {
 
 	assert.match(stripAnsi(getToolExpansionStartupHint(true, keybindings)), /ctrl\+o.*collapse tools/);
 	assert.match(stripAnsi(getToolExpansionStartupHint(false, keybindings)), /ctrl\+o.*expand tools/);
-	assert.equal(DEFAULT_TOOL_OUTPUT_EXPANDED, false);
-	assert.match(stripAnsi(getToolExpansionStartupHint(DEFAULT_TOOL_OUTPUT_EXPANDED, keybindings)), /ctrl\+o.*expand tools/);
+	assert.equal(DEFAULT_TOOL_OUTPUT_EXPANDED, true);
+	assert.match(stripAnsi(getToolExpansionStartupHint(DEFAULT_TOOL_OUTPUT_EXPANDED, keybindings)), /ctrl\+o.*collapse tools/);
 });

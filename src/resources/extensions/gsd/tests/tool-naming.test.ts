@@ -39,6 +39,12 @@ const RENAME_MAP: Array<{ canonical: string; alias: string }> = [
   { canonical: "gsd_milestone_reopen", alias: "gsd_reopen_milestone" },
 ];
 
+const STANDALONE_TOOLS = [
+  "gsd_save_gate_result",
+  "gsd_skip_slice",
+  "gsd_uat_result_save",
+];
+
 // ─── Registration count ──────────────────────────────────────────────────────
 
 console.log('\n── Tool naming: registration count ──');
@@ -48,9 +54,13 @@ registerDbTools(pi);
 
 assert.deepStrictEqual(
   pi.tools.length,
-  RENAME_MAP.length * 2 + 2,
-  'Should register canonical/alias tool pairs plus 1 gate tool and 1 gsd_skip_slice',
+  RENAME_MAP.length * 2 + STANDALONE_TOOLS.length,
+  'Should register canonical/alias tool pairs plus standalone DB tools',
 );
+
+for (const name of STANDALONE_TOOLS) {
+  assert.ok(pi.tools.some((t: any) => t.name === name), `Standalone tool "${name}" should be registered`);
+}
 
 // ─── Both names exist for each pair ──────────────────────────────────────────
 

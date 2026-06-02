@@ -2,7 +2,7 @@
 
 export const MAX_CHAT_COMPONENTS = 100;
 export const MAX_WIDGET_LINES = 10;
-export const DEFAULT_TOOL_OUTPUT_EXPANDED = false;
+export const DEFAULT_TOOL_OUTPUT_EXPANDED = true;
 
 export const MIME_BY_EXT: Record<string, string> = {
 	png: "image/png",

@@ -29,4 +29,33 @@ describe("models.generated.ts", () => {
 			expect(model.api).toBe("anthropic-vertex");
 		}
 	});
+
+	test("includes MiniMax M3 for direct MiniMax providers", () => {
+		const providers = [
+			["minimax", "https://api.minimax.io/anthropic"],
+			["minimax-cn", "https://api.minimaxi.com/anthropic"],
+		] as const;
+
+		for (const [provider, baseUrl] of providers) {
+			const model = MODELS[provider]["MiniMax-M3"];
+
+			expect(model).toMatchObject({
+				id: "MiniMax-M3",
+				name: "MiniMax-M3",
+				api: "anthropic-messages",
+				provider,
+				baseUrl,
+				reasoning: true,
+				input: ["text", "image"],
+				cost: {
+					input: 0.3,
+					output: 1.2,
+					cacheRead: 0.06,
+					cacheWrite: 0.375,
+				},
+				contextWindow: 1000000,
+				maxTokens: 131072,
+			});
+		}
+	});
 });

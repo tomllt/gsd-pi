@@ -344,6 +344,7 @@ test("#5843: run-uat uses verification tools policy so build/test commands can r
   const manifest = UNIT_MANIFESTS["run-uat"];
 
   assert.strictEqual(manifest.tools.mode, "verification");
+  assert.deepEqual(manifest.tools.allowedSubagents, ["mnemo", "scout", "reviewer", "tester"]);
 
   const buildResult = shouldBlockPlanningUnit(
     "bash",
@@ -367,6 +368,20 @@ test("#5843: run-uat uses verification tools policy so build/test commands can r
   );
   assert.strictEqual(sourceWriteResult.block, true);
   assert.match(sourceWriteResult.reason!, /tools-policy "verification"/);
+
+  const subagentResult = shouldBlockPlanningUnit(
+    "subagent",
+    "",
+    process.cwd(),
+    "run-uat",
+    manifest.tools,
+    ["mnemo"],
+  );
+  assert.strictEqual(
+    subagentResult.block,
+    false,
+    `run-uat must allow listed verification subagents: ${subagentResult.reason}`,
+  );
 });
 
 test("planning-dispatch hard block message omits internal tracker references", () => {
@@ -420,6 +435,11 @@ test('Unit Tool Contract exposes subagent dispatch permissions', () => {
     allowedSubagents: ["reviewer", "security", "tester"],
     toolsMode: "planning-dispatch",
   });
+  assert.deepEqual(resolveSubagentPermissionContract("run-uat"), {
+    allowed: true,
+    allowedSubagents: ["mnemo", "scout", "reviewer", "tester"],
+    toolsMode: "verification",
+  });
   assert.deepEqual(resolveSubagentPermissionContract("discuss-milestone"), {
     allowed: false,
     allowedSubagents: [],
@@ -427,21 +447,24 @@ test('Unit Tool Contract exposes subagent dispatch permissions', () => {
   });
 });
 
-test('planning-dispatch manifests declare non-empty allowedSubagents lists', () => {
+test('dispatch-capable manifests declare globally allowed subagents', () => {
   for (const [unitType, manifest] of Object.entries(UNIT_MANIFESTS)) {
-    if (manifest.tools.mode !== "planning-dispatch") continue;
+    const allowedSubagents = "allowedSubagents" in manifest.tools
+      ? manifest.tools.allowedSubagents
+      : undefined;
+    if (!allowedSubagents) continue;
     assert.ok(
-      Array.isArray(manifest.tools.allowedSubagents) && manifest.tools.allowedSubagents.length > 0,
-      `manifest "${unitType}" has planning-dispatch policy but no allowedSubagents — explicit allowlist is required for runtime dispatch gating`,
+      Array.isArray(allowedSubagents) && allowedSubagents.length > 0,
+      `manifest "${unitType}" enables subagent dispatch but has no allowedSubagents — explicit allowlist is required for runtime dispatch gating`,
     );
-    for (const agent of manifest.tools.allowedSubagents) {
+    for (const agent of allowedSubagents) {
       assert.ok(
         typeof agent === "string" && agent.length > 0,
         `manifest "${unitType}" has empty/invalid allowedSubagents entry: ${JSON.stringify(agent)}`,
       );
       assert.ok(
         ALLOWED_PLANNING_DISPATCH_AGENTS.has(agent),
-        `manifest "${unitType}" allows "${agent}", but the runtime planning-dispatch registry will hard-block it`,
+        `manifest "${unitType}" allows "${agent}", but the runtime controlled-dispatch registry will hard-block it`,
       );
     }
   }

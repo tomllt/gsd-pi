@@ -23,6 +23,8 @@ import {
   resolveAutoSupervisorConfig,
 } from "./preferences.js";
 
+const DEFAULT_WIDGET_MODE = "small";
+
 // ─── Data Collection ──────────────────────────────────────────────────────
 
 interface ConfigSection {
@@ -160,7 +162,7 @@ function collectConfigSections(): ConfigSection[] {
   if (prefs?.service_tier) toggleRows.push({ label: "service_tier", value: prefs.service_tier });
   if (prefs?.search_provider && prefs.search_provider !== "auto") toggleRows.push({ label: "search_provider", value: prefs.search_provider });
   if (prefs?.context_selection) toggleRows.push({ label: "context_selection", value: prefs.context_selection });
-  if (prefs?.widget_mode && prefs.widget_mode !== "full") toggleRows.push({ label: "widget_mode", value: prefs.widget_mode });
+  if (prefs?.widget_mode && prefs.widget_mode !== DEFAULT_WIDGET_MODE) toggleRows.push({ label: "widget_mode", value: prefs.widget_mode });
   if (prefs?.experimental?.rtk) toggleRows.push({ label: "experimental.rtk", value: "on" });
   if (toggleRows.length > 0) sections.push({ title: "Toggles", rows: toggleRows });
 

@@ -205,6 +205,7 @@ import {
   updateProgressWidget as _updateProgressWidget,
   setCompletionProgressWidget,
   setAutoOutcomeWidget,
+  setAutoActiveStatus,
   updateSliceProgressCache,
   clearSliceProgressCache,
   describeNextUnit as _describeNextUnit,
@@ -3022,7 +3023,7 @@ export async function startAuto(
     ensureOrchestrationModule(ctx, pi, s.basePath || base);
     registerSigtermHandler(lockBase());
 
-    ctx.ui.setStatus("gsd-auto", s.stepMode ? "next" : "auto");
+    setAutoActiveStatus(ctx, s.stepMode ? "next" : "auto");
     ctx.ui.setWidget("gsd-health", undefined);
     ctx.ui.notify(
       s.stepMode ? "Step-mode resumed." : "Auto-mode resumed.",
@@ -3351,7 +3352,7 @@ export async function dispatchHookUnit(
     await pauseAuto(ctx, pi);
   }, hookHardTimeoutMs);
 
-  ctx.ui.setStatus("gsd-auto", s.stepMode ? "next" : "auto");
+  setAutoActiveStatus(ctx, s.stepMode ? "next" : "auto");
   ctx.ui.notify(`Running post-unit hook: ${hookName}`, "info");
 
   debugLog("dispatchHookUnit", {

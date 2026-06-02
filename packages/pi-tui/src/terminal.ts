@@ -12,6 +12,10 @@ const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
 const TERMINAL_PROGRESS_ACTIVE_SEQUENCE = "\x1b]9;4;3\x07";
 const TERMINAL_PROGRESS_CLEAR_SEQUENCE = "\x1b]9;4;0;\x07";
 
+export function shouldEnableMouseReporting(env: NodeJS.ProcessEnv = process.env): boolean {
+	return env.PI_TUI_MOUSE === "1";
+}
+
 /**
  * Minimal terminal interface for TUI
  */
@@ -137,10 +141,11 @@ export class ProcessTerminal implements Terminal {
 		// Enable bracketed paste mode - terminal will wrap pastes in \x1b[200~ ... \x1b[201~
 		process.stdout.write("\x1b[?2004h");
 
-		// Enable mouse reporting so clicks and the wheel reach the TUI. On by
-		// default; set PI_TUI_MOUSE=0 to opt out (preserves native click-drag
-		// text selection without holding Shift).
-		if (process.env.PI_TUI_MOUSE !== "0") {
+		// Mouse reporting lets clicks and the wheel reach the TUI, but terminal
+		// mouse capture prevents native click-drag text selection in most
+		// emulators. Keep native selection as the default; set PI_TUI_MOUSE=1 to
+		// opt into mouse reporting.
+		if (shouldEnableMouseReporting()) {
 			process.stdout.write(ENABLE_MOUSE);
 			this._mouseActive = true;
 		}

@@ -30,6 +30,7 @@ import {
   executeSliceComplete,
   executeSliceReopen,
   executeValidateMilestone,
+  executeUatResultSave,
 } from "../tools/workflow-tool-executors.ts";
 
 function makeTmpBase(): string {
@@ -498,6 +499,88 @@ test("executePlanSlice marks validation failures with isError", async () => {
     assert.equal(result.details.operation, "plan_slice");
     assert.match(String(result.details.error), /validation failed: tasks must be a non-empty array/);
     assert.match(result.content[0].text, /Error planning slice:/);
+  } finally {
+    closeDatabase();
+    cleanup(base);
+  }
+});
+
+test("executeUatResultSave accepts gsd_uat_exec evidence written in a milestone worktree", async () => {
+  const base = makeTmpBase();
+  const worktree = join(base, ".gsd", "worktrees", "M001");
+  const worktreeExecDir = join(worktree, ".gsd", "exec");
+  const browserTimelineDir = join(base, ".artifacts", "browser", "session");
+  const evidenceId = "worktree-uat-evidence";
+  const browserTimelinePath = join(browserTimelineDir, "s02-uat-browser-timeline.json");
+  try {
+    openTestDb(base);
+    seedMilestone("M001", "Milestone One");
+    seedSlice("M001", "S02", "complete");
+    mkdirSync(worktreeExecDir, { recursive: true });
+    mkdirSync(browserTimelineDir, { recursive: true });
+    writeFileSync(browserTimelinePath, JSON.stringify({ summary: "browser timeline evidence" }), "utf-8");
+    writeFileSync(
+      join(worktreeExecDir, `${evidenceId}.meta.json`),
+      JSON.stringify({
+        id: evidenceId,
+        metadata: {
+          kind: "uat_exec",
+          milestoneId: "M001",
+          sliceId: "S02",
+          checkId: "UAT-01",
+          intent: "uat-runtime-check",
+        },
+      }),
+      "utf-8",
+    );
+
+    const result = await inProjectDir(worktree, () => executeUatResultSave({
+      milestoneId: "M001",
+      sliceId: "S02",
+      uatType: "runtime-executable",
+      verdict: "PASS",
+      checks: [{
+        id: "UAT-01",
+        description: "Runtime path C:\\tmp|uat evidence was captured in the active worktree",
+        mode: "runtime",
+        result: "PASS",
+        evidence: [
+          { kind: "gsd_uat_exec", ref: evidenceId },
+          { kind: "browser", ref: browserTimelinePath },
+        ],
+        notes: "Worktree-local gsd_uat_exec metadata should resolve with backslash \\ and pipe |.",
+      }],
+      presentation: {
+        surface: "mcp",
+        presentedTools: [
+          "gsd_uat_exec",
+          "gsd_uat_result_save",
+          "gsd_resume",
+          "gsd_milestone_status",
+          "gsd_journal_query",
+        ],
+        blockedTools: [
+          { name: "gsd_exec", reason: "forbidden during run-uat" },
+          { name: "gsd_summary_save", reason: "forbidden during run-uat" },
+          { name: "gsd_save_gate_result", reason: "forbidden during run-uat" },
+        ],
+      },
+      notes: "UAT passed with worktree-local evidence.",
+    }, worktree));
+
+    assert.equal(result.isError, undefined);
+    assert.equal(result.details.operation, "save_uat_result");
+    assert.equal(result.details.verdict, "PASS");
+    assert.ok(
+      existsSync(join(base, ".gsd", "uat", "M001", "S02", "attempt-1.json")),
+      "attempt JSON should be persisted under the authoritative project .gsd",
+    );
+    const assessment = readFileSync(
+      join(base, ".gsd", "milestones", "M001", "slices", "S02", "S02-ASSESSMENT.md"),
+      "utf-8",
+    );
+    assert.match(assessment, /Runtime path C:\\\\tmp\\\|uat evidence/);
+    assert.match(assessment, /backslash \\\\ and pipe \\\|/);
   } finally {
     closeDatabase();
     cleanup(base);

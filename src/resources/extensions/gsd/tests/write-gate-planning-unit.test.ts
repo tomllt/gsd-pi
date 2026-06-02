@@ -27,6 +27,10 @@ const PLANNING_DISPATCH_REVIEW: ToolsPolicy = {
 const READ_ONLY: ToolsPolicy = { mode: 'read-only' };
 const ALL: ToolsPolicy = { mode: 'all' };
 const VERIFICATION: ToolsPolicy = { mode: 'verification' };
+const VERIFICATION_UAT: ToolsPolicy = {
+  mode: 'verification',
+  allowedSubagents: ['mnemo', 'scout', 'reviewer', 'tester'],
+};
 const DOCS: ToolsPolicy = {
   mode: 'docs',
   allowedPathGlobs: ['docs/**', 'README.md', 'README.*.md', 'CHANGELOG.md', '*.md'],
@@ -467,6 +471,27 @@ test('verification-mode: run-uat still blocks subagent dispatch', () => {
   const r = shouldBlockPlanningUnit('subagent', '', BASE, 'run-uat', VERIFICATION);
   assert.strictEqual(r.block, true);
   assert.match(r.reason!, /subagent dispatch is not permitted/);
+});
+
+test('verification-mode: run-uat allows explicit UAT specialist subagents', () => {
+  for (const agent of ['mnemo', 'scout', 'reviewer', 'tester']) {
+    const r = shouldBlockPlanningUnit('subagent', '', BASE, 'run-uat', VERIFICATION_UAT, [agent]);
+    assert.strictEqual(r.block, false, `expected ${agent} to be allowed: ${r.reason}`);
+  }
+});
+
+test('verification-mode: run-uat blocks implementation-tier subagents', () => {
+  const r = shouldBlockPlanningUnit('subagent', '', BASE, 'run-uat', VERIFICATION_UAT, ['worker']);
+  assert.strictEqual(r.block, true);
+  assert.match(r.reason!, /"worker"/);
+  assert.match(r.reason!, /read-only specialists/);
+});
+
+test('verification-mode: run-uat blocks read-only specialists not listed by policy', () => {
+  const r = shouldBlockPlanningUnit('subagent', '', BASE, 'run-uat', VERIFICATION_UAT, ['security']);
+  assert.strictEqual(r.block, true);
+  assert.match(r.reason!, /"security"/);
+  assert.match(r.reason!, /ToolsPolicy\.allowedSubagents|permitted agents for this unit/);
 });
 
 // ─── read-only mode ───────────────────────────────────────────────────────

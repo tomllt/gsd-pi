@@ -137,7 +137,9 @@ export type ContextModePolicy =
  *                    edits project markdown outside .gsd/.
  *   - "verification"
  *                  — Read tools + Bash for verification commands, writes
- *                    restricted to .gsd/**, no subagents.
+ *                    restricted to .gsd/**. Subagent dispatch is denied unless
+ *                    `allowedSubagents` opts a unit into controlled read-only
+ *                    specialist delegation.
  *
  * The allowlist for "docs" is declared per-manifest rather than hardcoded so
  * projects with non-standard doc layouts can extend it without forking the
@@ -150,7 +152,7 @@ export type ToolsPolicy =
   | { readonly mode: "planning" }
   | { readonly mode: "planning-dispatch"; readonly allowedSubagents: readonly string[] }
   | { readonly mode: "docs"; readonly allowedPathGlobs: readonly string[] }
-  | { readonly mode: "verification" };
+  | { readonly mode: "verification"; readonly allowedSubagents?: readonly string[] };
 
 // ─── Computed-artifact registry (#4924 v2 contract) ───────────────────────
 
@@ -305,6 +307,10 @@ const COMMON_BUDGET_SMALL = 250_000;    // ~65K tokens
 const TOOLS_ALL: ToolsPolicy = { mode: "all" };
 const TOOLS_PLANNING: ToolsPolicy = { mode: "planning" };
 const TOOLS_VERIFICATION: ToolsPolicy = { mode: "verification" };
+const TOOLS_VERIFICATION_DISPATCH_UAT: ToolsPolicy = {
+  mode: "verification",
+  allowedSubagents: ["mnemo", "scout", "reviewer", "tester"],
+};
 // Like TOOLS_PLANNING but permits dispatch to read-only recon/planning
 // specialists. Runtime-enforced by write-gate.ts before the subagent tool runs.
 const TOOLS_PLANNING_DISPATCH_RECON: ToolsPolicy = {
@@ -601,7 +607,7 @@ export const UNIT_MANIFESTS: Record<UnitType, UnitContextManifest> = {
     codebaseMap: false,
     preferences: "active-only",
     contextMode: "verification",
-    tools: TOOLS_VERIFICATION,
+    tools: TOOLS_VERIFICATION_DISPATCH_UAT,
     artifacts: {
       inline: ["slice-uat"],
       excerpt: ["slice-summary"],
@@ -792,9 +798,12 @@ export function compileSubagentPermissionContract(
   if (policy.mode === "all") {
     return { allowed: true, allowedSubagents: ["*"], toolsMode: policy.mode };
   }
-  if (policy.mode === "planning-dispatch") {
+  if (
+    (policy.mode === "planning-dispatch" || policy.mode === "verification") &&
+    Array.isArray(policy.allowedSubagents)
+  ) {
     return {
-      allowed: true,
+      allowed: policy.allowedSubagents.length > 0,
       allowedSubagents: [...policy.allowedSubagents],
       toolsMode: policy.mode,
     };

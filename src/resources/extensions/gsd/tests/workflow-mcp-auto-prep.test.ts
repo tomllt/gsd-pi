@@ -54,7 +54,7 @@ test("prepareWorkflowMcpForProject uses the selected unit model when session pro
 
   assert.equal(result?.status, "created");
   assert.equal(existsSync(join(projectRoot, ".mcp.json")), true);
-  assert.match(notifications.map((entry) => entry.message).join("\n"), /Claude Code MCP prepared/);
+  assert.match(notifications.map((entry) => entry.message).join("\n"), /GSD MCP Server Prepared/);
 });
 
 test("shouldAutoPrepareWorkflowMcp stays disabled for non-Claude active provider even when claude-code is ready", () => {
@@ -178,7 +178,7 @@ test("before_agent_start auto-prepares project workflow MCP for Claude Code CLI"
     GSD_WORKFLOW_MCP_SERVER_NAME,
     GSD_BROWSER_MCP_SERVER_NAME,
   ]);
-  assert.match(notifications.join("\n"), /Claude Code MCP prepared/);
+  assert.match(notifications.join("\n"), /GSD MCP Server Prepared/);
 });
 
 test("before_agent_start returns discovered skill fallback without project .gsd", async (t) => {

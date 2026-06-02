@@ -36,7 +36,9 @@ import { resolveSkillManifest } from "../skill-manifest.js";
 import { applyUnitSkillVisibility, unitHasSkillManifest } from "../skill-scope.js";
 import { getGuidedUnitContext } from "../guided-unit-context.js";
 import { registerPlanMilestoneSchemaRecovery } from "./plan-milestone-schema-recovery.js";
-import { AUTO_UNIT_SCOPED_TOOLS, isWorkflowAliasTool } from "../auto-unit-tool-scope.js";
+import { AUTO_UNIT_SCOPED_TOOLS, RUN_UAT_BROWSER_TOOL_NAMES, isWorkflowAliasTool } from "../auto-unit-tool-scope.js";
+import { filterToolsForProvider } from "../model-router.js";
+import { RUN_UAT_WORKFLOW_TOOL_NAMES } from "../tool-presentation-plan.js";
 
 let approvalQuestionAbortInFlight = false;
 
@@ -226,6 +228,9 @@ export function buildMinimalAutoGsdToolSet(
   unitType: string | undefined,
   registeredToolNames: readonly string[] = activeToolNames,
 ): string[] {
+  if (unitType === "run-uat") {
+    return buildRunUatGsdToolSet(activeToolNames, registeredToolNames);
+  }
   const unitTools = unitType ? AUTO_UNIT_SCOPED_TOOLS[unitType] ?? [] : [];
   const autoBaseTools = new Set<string>(MINIMAL_AUTO_BASE_TOOL_NAMES);
   const availableBaseTools = registeredToolNames.filter((name) => autoBaseTools.has(name));
@@ -238,6 +243,17 @@ export function buildMinimalAutoGsdToolSet(
     [...MINIMAL_GSD_TOOL_NAMES, ...unitTools],
   );
   return withPreservedShimTools([...new Set([...preserved, ...scoped])]);
+}
+
+export function buildRunUatGsdToolSet(
+  activeToolNames: readonly string[],
+  registeredToolNames: readonly string[] = activeToolNames,
+): string[] {
+  const scoped = resolveScopedToolNames(
+    [...activeToolNames, ...registeredToolNames],
+    [...RUN_UAT_WORKFLOW_TOOL_NAMES, "subagent", ...RUN_UAT_BROWSER_TOOL_NAMES],
+  );
+  return [...new Set(scoped)];
 }
 
 export function buildMinimalGsdWorkflowToolSet(
@@ -1320,19 +1336,27 @@ export function registerHooks(
     const fullToolsRequested = isFullGsdToolSurfaceRequested();
     const dropAliases = !fullToolsRequested;
     const dropBrowser = !fullToolsRequested && !isBrowserToolSurfaceRequested();
-    const providerCompatible = compatible.filter(
-      (name) => !(dropAliases && isWorkflowAliasTool(name)) && !(dropBrowser && isBrowserTool(name)),
+    const aliasFilteredCompatible = compatible.filter(
+      (name) => !(dropAliases && isWorkflowAliasTool(name)),
+    );
+    const providerCompatible = aliasFilteredCompatible.filter(
+      (name) => !(dropBrowser && isBrowserTool(name)),
     );
     const surfaceReduced = providerCompatible.length !== compatible.length;
     if (fullToolsRequested) {
       return surfaceReduced ? { toolNames: providerCompatible } : undefined;
     }
     const registeredToolNames = resolveRegisteredToolNames(pi, event.activeToolNames);
+    const compatibleRegisteredToolNames = filterToolsForProvider(
+      registeredToolNames,
+      event.selectedModelApi,
+      event.selectedModelProvider,
+    ).compatible.filter((name) => !(dropAliases && isWorkflowAliasTool(name)));
     const guidedUnit = getGuidedUnitContext();
     const requestScoped = buildRequestScopedGsdToolSet(
-      providerCompatible,
+      guidedUnit?.unitType === "run-uat" ? aliasFilteredCompatible : providerCompatible,
       event.requestCustomMessages,
-      registeredToolNames,
+      guidedUnit?.unitType === "run-uat" ? compatibleRegisteredToolNames : registeredToolNames,
       guidedUnit?.unitType,
     );
     if (requestScoped) {
@@ -1342,9 +1366,11 @@ export function registerHooks(
     if (dash.active && dash.currentUnit) {
       return {
         toolNames: buildMinimalAutoGsdToolSet(
-          providerCompatible,
+          dash.currentUnit.type === "run-uat" ? aliasFilteredCompatible : providerCompatible,
           dash.currentUnit.type,
-          resolveRegisteredToolNames(pi, event.activeToolNames),
+          dash.currentUnit.type === "run-uat"
+            ? compatibleRegisteredToolNames
+            : resolveRegisteredToolNames(pi, event.activeToolNames),
         ),
       };
     }

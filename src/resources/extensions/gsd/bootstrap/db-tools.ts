@@ -413,6 +413,92 @@ export function registerDbTools(pi: ExtensionAPI): void {
   pi.registerTool(summarySaveTool);
   registerAlias(pi, summarySaveTool, "gsd_save_summary", "gsd_summary_save");
 
+  // ─── gsd_uat_result_save ─────────────────────────────────────────────────
+
+  const uatResultSaveExecute = async (_toolCallId: string, params: any, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    const { executeUatResultSave } = await loadWorkflowExecutors();
+    return executeUatResultSave(params, resolveWorkflowToolBasePath(_ctx, params));
+  };
+
+  const uatEvidenceRef = Type.Object({
+    kind: StringEnum(["gsd_uat_exec", "gsd_exec", "screenshot", "log", "url", "browser"], { description: "Evidence kind" }),
+    ref: Type.String({ description: "Evidence ID, approved .gsd path, or URL" }),
+    note: Type.Optional(Type.String({ description: "Short evidence note" })),
+  });
+
+  const uatCheck = Type.Object({
+    id: Type.String({ description: "Stable check ID from the UAT spec" }),
+    description: Type.String({ description: "Check description" }),
+    mode: StringEnum(["artifact", "runtime", "browser", "human-follow-up"], { description: "Evidence mode" }),
+    result: StringEnum(["PASS", "FAIL", "NEEDS-HUMAN"], { description: "Check result" }),
+    evidence: Type.Optional(Type.Array(uatEvidenceRef, { description: "Objective evidence references" })),
+    notes: Type.Optional(Type.String({ description: "Observed result, failure notes, or human instruction" })),
+    nonAutomatable: Type.Optional(Type.Boolean({ description: "True when the check is explicitly non-automatable" })),
+  });
+
+  const toolPresentationBlock = Type.Object({
+    surface: StringEnum(["provider-tools", "claude-code-sdk", "mcp", "hybrid"], { description: "Tool presentation surface" }),
+    model: Type.Optional(Type.Object({
+      provider: Type.Optional(Type.String()),
+      api: Type.Optional(Type.String()),
+      id: Type.Optional(Type.String()),
+    })),
+    presentedTools: Type.Array(Type.String(), { description: "Tool names actually presented to the model" }),
+    blockedTools: Type.Array(Type.Object({
+      name: Type.String(),
+      reason: Type.String(),
+    }), { description: "Tool names blocked from the model with reasons" }),
+    aliases: Type.Optional(Type.Array(Type.Object({
+      requested: Type.String(),
+      canonical: Type.String(),
+    }))),
+    fallbackToolsUsed: Type.Optional(Type.Array(Type.String())),
+    toolPresentationPlanId: Type.Optional(Type.String()),
+    notes: Type.Optional(Type.String()),
+  });
+
+  const uatResultSaveTool = {
+    name: "gsd_uat_result_save",
+    label: "Save UAT Result",
+    description:
+      "Save a structured UAT result for a slice. Validates evidence, writes the ASSESSMENT artifact, " +
+      "records attempt history, and saves the aggregate UAT gate result.",
+    promptSnippet: "Save structured UAT checks, evidence, verdict, and tool-presentation proof",
+    promptGuidelines: [
+      "Call gsd_uat_result_save once after all UAT checks have been executed.",
+      "Every PASS or FAIL check must cite objective evidence, preferably a gsd_uat_exec evidence ID.",
+      "Include the presented and blocked tool set in presentation so tool timing is auditable.",
+      "Do not use raw gsd_summary_save as a substitute for UAT results.",
+    ],
+    parameters: Type.Object({
+      milestoneId: Type.String({ description: "Milestone ID (e.g. M001)" }),
+      sliceId: Type.String({ description: "Slice ID (e.g. S01)" }),
+      uatType: StringEnum(["artifact-driven", "browser-executable", "runtime-executable", "live-runtime", "mixed", "human-experience"], { description: "Declared UAT mode" }),
+      verdict: StringEnum(["PASS", "FAIL", "PARTIAL"], { description: "Overall UAT verdict" }),
+      checks: Type.Array(uatCheck, { description: "Structured check results" }),
+      presentation: toolPresentationBlock,
+      notes: Type.Optional(Type.String({ description: "Overall verdict rationale" })),
+      attempt: Type.Optional(Type.String({ description: "Attempt number or auto" })),
+      previousAttemptId: Type.Optional(Type.String({ description: "Prior attempt ID, when retrying" })),
+    }),
+    execute: uatResultSaveExecute,
+    renderCall(args: any, theme: any) {
+      let text = theme.fg("toolTitle", theme.bold("uat_result_save "));
+      text += theme.fg("accent", `${args.milestoneId ?? "?"}/${args.sliceId ?? "?"}`);
+      if (args.verdict) text += theme.fg("dim", ` → ${args.verdict}`);
+      return new Text(text, 0, 0);
+    },
+    renderResult(result: any, _options: any, theme: any) {
+      const d = readDetails(result);
+      if (result.isError || d?.error) {
+        return new Text(theme.fg("error", formatToolErrorText(result, d)), 0, 0);
+      }
+      return new Text(theme.fg("success", `UAT ${d?.sliceId ?? ""}: ${d?.verdict ?? "saved"}`), 0, 0);
+    },
+  };
+
+  pi.registerTool(uatResultSaveTool);
+
   // ─── gsd_milestone_generate_id (formerly gsd_generate_milestone_id) ────
 
   const milestoneGenerateIdExecute = async (_toolCallId: string, _params: any, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {

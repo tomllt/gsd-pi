@@ -516,8 +516,9 @@ export const hideFooter = (_tui: unknown, theme: Theme, footerData: ReadonlyFoot
 
 /** Widget display modes: full → small → min → off → full */
 export type WidgetMode = "full" | "small" | "min" | "off";
+export const DEFAULT_WIDGET_MODE: WidgetMode = "small";
 const WIDGET_MODES: WidgetMode[] = ["full", "small", "min", "off"];
-let widgetMode: WidgetMode = "full";
+let widgetMode: WidgetMode = DEFAULT_WIDGET_MODE;
 let widgetModeInitialized = false;
 let widgetModePreferencePath: string | null = null;
 
@@ -628,7 +629,7 @@ export function getWidgetMode(projectPath?: string, globalPath?: string): Widget
 
 /** Test-only reset for widget mode caching. */
 export function _resetWidgetModeForTests(): void {
-  widgetMode = "full";
+  widgetMode = DEFAULT_WIDGET_MODE;
   widgetModeInitialized = false;
   widgetModePreferencePath = null;
 }
@@ -646,6 +647,16 @@ export interface WidgetStateAccessors {
   isSessionSwitching(): boolean;
   /** Fully-qualified dispatched model ID (provider/id) set after model selection + hook overrides (#2899). */
   getCurrentDispatchedModelId(): string | null;
+}
+
+function clearAutoOutcomeWidget(ctx: ExtensionContext): void {
+  if (!ctx.hasUI) return;
+  ctx.ui.setWidget("gsd-outcome", undefined);
+}
+
+export function setAutoActiveStatus(ctx: ExtensionContext, status: "auto" | "next"): void {
+  ctx.ui.setStatus("gsd-auto", status);
+  clearAutoOutcomeWidget(ctx);
 }
 
 export function updateProgressWidget(
@@ -673,7 +684,7 @@ export function updateProgressWidget(
     ctx.ui.setStatus("gsd-step", undefined);
   }
   if (!accessors.isSessionSwitching()) {
-    ctx.ui.setWidget("gsd-outcome", undefined);
+    clearAutoOutcomeWidget(ctx);
   }
 
   const verb = unitVerb(unitType);
@@ -732,6 +743,7 @@ export function updateProgressWidget(
         logWarning("dashboard", `DB status update failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }, 15_000);
+    progressRefreshTimer.unref?.();
 
     return {
       render(width: number): string[] {
@@ -1003,7 +1015,7 @@ export function setCompletionProgressWidget(
 ): void {
   if (!ctx.hasUI) return;
   const widgetKey = "gsd-progress";
-  ctx.ui.setWidget("gsd-outcome", undefined);
+  clearAutoOutcomeWidget(ctx);
 
   if (typeof ctx.ui?.setHeader === "function") {
     ctx.ui.setHeader(() => ({

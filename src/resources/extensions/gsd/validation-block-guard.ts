@@ -14,6 +14,8 @@ const VALIDATION_BLOCK_RE =
   /milestone validation returned needs-(?:attention|remediation)|validation verdict is needs-(?:attention|remediation)/i;
 
 const VALIDATION_SAFE_DISPATCH_COMMANDS = new Set([
+  "reassess",
+  "reassess-roadmap",
   "validate",
   "validate-milestone",
 ]);

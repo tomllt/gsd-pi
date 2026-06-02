@@ -24,6 +24,7 @@ import {
 } from "../../../src/resources/extensions/gsd/gsd-db.ts";
 import { buildReassessRoadmapPrompt } from "../../../src/resources/extensions/gsd/auto-prompts.ts";
 import { invalidateAllCaches } from "../../../src/resources/extensions/gsd/cache.ts";
+import { resolveToolPresentationPlan } from "../../../src/resources/extensions/gsd/tool-presentation-plan.ts";
 import {
   _buildBridgeImportCandidates,
   _buildImportCandidates,
@@ -151,6 +152,19 @@ function assertToolError(result: unknown, expected: RegExp | string): string {
     assert.ok(text.includes(expected), `error should mention ${expected}, got: ${text}`);
   }
   return text;
+}
+
+function runUatMcpPresentation() {
+  const plan = resolveToolPresentationPlan({
+    phase: "run-uat",
+    surface: "mcp",
+    workflowMcpServerName: "gsd-workflow",
+  });
+  return {
+    surface: plan.surface,
+    presentedTools: plan.presentedToolNames,
+    blockedTools: plan.blockedToolNames,
+  };
 }
 
 function cacheBustedWorkflowToolsImport(tag: string): string {
@@ -351,6 +365,178 @@ describe("workflow MCP tools", () => {
       assert.equal(record.isError, false);
       assert.equal(record.structuredContent.runtime, "bash");
       assert.match(record.content[0].text as string, /mcp-command-alias-defaults-to-bash/);
+    } finally {
+      cleanup(base);
+    }
+  });
+
+  it("gsd_uat_exec records typed UAT metadata and blocks unsafe UAT commands", async () => {
+    const base = makeTmpBase();
+    const originalCwd = process.cwd();
+    try {
+      seedContextModeFixture(base);
+      const server = makeMockServer();
+      registerWorkflowTools(server as any);
+      const tool = server.tools.find((t) => t.name === "gsd_uat_exec");
+      assert.ok(tool, "UAT exec tool should be registered");
+
+      const result = await tool!.handler({
+        projectDir: base,
+        milestoneId: "M001",
+        sliceId: "S01",
+        checkId: "UAT-01",
+        intent: "uat-runtime-check",
+        command: "echo UAT_OK",
+        expected: "UAT_OK appears in stdout",
+      });
+
+      const record = result as any;
+      assert.equal(record.isError, false);
+      assert.equal(record.structuredContent.operation, "gsd_uat_exec");
+      assert.equal(record.structuredContent.milestoneId, "M001");
+      assert.equal(record.structuredContent.sliceId, "S01");
+      assert.equal(record.structuredContent.checkId, "UAT-01");
+      assert.equal(record.structuredContent.intent, "uat-runtime-check");
+      assert.equal(typeof record.structuredContent.id, "string");
+      assert.ok(existsSync(record.structuredContent.meta_path), "meta should be persisted");
+      const meta = JSON.parse(readFileSync(record.structuredContent.meta_path, "utf-8")) as {
+        metadata?: Record<string, unknown>;
+      };
+      assert.deepEqual(meta.metadata, {
+        kind: "uat_exec",
+        milestoneId: "M001",
+        sliceId: "S01",
+        checkId: "UAT-01",
+        intent: "uat-runtime-check",
+        expected: "UAT_OK appears in stdout",
+      });
+      assert.equal(process.cwd(), originalCwd, "gsd_uat_exec must not mutate process.cwd");
+
+      const blocked = await tool!.handler({
+        projectDir: base,
+        milestoneId: "M001",
+        sliceId: "S01",
+        checkId: "UAT-02",
+        intent: "uat-runtime-check",
+        command: "npm install left-pad",
+      });
+      assertToolError(blocked, /blocked command/);
+      assert.equal((blocked as any).structuredContent.operation, "gsd_uat_exec");
+      assert.equal((blocked as any).structuredContent.error, "uat_exec_policy_block");
+    } finally {
+      cleanup(base);
+    }
+  });
+
+  it("gsd_uat_result_save validates evidence and persists aggregate UAT gate state", async () => {
+    const base = makeTmpBase();
+    try {
+      seedContextModeFixture(base);
+      const server = makeMockServer();
+      registerWorkflowTools(server as any);
+      const execTool = server.tools.find((t) => t.name === "gsd_uat_exec");
+      const saveTool = server.tools.find((t) => t.name === "gsd_uat_result_save");
+      assert.ok(execTool, "UAT exec tool should be registered");
+      assert.ok(saveTool, "UAT result tool should be registered");
+
+      const execResult = await execTool!.handler({
+        projectDir: base,
+        milestoneId: "M001",
+        sliceId: "S01",
+        checkId: "UAT-01",
+        intent: "uat-runtime-check",
+        command: "echo UAT_RESULT_OK",
+      });
+      const evidenceId = (execResult as any).structuredContent.id;
+      assert.equal(typeof evidenceId, "string");
+
+      const invalidPresentation = runUatMcpPresentation();
+      invalidPresentation.presentedTools = invalidPresentation.presentedTools.filter(
+        (toolName) => !toolName.endsWith("__gsd_journal_query"),
+      );
+      const missingPresentedTool = await saveTool!.handler({
+        projectDir: base,
+        milestoneId: "M001",
+        sliceId: "S01",
+        uatType: "runtime-executable",
+        verdict: "PASS",
+        checks: [{
+          id: "UAT-01",
+          description: "Runtime check has evidence",
+          mode: "runtime",
+          result: "PASS",
+          evidence: [{ kind: "gsd_uat_exec", ref: evidenceId }],
+        }],
+        presentation: invalidPresentation,
+      });
+      assertToolError(missingPresentedTool, /missing required UAT tool "gsd_journal_query"/);
+
+      const missingEvidence = await saveTool!.handler({
+        projectDir: base,
+        milestoneId: "M001",
+        sliceId: "S01",
+        uatType: "runtime-executable",
+        verdict: "PASS",
+        checks: [{
+          id: "UAT-01",
+          description: "Runtime check has evidence",
+          mode: "runtime",
+          result: "PASS",
+          evidence: [],
+        }],
+        presentation: runUatMcpPresentation(),
+      });
+      assertToolError(missingEvidence, /objective evidence/);
+
+      const result = await saveTool!.handler({
+        projectDir: base,
+        milestoneId: "M001",
+        sliceId: "S01",
+        uatType: "runtime-executable",
+        verdict: "PASS",
+        checks: [{
+          id: "UAT-01",
+          description: "Runtime check has evidence",
+          mode: "runtime",
+          result: "PASS",
+          evidence: [{ kind: "gsd_uat_exec", ref: evidenceId }],
+          notes: "Command produced the expected marker.",
+        }],
+        presentation: runUatMcpPresentation(),
+        notes: "UAT passed with objective runtime evidence.",
+      });
+
+      const record = result as any;
+      assert.equal(record.isError, undefined);
+      assert.equal(record.structuredContent.operation, "save_uat_result");
+      assert.equal(record.structuredContent.verdict, "PASS");
+      assert.equal(record.structuredContent.gateVerdict, "pass");
+      assert.equal(record.structuredContent.attempt, 1);
+      assert.equal(record.structuredContent.recommendedNextUnit, null);
+      assert.ok(
+        existsSync(join(base, ".gsd", record.structuredContent.attemptPath)),
+        "attempt JSON should be persisted",
+      );
+      assert.ok(
+        existsSync(join(base, ".gsd", "milestones", "M001", "slices", "S01", "S01-ASSESSMENT.md")),
+        "ASSESSMENT artifact should be persisted",
+      );
+
+      const gateRow = _getAdapter()!.prepare(
+        "SELECT status, verdict, rationale FROM quality_gates WHERE milestone_id = ? AND slice_id = ? AND gate_id = ? AND task_id = ''",
+      ).get("M001", "S01", "UAT") as Record<string, unknown> | undefined;
+      assert.ok(gateRow, "aggregate UAT quality gate row should exist");
+      assert.equal(gateRow["status"], "complete");
+      assert.equal(gateRow["verdict"], "pass");
+
+      const gateRun = _getAdapter()!.prepare(
+        "SELECT gate_type, unit_type, outcome, failure_class FROM gate_runs WHERE milestone_id = ? AND slice_id = ? AND gate_id = ?",
+      ).get("M001", "S01", "UAT") as Record<string, unknown> | undefined;
+      assert.ok(gateRun, "UAT gate run should be recorded");
+      assert.equal(gateRun["gate_type"], "uat");
+      assert.equal(gateRun["unit_type"], "run-uat");
+      assert.equal(gateRun["outcome"], "pass");
+      assert.equal(gateRun["failure_class"], "none");
     } finally {
       cleanup(base);
     }
@@ -1071,6 +1257,7 @@ export const executeValidateMilestone = noop;
 export const executeReassessRoadmap = noop;
 export const executeSaveGateResult = noop;
 export const executeSummarySave = noop;
+export const executeUatResultSave = noop;
 export const executeTaskReopen = noop;
 export const executeSliceReopen = noop;
 export const executeMilestoneReopen = noop;

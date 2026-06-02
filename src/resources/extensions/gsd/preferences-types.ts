@@ -423,7 +423,7 @@ export interface GSDPreferences {
   search_provider?: "brave" | "tavily" | "ollama" | "native" | "auto";
   /** Context selection mode for file inlining. "full" inlines entire files, "smart" uses semantic chunking. Default derived from token profile. */
   context_selection?: ContextSelectionMode;
-  /** Default widget display mode for auto-mode dashboard. "full" | "small" | "min" | "off". Default: "full". */
+  /** Default widget display mode for auto-mode dashboard. "full" | "small" | "min" | "off". Default: "small". */
   widget_mode?: "full" | "small" | "min" | "off";
   /** Reactive (graph-derived parallel) task execution within slices. Disabled by default. */
   reactive_execution?: ReactiveExecutionConfig;
