@@ -19,6 +19,7 @@ import type { DispatchContext } from "../auto-dispatch.ts";
 import type { AutoSession } from "../auto/session.ts";
 import type { GSDState } from "../types.ts";
 import { enableDebug, disableDebug, getDebugLogPath } from "../debug-logger.ts";
+import { closeDatabase, insertMilestone, isDbAvailable, openDatabase } from "../gsd-db.ts";
 
 function makeState(overrides: Partial<GSDState> = {}): GSDState {
   return {
@@ -121,6 +122,29 @@ test("dispatch: missing task plan triggers plan-slice (not stop) — issue #909"
     `unitType should be plan-slice, got: ${result.action === "dispatch" ? result.unitType : "(stop)"}`);
   assert.ok(result.action === "dispatch" && result.unitId === "M002/S03",
     `unitId should be M002/S03, got: ${result.action === "dispatch" ? result.unitId : "(stop)"}`);
+});
+
+test("dispatch: closed milestone is not implicitly recovered or reopened", async (t) => {
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-closed-dispatch-"));
+  t.after(() => {
+    if (isDbAvailable()) closeDatabase();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  if (isDbAvailable()) closeDatabase();
+  mkdirSync(join(tmp, ".gsd"), { recursive: true });
+  openDatabase(join(tmp, ".gsd", "gsd.db"));
+  insertMilestone({ id: "M002", title: "Closed Milestone", status: "complete" });
+  scaffoldMilestoneContext(tmp, "M002");
+  scaffoldSlicePlan(tmp, "M002", "S03");
+
+  const result = await resolveDispatch(makeContext(tmp));
+
+  assert.equal(result.action, "stop");
+  assert.ok(result.action === "stop");
+  assert.equal(result.level, "warning");
+  assert.match(result.reason, /Milestone M002 is closed/);
+  assert.match(result.reason, /will not reopen or recover it implicitly/);
 });
 
 test("dispatch: present task plan proceeds to execute-task normally", async (t) => {

@@ -1655,6 +1655,19 @@ import { getRegistry } from "./rule-registry.js";
 export async function resolveDispatch(
   ctx: DispatchContext,
 ): Promise<DispatchAction> {
+  if (ctx.mid && isDbAvailable()) {
+    const milestone = getMilestone(ctx.mid);
+    if (milestone && isClosedStatus(milestone.status)) {
+      return {
+        action: "stop",
+        reason:
+          `Milestone ${ctx.mid} is closed (status: ${milestone.status}); auto-mode will not reopen or recover it implicitly. ` +
+          "Use an explicit reopen command before planning or executing more work for this milestone.",
+        level: "warning",
+      };
+    }
+  }
+
   const activeMid = ctx.state.activeMilestone?.id;
   if (activeMid && ctx.mid !== activeMid) {
     return {
