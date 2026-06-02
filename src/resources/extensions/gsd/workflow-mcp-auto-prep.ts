@@ -73,7 +73,7 @@ export function prepareWorkflowMcpForProject(
   try {
     const result = ensureProjectWorkflowMcpConfig(projectRoot);
     if (result.status !== "unchanged") {
-      prepCtx.ui?.notify?.(`Claude Code MCP prepared at ${result.configPath}`, "info");
+      prepCtx.ui?.notify?.(`GSD MCP Server Prepared at ${result.configPath}`, "info");
     }
     return result;
   } catch (err) {
