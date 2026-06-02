@@ -278,3 +278,57 @@ test("handleAgentEvent: standalone completed tool events roll up incrementally",
 	assert.doesNotMatch(rendered, /^\s*│?\s*edit\s+success ·/m);
 	assert.ok(renderCount > 0);
 });
+
+test("handleAgentEvent: agent_end finalizes orphaned pending tool cards", async () => {
+	initTheme("dark", false);
+	const chatContainer = new Container();
+	const host = {
+		isInitialized: true,
+		footer: { invalidate() {} },
+		settingsManager: {
+			getTimestampFormat() {
+				return "date-time-iso";
+			},
+			getShowImages() {
+				return false;
+			},
+		},
+		getRegisteredToolDefinition() {
+			return undefined;
+		},
+		chatContainer,
+		pendingTools: new Map(),
+		loadingAnimation: undefined,
+		statusContainer: { clear() {} },
+		streamingComponent: undefined,
+		streamingMessage: undefined,
+		pinnedMessageContainer: { clear() {} },
+		checkShutdownRequested: async () => {},
+		ui: {
+			requestRender() {},
+		},
+	} as any;
+
+	await handleAgentEvent(host, {
+		type: "tool_execution_start",
+		toolCallId: "capture-1",
+		toolName: "capture_thought",
+		args: { thought: "write the milestone roadmap" },
+	} as any);
+
+	assert.match(
+		stripAnsi(chatContainer.render(100).join("\n")),
+		/running/,
+		"precondition: orphaned tool card starts in running state",
+	);
+
+	await handleAgentEvent(host, {
+		type: "agent_end",
+		messages: [],
+		willRetry: false,
+	} as any);
+
+	const rendered = stripAnsi(chatContainer.render(100).join("\n"));
+	assert.doesNotMatch(rendered, /running/, "agent_end must not leave stale running tool cards");
+	assert.match(rendered, /success/, "orphaned tool card should settle as no-result success");
+});

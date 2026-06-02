@@ -1202,6 +1202,9 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				host.streamingComponent.setShowMetadata(true);
 				host.streamingComponent.updateContent(host.streamingMessage);
 			}
+			for (const component of new Set(host.pendingTools.values())) {
+				component.markHistoricalNoResult();
+			}
 			replaceCompactToolRowsWithPhaseSummary(host);
 			host.streamingComponent = undefined;
 			host.streamingMessage = undefined;
