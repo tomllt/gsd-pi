@@ -896,8 +896,8 @@ export async function deriveStateFromDb(
   }
 
   // ADR-011 Phase 2: pause-on-escalation takes precedence over dispatching the
-  // next task. `awaiting_review` tasks (continueWithDefault=true) are NOT
-  // surfaced here — they let the loop continue.
+  // next task. `awaiting_review` tasks (continueWithDefault=true) still pause
+  // here so silence is never treated as consent.
   //
   // We do NOT gate this on `phases.mid_execution_escalation` — creation of
   // new escalations is gated at the write site (tools/complete-task.ts:315),

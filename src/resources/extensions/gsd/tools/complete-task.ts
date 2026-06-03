@@ -12,7 +12,7 @@
 
 import { join } from "node:path";
 
-import type { CompleteTaskParams } from "../types.js";
+import type { CompleteTaskParams, EscalationArtifact } from "../types.js";
 import { isClosedStatus } from "../status-guards.js";
 import {
   transaction,
@@ -48,6 +48,14 @@ export interface CompleteTaskResult {
   sliceId: string;
   milestoneId: string;
   summaryPath: string;
+  escalation?: {
+    artifactPath: string;
+    question: string;
+    options: EscalationArtifact["options"];
+    recommendation: string;
+    recommendationRationale: string;
+    continueWithDefault: boolean;
+  };
   /**
    * True when this call re-completed an already-closed task from a turn that
    * had been superseded by timeout recovery or cancellation. The underlying
@@ -407,9 +415,18 @@ export async function handleCompleteTask(
   // overwrite it; gate rows are UPSERT-keyed per task and will also be
   // overwritten. This restores the invariant that deriveState() sees a
   // consistent "task not done" view so the loop re-dispatches the task.
+  let escalationMetadata: CompleteTaskResult["escalation"] | undefined;
   if (validatedEscalationArtifact) {
     try {
-      writeEscalationArtifact(artifactBasePath, validatedEscalationArtifact);
+      const escalationPath = writeEscalationArtifact(artifactBasePath, validatedEscalationArtifact);
+      escalationMetadata = {
+        artifactPath: escalationPath,
+        question: validatedEscalationArtifact.question,
+        options: validatedEscalationArtifact.options,
+        recommendation: validatedEscalationArtifact.recommendation,
+        recommendationRationale: validatedEscalationArtifact.recommendationRationale,
+        continueWithDefault: validatedEscalationArtifact.continueWithDefault,
+      };
     } catch (escalationErr) {
       const msg = `complete-task escalation write failed for ${params.milestoneId}/${params.sliceId}/${params.taskId}: ${(escalationErr as Error).message}`;
       logWarning("tool", msg);
@@ -477,6 +494,7 @@ export async function handleCompleteTask(
     sliceId: params.sliceId,
     milestoneId: params.milestoneId,
     summaryPath,
+    ...(escalationMetadata ? { escalation: escalationMetadata } : {}),
     ...(projectionStale ? { stale: true } : {}),
   };
 }

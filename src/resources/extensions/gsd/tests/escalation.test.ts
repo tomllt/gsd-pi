@@ -106,7 +106,7 @@ test("ADR-011 P2: writeEscalationArtifact persists canonical JSON at tasks/T##-E
   assert.equal(row?.escalation_artifact_path, path);
 });
 
-test("ADR-011 P2: continueWithDefault=true sets awaiting_review (NOT pending) — no pause", (t) => {
+test("ADR-011 P2: continueWithDefault=true sets awaiting_review (NOT pending)", (t) => {
   const base = makeBase();
   t.after(() => cleanup(base));
   seedCompletedTask(base, "T04");
@@ -126,7 +126,7 @@ test("ADR-011 P2: continueWithDefault=true sets awaiting_review (NOT pending) �
   assert.equal(row?.escalation_awaiting_review, 1);
 });
 
-test("ADR-011 P2: detectPendingEscalation returns only pause-scoped escalations", (t) => {
+test("ADR-011 P2: detectPendingEscalation pauses on unresolved awaiting_review escalations", (t) => {
   const base = makeBase();
   t.after(() => cleanup(base));
   seedCompletedTask(base, "T01");
@@ -147,7 +147,7 @@ test("ADR-011 P2: detectPendingEscalation returns only pause-scoped escalations"
 
   const tasks = [getTask("M001", "S01", "T01")!, getTask("M001", "S01", "T02")!];
   const id = detectPendingEscalation(tasks, base);
-  assert.equal(id, "T02", "only T02 is pause-worthy; T01 is awaiting_review");
+  assert.equal(id, "T01", "unresolved awaiting_review escalations must pause before later tasks");
 });
 
 test("ADR-011 P2: resolveEscalation(accept) marks artifact + clears flags", (t) => {
@@ -677,26 +677,19 @@ test("ADR-011 P3 #23: concurrent escalations across parallel slices — only the
   assert.equal(detectPendingEscalation([getTask("M001", "S02", "T70")!], base), null);
 });
 
-test("ADR-011 P3 #24: continueWithDefault timeout — late user response injects into the next task dispatched AFTER the response", (t) => {
-  // Timeline this test pins (the "timeout" is implicit — it's just the
-  // elapsed wall-clock where the loop keeps running after T80's
-  // continueWithDefault=true write):
+test("ADR-011 P3 #24: continueWithDefault requires explicit response before override injection", (t) => {
+  // Timeline this test pins:
   //
-  //   1. T80 writes continueWithDefault=true → awaiting_review=1, loop
-  //      continues dispatching T81, T82. Neither claim fires because the
-  //      user has not responded (pins Bug 2 behavior, tested at line 244).
-  //   2. The user responds LATE (after T81/T82 already dispatched).
-  //   3. The very next prompt build (for T83) claims the override exactly
-  //      once. T81/T82 are in the past — they must not retroactively
-  //      receive the injection even though they ran during the window.
+  //   1. T80 writes continueWithDefault=true → awaiting_review=1.
+  //   2. Scheduler detection pauses on T80 instead of treating silence as
+  //      consent. Prompt injection still waits until the user responds.
+  //   3. After the response, the next prompt build claims the override once.
   const base = makeBase();
   t.after(() => cleanup(base));
   seedCompletedTask(base, "T80");
-  seedCompletedTask(base, "T81");
-  seedCompletedTask(base, "T82");
   seedCompletedTask(base, "T83");
 
-  // Phase 1 — T80 escalates with continueWithDefault=true, loop continues.
+  // Phase 1 — T80 escalates with continueWithDefault=true.
   writeEscalationArtifact(base, buildEscalationArtifact({
     taskId: "T80", sliceId: "S01", milestoneId: "M001",
     question: "Which cache strategy?", options: sampleOptions,
@@ -704,21 +697,17 @@ test("ADR-011 P3 #24: continueWithDefault timeout — late user response injects
     continueWithDefault: true,
   }));
 
-  // T80 is awaiting_review (not pending) — scheduler does not pause.
+  // T80 is awaiting_review (not pending), but scheduler detection still
+  // pauses until the user explicitly responds.
   assert.equal(getTask("M001", "S01", "T80")?.escalation_awaiting_review, 1);
   assert.equal(getTask("M001", "S01", "T80")?.escalation_pending, 0);
-  assert.equal(detectPendingEscalation([getTask("M001", "S01", "T80")!], base), null);
+  assert.equal(detectPendingEscalation([getTask("M001", "S01", "T80")!], base), "T80");
 
-  // T81 + T82 dispatch during the response window — neither gets the injection.
+  // Prompt injection must still wait for a response.
   assert.equal(
     claimOverrideForInjection(base, "M001", "S01"),
     null,
-    "T81's prompt build must not claim the unresolved awaiting_review",
-  );
-  assert.equal(
-    claimOverrideForInjection(base, "M001", "S01"),
-    null,
-    "T82's prompt build must also not claim the unresolved awaiting_review",
+    "unresolved awaiting_review must not be claimed as a default response",
   );
 
   // The response window remains open across N tasks — still no override applied.
@@ -728,7 +717,7 @@ test("ADR-011 P3 #24: continueWithDefault timeout — late user response injects
     "applied_at must stay null throughout the response window",
   );
 
-  // Phase 2 — user responds LATE with a different option than the recommendation.
+  // Phase 2 — user responds with a different option than the recommendation.
   const resolveResult = resolveEscalation(
     base, "M001", "S01", "T80", "B", "after reviewing, B is the call",
   );

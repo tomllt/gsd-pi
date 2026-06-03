@@ -1488,7 +1488,7 @@ export function setTaskEscalationPending(
   ).run({ ":path": artifactPath, ":mid": milestoneId, ":sid": sliceId, ":tid": taskId });
 }
 
-/** Set awaiting-review state (artifact exists but continueWithDefault=true, no pause). Mutually exclusive with pending. */
+/** Set awaiting-review state (artifact exists and requires explicit user review). Mutually exclusive with pending. */
 export function setTaskEscalationAwaitingReview(
   milestoneId: string, sliceId: string, taskId: string,
   artifactPath: string,

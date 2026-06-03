@@ -24,7 +24,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import type { CompleteMilestoneParams } from "./complete-milestone.js";
 import { handleCompleteMilestone } from "./complete-milestone.js";
 import { handleCompleteTask } from "./complete-task.js";
-import type { CompleteSliceParams } from "../types.js";
+import type { CompleteSliceParams, EscalationOption } from "../types.js";
 import { handleCompleteSlice } from "./complete-slice.js";
 import type { PlanMilestoneParams } from "./plan-milestone.js";
 import { handlePlanMilestone } from "./plan-milestone.js";
@@ -347,6 +347,14 @@ type VerificationEvidenceInput =
     }
   | string;
 
+interface TaskEscalationInput {
+  question: string;
+  options: EscalationOption[];
+  recommendation: string;
+  recommendationRationale: string;
+  continueWithDefault: boolean;
+}
+
 export interface TaskCompleteParams {
   taskId: string;
   sliceId: string;
@@ -359,6 +367,7 @@ export interface TaskCompleteParams {
   keyFiles?: string[];
   keyDecisions?: string[];
   blockerDiscovered?: boolean;
+  escalation?: TaskEscalationInput;
   verificationEvidence?: VerificationEvidenceInput[];
 }
 
@@ -509,6 +518,28 @@ export async function executeTaskComplete(
         content: [{ type: "text", text: `Error completing task: ${result.error}` }],
         details: { operation: "complete_task", error: result.error },
       isError: true,
+      };
+    }
+    if (result.escalation) {
+      const recommended = result.escalation.options.find((option) => option.id === result.escalation?.recommendation);
+      const optionIds = result.escalation.options.map((option) => option.id).join("|");
+      return {
+        content: [{
+          type: "text",
+          text: [
+            `Task completed with escalation decision required: ${result.escalation.question}`,
+            `Recommendation: ${result.escalation.recommendation}${recommended ? ` (${recommended.label})` : ""} — ${result.escalation.recommendationRationale}`,
+            `Resolve with: /gsd escalate resolve ${result.taskId} <${optionIds}|accept|reject-blocker> [rationale...]`,
+          ].join("\n"),
+        }],
+        details: {
+          operation: "complete_task",
+          taskId: result.taskId,
+          sliceId: result.sliceId,
+          milestoneId: result.milestoneId,
+          summaryPath: result.summaryPath,
+          escalation: result.escalation,
+        },
       };
     }
     return {

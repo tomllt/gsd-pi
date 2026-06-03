@@ -832,7 +832,7 @@ export function registerDbTools(pi: ExtensionAPI): void {
         recommendation: Type.String({ description: "Option id the executor recommends." }),
         recommendationRationale: Type.String({ description: "Why the recommendation — 1–2 sentences." }),
         continueWithDefault: Type.Boolean({
-          description: "When true, loop continues (artifact logged for later review). When false, auto-mode pauses until the user resolves via /gsd escalate resolve.",
+          description: "When true, the recommendation is recorded as the default, but auto-mode still pauses until the user resolves via /gsd escalate resolve.",
         }),
       }, { description: "ADR-011 Phase 2: optional escalation payload. Only honored when phases.mid_execution_escalation is true." })),
       verificationEvidence: Type.Optional(Type.Array(

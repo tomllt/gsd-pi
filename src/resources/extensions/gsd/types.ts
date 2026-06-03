@@ -384,10 +384,10 @@ export interface EscalationArtifact {
   /** Why the executor recommends that option (1-2 sentences). */
   recommendationRationale: string;
   /**
-   * When true, the executor proceeds with the recommendation as the answer
-   * and the loop continues. User's later choice becomes a carry-forward
-   * override for the NEXT task. When false, auto-mode pauses until the
-   * user resolves via `/gsd escalate resolve`.
+   * When true, the recommendation is recorded as the default path but the
+   * loop still pauses until the user explicitly resolves the escalation.
+   * When false, auto-mode also pauses until the user resolves via
+   * `/gsd escalate resolve`.
    */
   continueWithDefault: boolean;
   createdAt: string;

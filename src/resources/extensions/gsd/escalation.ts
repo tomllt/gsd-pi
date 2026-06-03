@@ -159,13 +159,13 @@ export function readEscalationArtifact(path: string): EscalationArtifact | null 
 // ─── Detection ────────────────────────────────────────────────────────────
 
 /**
- * Returns the task id of the first task with an un-resolved pause-escalation
- * (escalation_pending=1, not yet respondedAt). awaiting_review slices are NOT
- * returned — they don't pause the loop.
+ * Returns the task id of the first task with an unresolved escalation.
+ * `continueWithDefault=true` artifacts keep the awaiting_review flag for
+ * compatibility, but still pause dispatch until the user explicitly responds.
  */
 export function detectPendingEscalation(tasks: TaskRow[], basePath: string): string | null {
   for (const t of tasks) {
-    if (t.escalation_pending !== 1) continue;
+    if (t.escalation_pending !== 1 && t.escalation_awaiting_review !== 1) continue;
     if (!t.escalation_artifact_path) continue;
     const art = readEscalationArtifact(t.escalation_artifact_path);
     if (art && !art.respondedAt) return t.id;

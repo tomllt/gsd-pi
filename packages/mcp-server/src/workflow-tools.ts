@@ -1620,7 +1620,7 @@ const taskCompleteParams = {
     recommendation: z.string().describe("Option id the executor recommends."),
     recommendationRationale: z.string().describe("Why the recommendation — 1-2 sentences."),
     continueWithDefault: z.boolean().describe(
-      "When true, loop continues (artifact logged for later review). When false, auto-mode pauses until the user resolves via /gsd escalate resolve.",
+      "When true, the recommendation is recorded as the default, but auto-mode still pauses until the user resolves via /gsd escalate resolve.",
     ),
   }).optional().describe("ADR-011 Phase 2: optional escalation payload. Only honored when phases.mid_execution_escalation is true."),
   verificationEvidence: z.array(z.union([
