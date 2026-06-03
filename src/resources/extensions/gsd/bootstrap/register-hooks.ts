@@ -17,7 +17,7 @@ import { canonicalToolName, clearDiscussionFlowState, isDepthConfirmationAnswer,
 import { resolveManifest } from "../unit-context-manifest.js";
 import { isBlockedStateFile, isBashWriteToStateFile, BLOCKED_WRITE_ERROR } from "../write-intercept.js";
 import { loadFile, saveFile, formatContinue } from "../files.js";
-import { clearToolInvocationError, getAutoRuntimeSnapshot, isAutoActive, isAutoPaused, markToolEnd, markToolStart, recordToolInvocationError } from "../auto-runtime-state.js";
+import { clearToolInvocationError, getAutoRuntimeSnapshot, isAutoActive, isAutoCompletionStopInProgress, isAutoPaused, markToolEnd, markToolStart, recordToolInvocationError } from "../auto-runtime-state.js";
 
 import { checkToolCallLoop, resetToolCallLoopGuard } from "./tool-call-loop-guard.js";
 import { maybePauseAutoForApprovalGate, resetPendingGatePauseGuard } from "./pending-gate-pause.js";
@@ -535,8 +535,9 @@ export function registerHooks(
 
   pi.on("session_start", async (_event, ctx) => {
     const basePath = contextBasePath(ctx);
+    const preserveCloseoutSurface = isAutoCompletionStopInProgress();
     initSessionNotifications(ctx);
-    if (!isAutoActive()) {
+    if (!isAutoActive() && !preserveCloseoutSurface) {
       const { initHealthWidget } = await import("../health-widget.js");
       initHealthWidget(ctx);
     }
@@ -556,15 +557,18 @@ export function registerHooks(
       const prefs = loadEffectiveGSDPreferences(basePath);
       process.env.GSD_SHOW_TOKEN_COST = prefs?.preferences.show_token_cost ? "1" : "";
     } catch { /* non-fatal */ }
-    await installWelcomeHeader(ctx);
+    if (!preserveCloseoutSurface) {
+      await installWelcomeHeader(ctx);
+    }
     await loadToolApiKeysForSession();
-    if (isAutoActive()) {
+    if (isAutoActive() || preserveCloseoutSurface) {
       ctx.ui.setWidget("gsd-health", undefined);
     }
   });
 
   pi.on("session_switch", async (_event, ctx) => {
     const basePath = contextBasePath(ctx);
+    const preserveCloseoutSurface = isAutoCompletionStopInProgress();
     initSessionNotifications(ctx);
     resetWriteGateState(basePath);
     resetToolCallLoopGuard();
@@ -576,7 +580,7 @@ export function registerHooks(
     await applyCompactionThresholdOverride(ctx);
     await prepareWorkflowMcpForHookContext(ctx, basePath);
     await loadToolApiKeysForSession();
-    if (!isAutoActive()) {
+    if (!isAutoActive() && !preserveCloseoutSurface) {
       ctx.ui.setWidget("gsd-progress", undefined);
       ctx.ui.setWidget("gsd-outcome", undefined);
       const { initHealthWidget } = await import("../health-widget.js");

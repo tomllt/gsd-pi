@@ -42,6 +42,10 @@ export function isAutoPaused(): boolean {
   return autoSession.paused;
 }
 
+export function isAutoCompletionStopInProgress(): boolean {
+  return autoSession.completionStopInProgress;
+}
+
 export function markToolStart(toolCallId: string, toolName?: string): void {
   markTrackedToolStart(toolCallId, autoSession.active, toolName);
 }

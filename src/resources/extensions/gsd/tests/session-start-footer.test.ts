@@ -298,6 +298,106 @@ test("session_start installs the welcome screen as the TUI header", async (t) =>
   assert.deepEqual(header.render(123), ["welcome 9.9.9-test none 123"]);
 });
 
+test("session hooks preserve closeout-boundary UI during completion reroot", async (t) => {
+  const dir = join(
+    tmpdir(),
+    `gsd-closeout-session-hooks-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  );
+  mkdirSync(join(dir, ".gsd"), { recursive: true });
+  mkdirSync(join(dir, "dist"), { recursive: true });
+  const tempGsdHome = join(dir, "home");
+  mkdirSync(tempGsdHome, { recursive: true });
+  writeFileSync(
+    join(dir, "dist", "welcome-screen.js"),
+    "export function buildWelcomeScreenLines() { return ['welcome header']; }\n",
+    "utf-8",
+  );
+
+  const originalCwd = process.cwd();
+  const originalGsdHome = process.env.GSD_HOME;
+  const originalGsdPkgRoot = process.env.GSD_PKG_ROOT;
+  process.chdir(dir);
+  process.env.GSD_HOME = tempGsdHome;
+  process.env.GSD_PKG_ROOT = dir;
+  autoSession.reset();
+  autoSession.completionStopInProgress = true;
+  t.after(() => {
+    autoSession.reset();
+    process.chdir(originalCwd);
+    if (originalGsdHome === undefined) delete process.env.GSD_HOME;
+    else process.env.GSD_HOME = originalGsdHome;
+    if (originalGsdPkgRoot === undefined) delete process.env.GSD_PKG_ROOT;
+    else process.env.GSD_PKG_ROOT = originalGsdPkgRoot;
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  });
+
+  const handlers = new Map<string, (event: unknown, ctx: any) => Promise<void> | void>();
+  const pi = {
+    on(event: string, handler: (event: unknown, ctx: any) => Promise<void> | void) {
+      handlers.set(event, handler);
+    },
+  } as any;
+
+  registerHooks(pi, []);
+
+  const sessionStart = handlers.get("session_start");
+  const sessionSwitch = handlers.get("session_switch");
+  assert.ok(sessionStart, "session_start handler must be registered");
+  assert.ok(sessionSwitch, "session_switch handler must be registered");
+
+  const widgetCalls: Array<{ key: string; value: unknown }> = [];
+  let headerInstallCount = 0;
+  const ctx = {
+    hasUI: true,
+    ui: {
+      notify: () => {},
+      setStatus: () => {},
+      setFooter: () => {},
+      setHeader: () => {
+        headerInstallCount++;
+      },
+      setWorkingMessage: () => {},
+      onTerminalInput: () => () => {},
+      setWidget: (key: string, value: unknown) => {
+        widgetCalls.push({ key, value });
+      },
+    },
+    sessionManager: { getSessionId: () => null },
+    model: null,
+    setCompactionThresholdOverride: () => {},
+    modelRegistry: {
+      setDisabledModelProviders: () => {},
+      getProviderAuthMode: () => undefined,
+      isProviderRequestReady: () => false,
+    },
+  };
+
+  await sessionStart!({}, ctx);
+  assert.equal(
+    headerInstallCount,
+    0,
+    "completion reroot session_start must not reinstall the welcome/project-console header",
+  );
+  assert.ok(
+    widgetCalls.some((call) => call.key === "gsd-health" && call.value === undefined),
+    "completion reroot session_start should hide the ambient health widget",
+  );
+
+  widgetCalls.length = 0;
+  await sessionSwitch!({ reason: "reroot" }, ctx);
+  assert.deepEqual(
+    widgetCalls
+      .filter((call) => call.key === "gsd-progress" || call.key === "gsd-outcome")
+      .map((call) => [call.key, call.value]),
+    [],
+    "completion reroot session_switch must not clear the preserved closeout surface",
+  );
+  assert.ok(
+    widgetCalls.some((call) => call.key === "gsd-health" && call.value === undefined),
+    "completion reroot session_switch should keep the ambient health widget hidden",
+  );
+});
+
 test("session_start and session_switch apply disabled model provider policy from current preferences", async (t) => {
   const dir = join(
     tmpdir(),
