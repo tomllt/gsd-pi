@@ -41,3 +41,23 @@ test("forensics prompt routes issue creation through bash tool, not github_issue
     "Prompt must instruct use of the bash tool for issue creation",
   );
 });
+
+test("forensics prompt provides paste-once fallback when bash is unavailable", () => {
+  const prompt = readPrompt("forensics");
+
+  assert.match(
+    prompt,
+    /If `bash` is unavailable/i,
+    "Prompt must branch when bash cannot be activated",
+  );
+  assert.match(
+    prompt,
+    /paste-once shell script/i,
+    "Prompt must provide a user-runnable fallback instead of an impossible tool call",
+  );
+  assert.match(
+    prompt,
+    /Searching closed issues for possible duplicates/i,
+    "Fallback script must preserve the duplicate-search step for the user",
+  );
+});

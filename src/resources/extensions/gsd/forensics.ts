@@ -123,6 +123,91 @@ interface ForensicReport {
   worktreeTelemetry: WorktreeTelemetrySummary | null;
 }
 
+// ─── Filing Tool Scope ───────────────────────────────────────────────────────
+
+const FORENSICS_FILING_TOOLS = ["bash", "write"] as const;
+
+type ForensicsFilingTool = typeof FORENSICS_FILING_TOOLS[number];
+
+export interface ForensicsToolScope {
+  savedTools: string[];
+  activeToolsForTurn: string[];
+  availableFilingTools: ForensicsFilingTool[];
+  missingFilingTools: ForensicsFilingTool[];
+  toolsChanged: boolean;
+}
+
+function uniqueAppend(base: readonly string[], additions: readonly string[]): string[] {
+  const seen = new Set(base);
+  const next = [...base];
+  for (const name of additions) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    next.push(name);
+  }
+  return next;
+}
+
+function sameOrderedTools(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((name, index) => name === b[index]);
+}
+
+function getRegisteredToolNames(
+  pi: Pick<ExtensionAPI, "getActiveTools"> & Partial<Pick<ExtensionAPI, "getAllTools">>,
+  fallback: readonly string[],
+): string[] {
+  if (typeof pi.getAllTools === "function") {
+    return pi.getAllTools().map((tool) => tool.name);
+  }
+  return [...fallback];
+}
+
+export function createForensicsToolScope(
+  pi: Pick<ExtensionAPI, "getActiveTools"> & Partial<Pick<ExtensionAPI, "getAllTools">>,
+): ForensicsToolScope {
+  const savedTools = [...pi.getActiveTools()];
+  const registeredTools = new Set([...getRegisteredToolNames(pi, savedTools), ...savedTools]);
+  const availableFilingTools = FORENSICS_FILING_TOOLS.filter((name) => registeredTools.has(name));
+  const missingFilingTools = FORENSICS_FILING_TOOLS.filter((name) => !registeredTools.has(name));
+  const activeToolsForTurn = uniqueAppend(savedTools, availableFilingTools);
+
+  return {
+    savedTools,
+    activeToolsForTurn,
+    availableFilingTools,
+    missingFilingTools,
+    toolsChanged: !sameOrderedTools(savedTools, activeToolsForTurn),
+  };
+}
+
+export function applyForensicsToolScope(pi: Pick<ExtensionAPI, "setActiveTools">, scope: ForensicsToolScope): void {
+  if (scope.toolsChanged) pi.setActiveTools(scope.activeToolsForTurn);
+}
+
+export function restoreForensicsToolScope(pi: Pick<ExtensionAPI, "setActiveTools">, scope: ForensicsToolScope): void {
+  if (scope.toolsChanged) pi.setActiveTools(scope.savedTools);
+}
+
+export function buildForensicsToolingSection(scope: ForensicsToolScope): string {
+  const available = new Set(scope.availableFilingTools);
+  const requested = scope.availableFilingTools.length
+    ? scope.availableFilingTools.map((name) => `\`${name}\``).join(", ")
+    : "none";
+  const statusFor = (name: ForensicsFilingTool) => available.has(name)
+    ? `- \`${name}\`: available for this queued forensics turn`
+    : `- \`${name}\`: unavailable in this host session`;
+
+  return `
+## Filing Tool Availability
+
+For this queued forensic turn, the extension requested the registered filing tools: ${requested}.
+
+${FORENSICS_FILING_TOOLS.map(statusFor).join("\n")}
+
+If \`bash\` is available, use the GitHub duplicate-check and issue-creation protocols below. If \`bash\` is unavailable, do not attempt duplicate-check or issue-creation tool calls with another tool; provide the paste-once shell script fallback instead.
+`;
+}
+
 // ─── Duplicate Detection ──────────────────────────────────────────────────────
 
 const DEDUP_PROMPT_SECTION = `
@@ -133,6 +218,8 @@ Before reading GSD source code or performing deep analysis, you MUST search for 
 ### Search Steps
 
 Use keywords from the user's problem description and the anomaly summaries in the forensic report above.
+
+If \`bash\` is unavailable in the Filing Tool Availability section, do not attempt live duplicate-search tool calls. Say the live duplicate search must be run by the user, continue the source investigation, and include the duplicate-search commands in the paste-once fallback when issue filing is accepted.
 
 1. **Search closed issues** for similar keywords:
    \`\`\`
@@ -265,21 +352,28 @@ export async function handleForensics(
   }
 
   const forensicData = formatReportForPrompt(report);
+  const toolScope = createForensicsToolScope(pi);
   const content = loadPrompt("forensics", {
     problemDescription,
     forensicData,
     gsdSourceDir,
     dedupSection,
+    toolingSection: buildForensicsToolingSection(toolScope),
   });
 
   ctx.ui.notify(`Forensic report saved: ${relative(basePath, savedPath)}`, "info");
   ctx.ui.setStatus("gsd-forensics", "running");
 
-  pi.sendMessage(
-    { customType: "gsd-forensics", content, display: false },
-    { triggerTurn: true },
-  );
-  ctx.ui.setStatus("gsd-forensics", undefined);
+  try {
+    applyForensicsToolScope(pi, toolScope);
+    await pi.sendMessage(
+      { customType: "gsd-forensics", content, display: false },
+      { triggerTurn: true },
+    );
+  } finally {
+    restoreForensicsToolScope(pi, toolScope);
+    ctx.ui.setStatus("gsd-forensics", undefined);
+  }
 
   // Persist forensics context so follow-up turns can re-inject it (#2941)
   writeForensicsMarker(basePath, savedPath, content);

@@ -24,13 +24,16 @@ test("forensics prompt renders compact investigation and issue routing guidance"
     forensicData: "stuck-detected event for execute-task/M001/S01/T01",
     gsdSourceDir: process.env.GSD_TEST_WORKSPACE_ROOT ?? process.cwd(),
     dedupSection: "No duplicate issue found.",
+    toolingSection: "## Filing Tool Availability\n\n- `bash`: available\n- `write`: available",
   });
 
   assert.match(prompt, /Investigation Protocol/);
+  assert.match(prompt, /Filing Tool Availability/);
   assert.match(prompt, /gsd_milestone_status/);
   assert.match(prompt, /sqlite3 .gsd\/gsd.db/);
   assert.match(prompt, /gh issue create --repo open-gsd\/gsd-pi/);
   assert.match(prompt, /Do NOT use the `github_issues` tool/);
+  assert.match(prompt, /paste-once shell script/);
   assert.match(prompt, /Redaction Rules/);
   assert.doesNotMatch(prompt, /\{\{[a-zA-Z][a-zA-Z0-9_]*\}\}/);
 });
