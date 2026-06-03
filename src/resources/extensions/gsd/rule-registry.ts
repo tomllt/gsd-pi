@@ -22,6 +22,8 @@ import { resolvePostUnitHooks, resolvePreDispatchHooks } from "./preferences.js"
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseUnitId } from "./unit-id.js";
+import { queryJournal, type JournalEntry } from "./journal.js";
+import { readUnitRuntimeRecord, type UnitRuntimePhase } from "./unit-runtime.js";
 
 // ─── Artifact Path Resolution ──────────────────────────────────────────────
 
@@ -56,6 +58,24 @@ export function convertDispatchRules(rules: DispatchRule[]): UnifiedRule[] {
 // ─── RuleRegistry ─────────────────────────────────────────────────────────
 
 const HOOK_STATE_FILE = "hook-state.json";
+const FAILED_HOOK_RUNTIME_PHASES: ReadonlySet<UnitRuntimePhase> = new Set([
+  "timeout",
+  "finalize-timeout",
+  "crashed",
+  "paused",
+]);
+
+interface HookFailureState {
+  hookName: string;
+  unitType: string;
+  unitId: string;
+  reason: string;
+}
+
+type HookCompletionAssessment =
+  | { outcome: "success" }
+  | { outcome: "failed"; reason: string }
+  | { outcome: "unknown" };
 
 export class RuleRegistry {
   /** Static dispatch rules provided at construction time. */
@@ -72,6 +92,7 @@ export class RuleRegistry {
   cycleCounts: Map<string, number> = new Map();
   retryPending: boolean = false;
   retryTrigger: { unitType: string; unitId: string; retryArtifact: string } | null = null;
+  hookFailure: HookFailureState | null = null;
 
   constructor(dispatchRules: UnifiedRule[]) {
     this.dispatchRules = dispatchRules;
@@ -192,42 +213,28 @@ export class RuleRegistry {
       // Check idempotency — if artifact already exists, skip
       if (config.artifact) {
         const artifactPath = resolveHookArtifactPath(basePath, triggerUnitId, config.artifact);
-        if (existsSync(artifactPath)) continue;
+        if (existsSync(artifactPath)) {
+          const completion = this._assessConfiguredHookCompletion(basePath, config.name, triggerUnitId);
+          if (completion.outcome === "failed") {
+            return this._handleFailedHookCompletion(
+              basePath,
+              {
+                hookName: config.name,
+                triggerUnitType,
+                triggerUnitId,
+                cycle: this.cycleCounts.get(`${config.name}/${triggerUnitType}/${triggerUnitId}`) ?? 0,
+                pendingRetry: false,
+              },
+              config,
+              completion.reason,
+            );
+          }
+          continue;
+        }
       }
 
-      // Check cycle limit
-      const cycleKey = `${config.name}/${triggerUnitType}/${triggerUnitId}`;
-      const currentCycle = (this.cycleCounts.get(cycleKey) ?? 0) + 1;
-      const maxCycles = config.max_cycles ?? 1;
-      if (currentCycle > maxCycles) continue;
-
-      this.cycleCounts.set(cycleKey, currentCycle);
-
-      this.activeHook = {
-        hookName: config.name,
-        triggerUnitType,
-        triggerUnitId,
-        cycle: currentCycle,
-        pendingRetry: false,
-      };
-
-      // Build prompt with variable substitution
-      const { milestone: mid, slice: sid, task: tid } = parseUnitId(triggerUnitId);
-      let prompt = config.prompt
-        .replace(/\{milestoneId\}/g, mid ?? "")
-        .replace(/\{sliceId\}/g, sid ?? "")
-        .replace(/\{taskId\}/g, tid ?? "");
-
-      // Inject browser safety instruction
-      prompt += "\n\n**Browser tool safety:** Do NOT use `browser_wait_for` with `condition: \"network_idle\"` — it hangs indefinitely when dev servers keep persistent connections (Vite HMR, WebSocket). Use `selector_visible`, `text_visible`, or `delay` instead.";
-
-      return {
-        hookName: config.name,
-        prompt,
-        model: config.model,
-        unitType: `hook/${config.name}`,
-        unitId: triggerUnitId,
-      };
+      const dispatch = this._startHook(config, triggerUnitType, triggerUnitId);
+      if (dispatch) return dispatch;
     }
 
     // No more hooks — clear active state
@@ -239,6 +246,11 @@ export class RuleRegistry {
     const hook = this.activeHook!;
     const hooks = resolvePostUnitHooks(basePath);
     const config = hooks.find(h => h.name === hook.hookName);
+
+    const completion = this._assessHookCompletion(basePath, hook);
+    if (completion.outcome === "failed") {
+      return this._handleFailedHookCompletion(basePath, hook, config, completion.reason);
+    }
 
     // Check if retry was requested via retry_on artifact
     if (config?.retry_on) {
@@ -265,6 +277,129 @@ export class RuleRegistry {
     // Hook completed normally — try next hook in queue
     this.activeHook = null;
     return this._dequeueNextHook(basePath);
+  }
+
+  private _startHook(
+    config: PostUnitHookConfig,
+    triggerUnitType: string,
+    triggerUnitId: string,
+  ): HookDispatchResult | null {
+    const cycleKey = `${config.name}/${triggerUnitType}/${triggerUnitId}`;
+    const currentCycle = (this.cycleCounts.get(cycleKey) ?? 0) + 1;
+    const maxCycles = config.max_cycles ?? 1;
+    if (currentCycle > maxCycles) return null;
+
+    this.cycleCounts.set(cycleKey, currentCycle);
+
+    this.activeHook = {
+      hookName: config.name,
+      triggerUnitType,
+      triggerUnitId,
+      cycle: currentCycle,
+      pendingRetry: false,
+    };
+
+    const { milestone: mid, slice: sid, task: tid } = parseUnitId(triggerUnitId);
+    let prompt = config.prompt
+      .replace(/\{milestoneId\}/g, mid ?? "")
+      .replace(/\{sliceId\}/g, sid ?? "")
+      .replace(/\{taskId\}/g, tid ?? "");
+
+    prompt += "\n\n**Browser tool safety:** Do NOT use `browser_wait_for` with `condition: \"network_idle\"` — it hangs indefinitely when dev servers keep persistent connections (Vite HMR, WebSocket). Use `selector_visible`, `text_visible`, or `delay` instead.";
+
+    return {
+      hookName: config.name,
+      prompt,
+      model: config.model,
+      unitType: `hook/${config.name}`,
+      unitId: triggerUnitId,
+    };
+  }
+
+  private _assessHookCompletion(
+    basePath: string,
+    hook: HookExecutionState,
+  ): HookCompletionAssessment {
+    return this._assessConfiguredHookCompletion(basePath, hook.hookName, hook.triggerUnitId);
+  }
+
+  private _assessConfiguredHookCompletion(
+    basePath: string,
+    hookName: string,
+    unitId: string,
+  ): HookCompletionAssessment {
+    const unitType = `hook/${hookName}`;
+    const latestUnitEnd = this._latestHookUnitEnd(basePath, unitType, unitId);
+    if (latestUnitEnd) {
+      const data = latestUnitEnd.data ?? {};
+      const status = data.status;
+      const artifactVerified = data.artifactVerified;
+      if (status === "completed" && artifactVerified !== false) {
+        return { outcome: "success" };
+      }
+      return {
+        outcome: "failed",
+        reason: this._formatHookFailureReason(status, artifactVerified, data.errorContext),
+      };
+    }
+
+    const runtime = readUnitRuntimeRecord(basePath, unitType, unitId);
+    if (runtime && FAILED_HOOK_RUNTIME_PHASES.has(runtime.phase)) {
+      return { outcome: "failed", reason: `runtime phase ${runtime.phase}` };
+    }
+
+    return { outcome: "unknown" };
+  }
+
+  private _latestHookUnitEnd(
+    basePath: string,
+    unitType: string,
+    unitId: string,
+  ): JournalEntry | null {
+    const unitEnds = queryJournal(basePath, { eventType: "unit-end", unitId })
+      .filter(entry => entry.data?.unitType === unitType);
+    return unitEnds[unitEnds.length - 1] ?? null;
+  }
+
+  private _formatHookFailureReason(
+    status: unknown,
+    artifactVerified: unknown,
+    errorContext: unknown,
+  ): string {
+    const parts = [`status ${typeof status === "string" ? status : "unknown"}`];
+    if (artifactVerified === false) {
+      parts.push("artifact not verified");
+    }
+    if (typeof errorContext === "object" && errorContext !== null && "message" in errorContext) {
+      const message = (errorContext as { message?: unknown }).message;
+      if (typeof message === "string" && message.length > 0) {
+        parts.push(message);
+      }
+    }
+    return parts.join("; ");
+  }
+
+  private _handleFailedHookCompletion(
+    basePath: string,
+    hook: HookExecutionState,
+    config: PostUnitHookConfig | undefined,
+    reason: string,
+  ): HookDispatchResult | null {
+    if (config) {
+      const retry = this._startHook(config, hook.triggerUnitType, hook.triggerUnitId);
+      if (retry) return retry;
+    }
+
+    this.hookFailure = {
+      hookName: hook.hookName,
+      unitType: `hook/${hook.hookName}`,
+      unitId: hook.triggerUnitId,
+      reason,
+    };
+    this.activeHook = null;
+    this.hookQueue = [];
+    this.persistState(basePath);
+    return null;
   }
 
   // ── Pre-dispatch hook evaluation (sync, all-matching with compose) ──
@@ -351,6 +486,13 @@ export class RuleRegistry {
     return this.retryPending;
   }
 
+  consumeHookFailure(): HookFailureState | null {
+    if (!this.hookFailure) return null;
+    const failure = { ...this.hookFailure };
+    this.hookFailure = null;
+    return failure;
+  }
+
   /**
    * Returns the trigger unit info for a pending retry, or null.
    * Clears the retry state after reading.
@@ -370,6 +512,7 @@ export class RuleRegistry {
     this.cycleCounts.clear();
     this.retryPending = false;
     this.retryTrigger = null;
+    this.hookFailure = null;
   }
 
   // ── Persistence ─────────────────────────────────────────────────────

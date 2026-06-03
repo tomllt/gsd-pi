@@ -55,6 +55,7 @@ import { parseRoadmap as parseLegacyRoadmap } from "./parsers-legacy.js";
 import { consumeSignal } from "./session-status-io.js";
 import {
   checkPostUnitHooks,
+  consumeHookFailure,
   isRetryPending,
   consumeRetryTrigger,
   persistHookState,
@@ -2238,6 +2239,16 @@ export async function postUnitPostVerification(pctx: PostUnitContext): Promise<"
         { kind: "hook", unitType: hookUnit.unitType, unitId: hookUnit.unitId, prompt: hookUnit.prompt, model: hookUnit.model },
         { hookName: hookUnit.hookName },
       );
+    }
+
+    const hookFailure = consumeHookFailure();
+    if (hookFailure) {
+      ctx.ui.notify(
+        `Post-unit hook ${hookFailure.hookName} failed for ${hookFailure.unitId}: ${hookFailure.reason}. Pausing auto-mode.`,
+        "warning",
+      );
+      await pauseAuto(ctx, pi);
+      return "stopped";
     }
 
     // Check if a hook requested a retry of the trigger unit

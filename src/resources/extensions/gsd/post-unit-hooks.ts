@@ -37,6 +37,10 @@ export function consumeRetryTrigger(): { unitType: string; unitId: string; retry
   return getOrCreateRegistry().consumeRetryTrigger();
 }
 
+export function consumeHookFailure(): { hookName: string; unitType: string; unitId: string; reason: string } | null {
+  return getOrCreateRegistry().consumeHookFailure();
+}
+
 export function resetHookState(): void {
   getOrCreateRegistry().resetState();
 }

@@ -8,6 +8,7 @@ import { test, describe, beforeEach } from "node:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { emitJournalEvent } from "../journal.ts";
 import {
   RuleRegistry,
   getRegistry,
@@ -16,6 +17,7 @@ import {
   resetRegistry,
   convertDispatchRules,
   getOrCreateRegistry,
+  resolveHookArtifactPath,
 } from "../rule-registry.ts";
 import type { UnifiedRule } from "../rule-types.ts";
 import type { DispatchAction, DispatchContext } from "../auto-dispatch.ts";
@@ -439,6 +441,79 @@ describe("RuleRegistry", () => {
       else process.env.GSD_HOME = originalGsdHome;
       rmSync(projectRoot, { recursive: true, force: true });
       rmSync(worktreeRoot, { recursive: true, force: true });
+      rmSync(tempGsdHome, { recursive: true, force: true });
+    }
+  });
+
+  test("failed hook completion with an artifact does not dequeue the next hook", () => {
+    const originalGsdHome = process.env.GSD_HOME;
+    const projectRoot = mkdtempSync(join(tmpdir(), "gsd-hook-failed-"));
+    const tempGsdHome = mkdtempSync(join(tmpdir(), "gsd-hook-home-"));
+    const unitId = "M001/S01/T01";
+
+    try {
+      mkdirSync(join(projectRoot, ".gsd", "milestones", "M001", "slices", "S01", "tasks"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, ".gsd", "PREFERENCES.md"),
+        [
+          "---",
+          "version: 1",
+          "post_unit_hooks:",
+          "  - name: review-arbiter",
+          "    after: [execute-task]",
+          "    prompt: Review {taskId}",
+          "    artifact: REVIEW.md",
+          "    max_cycles: 1",
+          "  - name: follow-up-review",
+          "    after: [execute-task]",
+          "    prompt: Follow-up review {taskId}",
+          "---",
+        ].join("\n"),
+        "utf-8",
+      );
+      process.env.GSD_HOME = tempGsdHome;
+
+      const registry = new RuleRegistry([]);
+      const firstHook = registry.evaluatePostUnit("execute-task", unitId, projectRoot);
+      assert.equal(firstHook?.hookName, "review-arbiter");
+
+      writeFileSync(
+        resolveHookArtifactPath(projectRoot, unitId, "REVIEW.md"),
+        "partial review output",
+        "utf-8",
+      );
+      emitJournalEvent(projectRoot, {
+        ts: "2026-06-03T12:00:00.000Z",
+        flowId: "flow-hook-failed",
+        seq: 3,
+        eventType: "unit-end",
+        data: {
+          unitType: "hook/review-arbiter",
+          unitId,
+          status: "cancelled",
+          artifactVerified: false,
+          errorContext: {
+            message: "Provider error: Stream ended without finish_reason",
+            category: "provider",
+          },
+        },
+      });
+
+      const nextHook = registry.evaluatePostUnit("hook/review-arbiter", unitId, projectRoot);
+      assert.equal(nextHook, null, "failed hook must not allow follow-up hook dispatch");
+      const failure = registry.consumeHookFailure();
+      assert.equal(failure?.hookName, "review-arbiter");
+      assert.match(failure?.reason ?? "", /status cancelled/);
+
+      const resumedRegistry = new RuleRegistry([]);
+      resumedRegistry.restoreState(projectRoot);
+      const resumedHook = resumedRegistry.evaluatePostUnit("execute-task", unitId, projectRoot);
+      assert.equal(resumedHook, null, "resumed hook evaluation must not skip failed hook artifact");
+      assert.equal(resumedRegistry.consumeHookFailure()?.hookName, "review-arbiter");
+    } finally {
+      if (originalGsdHome === undefined) delete process.env.GSD_HOME;
+      else process.env.GSD_HOME = originalGsdHome;
+      rmSync(projectRoot, { recursive: true, force: true });
       rmSync(tempGsdHome, { recursive: true, force: true });
     }
   });
