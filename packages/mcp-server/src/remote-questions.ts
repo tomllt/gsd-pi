@@ -229,10 +229,20 @@ async function apiRequest(
     Authorization: `${authScheme} ${authToken}`,
   };
 
+  // Use setTimeout + clearTimeout instead of AbortSignal.timeout() so the
+  // timer is always cancelled after the request and response body settle.
+  // AbortSignal.timeout() leaves a lingering libuv async handle on Windows that
+  // causes an assertion failure during process exit when requests complete
+  // before the timeout fires.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort(new Error(`${errorLabel} timed out`));
+  }, PER_REQUEST_TIMEOUT_MS);
+
   const init: RequestInit = {
     method,
     headers,
-    signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS),
+    signal: controller.signal,
   };
 
   if (body !== undefined) {
@@ -240,17 +250,21 @@ async function apiRequest(
     init.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, init);
+  try {
+    const response = await fetch(url, init);
 
-  if (response.status === 204) return {};
+    if (response.status === 204) return {};
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    const safeText = text.length > 200 ? text.slice(0, 200) + '\u2026' : text;
-    throw new Error(`${errorLabel} HTTP ${response.status}: ${safeText}`);
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      const safeText = text.length > 200 ? text.slice(0, 200) + '\u2026' : text;
+      throw new Error(`${errorLabel} HTTP ${response.status}: ${safeText}`);
+    }
+
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return response.json();
 }
 
 // ---------------------------------------------------------------------------

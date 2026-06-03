@@ -120,10 +120,28 @@ test("rewriteCommandWithRtk falls back to the managed RTK path when GSD_RTK_PATH
 
 test("validateRtkBinary checks the rewrite contract", () => {
   const validSpawn = ((_binary: string, _args: string[]) => ({ status: 0, stdout: "rtk git status", error: undefined })) as typeof import("node:child_process").spawnSync;
-  assert.equal(validateRtkBinary("/tmp/rtk", { spawnSyncImpl: validSpawn }), true);
+  assert.deepEqual(validateRtkBinary("/tmp/rtk", { spawnSyncImpl: validSpawn }), { valid: true });
 
   const invalidSpawn = ((_binary: string, _args: string[]) => ({ status: 0, stdout: "wrong output", error: undefined })) as typeof import("node:child_process").spawnSync;
-  assert.equal(validateRtkBinary("/tmp/rtk", { spawnSyncImpl: invalidSpawn }), false);
+  assert.deepEqual(validateRtkBinary("/tmp/rtk", { spawnSyncImpl: invalidSpawn }), {
+    valid: false,
+    error: "unexpected output: wrong output",
+  });
+});
+
+test("validateRtkBinary surfaces subprocess stderr", () => {
+  const glibcError = "/tmp/rtk: /lib/aarch64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found";
+  const failingSpawn = ((_binary: string, _args: string[]) => ({
+    status: 1,
+    stdout: "",
+    stderr: glibcError,
+    error: undefined,
+  })) as typeof import("node:child_process").spawnSync;
+
+  assert.deepEqual(validateRtkBinary("/tmp/rtk", { spawnSyncImpl: failingSpawn }), {
+    valid: false,
+    error: glibcError,
+  });
 });
 
 test("ensureRtkAvailable respects explicit disable and skip flags without downloading", async () => {

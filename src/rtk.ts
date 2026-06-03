@@ -244,18 +244,33 @@ export interface ValidateRtkBinaryOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-export function validateRtkBinary(binaryPath: string, options: ValidateRtkBinaryOptions = {}): boolean {
+export type ValidateRtkBinaryResult = { valid: true } | { valid: false; error: string };
+
+function trimSpawnOutput(output: string | Buffer | null | undefined): string {
+  return output?.toString().trim() ?? "";
+}
+
+export function validateRtkBinary(binaryPath: string, options: ValidateRtkBinaryOptions = {}): ValidateRtkBinaryResult {
   const run = options.spawnSyncImpl ?? spawnSync;
   const result = run(binaryPath, ["rewrite", "git status"], {
     encoding: "utf-8",
     env: buildRtkEnv(options.env ?? process.env),
-    stdio: ["ignore", "pipe", "ignore"],
+    stdio: ["ignore", "pipe", "pipe"],
     timeout: RTK_REWRITE_TIMEOUT_MS,
   });
 
-  if (result.error) return false;
-  if (result.status !== 0) return false;
-  return (result.stdout ?? "").trim() === "rtk git status";
+  if (result.error) return { valid: false, error: result.error.message };
+  if (result.status !== 0) {
+    const stderr = trimSpawnOutput(result.stderr);
+    return { valid: false, error: stderr || `exit code ${result.status ?? "unknown"}` };
+  }
+
+  const stdout = trimSpawnOutput(result.stdout);
+  if (stdout !== "rtk git status") {
+    return { valid: false, error: stdout ? `unexpected output: ${stdout}` : "unexpected empty output" };
+  }
+
+  return { valid: true };
 }
 
 export async function ensureRtkAvailable(options: EnsureRtkOptions = {}): Promise<EnsureRtkResult> {
@@ -274,13 +289,19 @@ export async function ensureRtkAvailable(options: EnsureRtkOptions = {}): Promis
   const targetDir = options.targetDir ?? getManagedRtkDir(env);
   const managedPath = getManagedRtkPath(process.platform, targetDir);
 
-  if (existsSync(managedPath) && validateRtkBinary(managedPath, { env })) {
-    return { enabled: true, supported: true, available: true, source: "managed", binaryPath: managedPath };
+  if (existsSync(managedPath)) {
+    const managedValidation = validateRtkBinary(managedPath, { env });
+    if (managedValidation.valid) {
+      return { enabled: true, supported: true, available: true, source: "managed", binaryPath: managedPath };
+    }
   }
 
   const systemPath = resolveSystemRtkPath(options.pathValue ?? getPathValue(env));
-  if (systemPath && validateRtkBinary(systemPath, { env })) {
-    return { enabled: true, supported: true, available: true, source: "system", binaryPath: systemPath };
+  if (systemPath) {
+    const systemValidation = validateRtkBinary(systemPath, { env });
+    if (systemValidation.valid) {
+      return { enabled: true, supported: true, available: true, source: "system", binaryPath: systemPath };
+    }
   }
 
   const version = options.releaseVersion ?? RTK_VERSION;
@@ -336,9 +357,10 @@ export async function ensureRtkAvailable(options: EnsureRtkOptions = {}): Promis
       chmodSync(managedPath, 0o755);
     }
 
-    if (!validateRtkBinary(managedPath, { env })) {
+    const downloadedValidation = validateRtkBinary(managedPath, { env });
+    if (!downloadedValidation.valid) {
       rmSync(managedPath, { force: true });
-      throw new Error("downloaded RTK binary failed validation");
+      throw new Error(`downloaded RTK binary failed validation: ${downloadedValidation.error}`);
     }
 
     options.log?.(`installed RTK ${version} to ${managedPath}`);
