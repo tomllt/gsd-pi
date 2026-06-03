@@ -58,4 +58,15 @@ describe("models.generated.ts", () => {
 			});
 		}
 	});
+
+	test("keeps GitHub Copilot Claude 4.6 context at Copilot's 200K limit", () => {
+		for (const id of ["claude-opus-4.6", "claude-sonnet-4.6"] as const) {
+			const model = MODELS["github-copilot"][id];
+
+			expect(model.provider).toBe("github-copilot");
+			expect(model.api).toBe("anthropic-messages");
+			expect(model.contextWindow).toBe(200000);
+			expect(model.maxTokens).toBe(32000);
+		}
+	});
 });

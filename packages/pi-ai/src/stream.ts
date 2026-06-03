@@ -1,6 +1,6 @@
 import "./providers/register-builtins.js";
 
-import { getApiProvider } from "./api-registry.js";
+import { getApiProviderForModel } from "./api-registry.js";
 import type {
 	Api,
 	AssistantMessage,
@@ -14,10 +14,10 @@ import type {
 
 export { getEnvApiKey } from "./env-api-keys.js";
 
-function resolveApiProvider(api: Api) {
-	const provider = getApiProvider(api);
+function resolveApiProvider(model: Model<Api>) {
+	const provider = getApiProviderForModel(model);
 	if (!provider) {
-		throw new Error(`No API provider registered for api: ${api}`);
+		throw new Error(`No API provider registered for provider/api: ${model.provider}/${model.api}`);
 	}
 	return provider;
 }
@@ -27,7 +27,7 @@ export function stream<TApi extends Api>(
 	context: Context,
 	options?: ProviderStreamOptions,
 ): AssistantMessageEventStream {
-	const provider = resolveApiProvider(model.api);
+	const provider = resolveApiProvider(model);
 	return provider.stream(model, context, options as StreamOptions);
 }
 
@@ -45,7 +45,7 @@ export function streamSimple<TApi extends Api>(
 	context: Context,
 	options?: SimpleStreamOptions,
 ): AssistantMessageEventStream {
-	const provider = resolveApiProvider(model.api);
+	const provider = resolveApiProvider(model);
 	return provider.streamSimple(model, context, options);
 }
 

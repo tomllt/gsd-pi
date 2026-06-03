@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AnthropicMessagesCompat, Api, Context, Model, OpenAICompletionsCompat } from "@earendil-works/pi-ai";
-import { getApiProvider } from "@earendil-works/pi-ai";
+import { getApiProvider, streamSimple } from "@earendil-works/pi-ai";
 import { getOAuthProvider } from "@earendil-works/pi-ai/oauth";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AuthStorage } from "../src/core/auth-storage.ts";
@@ -1025,34 +1025,42 @@ describe("ModelRegistry", () => {
 			expect(getOAuthProvider("anthropic")?.name).not.toBe("Custom Anthropic OAuth");
 		});
 
-		test("unregisterProvider removes custom streamSimple override and restores built-in API stream handler", () => {
+		test("provider streamSimple is scoped to that provider and removed on unregister", () => {
 			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
 
 			registry.registerProvider("stream-override-provider", {
 				api: "openai-completions",
+				baseUrl: "https://provider.test/v1",
+				apiKey: "TEST_KEY",
+				models: [
+					{
+						id: "scoped-model",
+						name: "Scoped Model",
+						reasoning: false,
+						input: ["text"],
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+						contextWindow: 128000,
+						maxTokens: 4096,
+					},
+				],
 				streamSimple: () => {
 					throw new Error("custom streamSimple override");
 				},
 			});
 
-			let threwCustomOverride = false;
-			try {
-				getApiProvider("openai-completions")?.streamSimple(openAiModel, emptyContext);
-			} catch (error) {
-				threwCustomOverride = error instanceof Error && error.message === "custom streamSimple override";
+			const scopedModel = registry.find("stream-override-provider", "scoped-model");
+			if (!scopedModel) {
+				throw new Error("Expected scoped model to be registered");
 			}
-			expect(threwCustomOverride).toBe(true);
+
+			expect(() => streamSimple(scopedModel, emptyContext)).toThrow("custom streamSimple override");
+			expect(() => getApiProvider("openai-completions")?.streamSimple(openAiModel, emptyContext)).not.toThrow(
+				"custom streamSimple override",
+			);
 
 			registry.unregisterProvider("stream-override-provider");
 
-			let threwCustomOverrideAfterUnregister = false;
-			try {
-				getApiProvider("openai-completions")?.streamSimple(openAiModel, emptyContext);
-			} catch (error) {
-				threwCustomOverrideAfterUnregister =
-					error instanceof Error && error.message === "custom streamSimple override";
-			}
-			expect(threwCustomOverrideAfterUnregister).toBe(false);
+			expect(() => streamSimple(scopedModel, emptyContext)).not.toThrow("custom streamSimple override");
 		});
 
 		describe("dynamic provider override persistence", () => {

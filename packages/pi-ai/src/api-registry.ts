@@ -38,6 +38,11 @@ type RegisteredApiProvider = {
 };
 
 const apiProviderRegistry = new Map<string, RegisteredApiProvider>();
+const providerApiProviderRegistry = new Map<string, RegisteredApiProvider>();
+
+function providerApiKey(provider: string, api: Api): string {
+	return JSON.stringify([provider, api]);
+}
 
 function wrapStream<TApi extends Api, TOptions extends StreamOptions>(
 	api: TApi,
@@ -77,8 +82,29 @@ export function registerApiProvider<TApi extends Api, TOptions extends StreamOpt
 	});
 }
 
+export function registerProviderApiProvider<TApi extends Api, TOptions extends StreamOptions>(
+	providerName: string,
+	provider: ApiProvider<TApi, TOptions>,
+	sourceId?: string,
+): void {
+	providerApiProviderRegistry.set(providerApiKey(providerName, provider.api), {
+		provider: {
+			api: provider.api,
+			stream: wrapStream(provider.api, provider.stream),
+			streamSimple: wrapStreamSimple(provider.api, provider.streamSimple),
+		},
+		sourceId,
+	});
+}
+
 export function getApiProvider(api: Api): ApiProviderInternal | undefined {
 	return apiProviderRegistry.get(api)?.provider;
+}
+
+export function getApiProviderForModel(model: Model<Api>): ApiProviderInternal | undefined {
+	return (
+		providerApiProviderRegistry.get(providerApiKey(model.provider, model.api))?.provider ?? getApiProvider(model.api)
+	);
 }
 
 export function getApiProviders(): ApiProviderInternal[] {
@@ -91,8 +117,14 @@ export function unregisterApiProviders(sourceId: string): void {
 			apiProviderRegistry.delete(api);
 		}
 	}
+	for (const [key, entry] of providerApiProviderRegistry.entries()) {
+		if (entry.sourceId === sourceId) {
+			providerApiProviderRegistry.delete(key);
+		}
+	}
 }
 
 export function clearApiProviders(): void {
 	apiProviderRegistry.clear();
+	providerApiProviderRegistry.clear();
 }

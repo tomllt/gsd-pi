@@ -14,7 +14,7 @@ import {
 	type OAuthProviderInterface,
 	type OpenAICompletionsCompat,
 	type OpenAIResponsesCompat,
-	registerApiProvider,
+	registerProviderApiProvider,
 	resetApiProviders,
 	type SimpleStreamOptions,
 } from "@gsd/pi-ai";
@@ -911,7 +911,8 @@ export class ModelRegistry {
 
 		if (config.streamSimple) {
 			const streamSimple = config.streamSimple;
-			registerApiProvider(
+			registerProviderApiProvider(
+				providerName,
 				{
 					api: config.api!,
 					stream: (model, context, options) => streamSimple(model, context, options as SimpleStreamOptions),

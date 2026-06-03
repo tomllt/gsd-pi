@@ -4137,7 +4137,7 @@ export const MODELS = {
 				cacheRead: 0,
 				cacheWrite: 0,
 			},
-			contextWindow: 1000000,
+			contextWindow: 200000,
 			maxTokens: 32000,
 		} satisfies Model<"anthropic-messages">,
 		"claude-opus-4.7": {
@@ -4215,7 +4215,7 @@ export const MODELS = {
 				cacheRead: 0,
 				cacheWrite: 0,
 			},
-			contextWindow: 1000000,
+			contextWindow: 200000,
 			maxTokens: 32000,
 		} satisfies Model<"anthropic-messages">,
 		"gemini-2.5-pro": {
