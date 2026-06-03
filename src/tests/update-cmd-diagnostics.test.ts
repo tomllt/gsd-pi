@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 import { runUpdate } from "../update-cmd.ts";
 import { handleUpdate } from "../resources/extensions/gsd/commands-handlers.ts";
+import { GSD_BROWSER_PACKAGE_NAME, resolveInstalledPackageVersion } from "../update-check.js";
 
 test("update-cmd prints latest version before comparison (#3445)", async (t) => {
   const originalFetch = globalThis.fetch;
@@ -82,6 +83,31 @@ test("update-cmd refreshes managed resources when already up to date (#52)", asy
   const manifest = JSON.parse(readFileSync(join(fakeAgentDir, "managed-resources.json"), "utf-8"));
   assert.equal(manifest.gsdVersion, "1.0.1");
   assert.equal(manifest.packageName, "@opengsd/gsd-pi");
+});
+
+test("update-cmd supports browser-only update checks", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalStdoutWrite = process.stdout.write;
+  const writes: string[] = [];
+  const browserVersion = resolveInstalledPackageVersion(GSD_BROWSER_PACKAGE_NAME) ?? "0.1.27";
+
+  try {
+    globalThis.fetch = async () => Response.json({ version: browserVersion });
+    (process.stdout as any).write = (chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    };
+
+    await runUpdate({ target: "browser" });
+  } finally {
+    globalThis.fetch = originalFetch;
+    (process.stdout as any).write = originalStdoutWrite;
+  }
+
+  const output = writes.join("");
+  assert.match(output, /Current gsd-browser version:/);
+  assert.match(output, /Latest gsd-browser version:/);
+  assert.match(output, /gsd-browser is already up to date/);
 });
 
 test("update-check exports resolveInstallCommand (#4145)", async () => {
@@ -209,6 +235,33 @@ test("/gsd update handler fetches latest version through the registry endpoint (
   }
 
   assert.deepEqual(fetchUrls, ["https://registry.npmjs.org/@opengsd%2fgsd-pi/latest"]);
+  assert.ok(notifications.some((notification) => notification.message.includes("Already up to date")));
+});
+
+test("/gsd update browser handler fetches latest gsd-browser version", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchUrls: string[] = [];
+  const notifications: Array<{ message: string; level: string }> = [];
+  const browserVersion = resolveInstalledPackageVersion(GSD_BROWSER_PACKAGE_NAME) ?? "0.1.27";
+
+  try {
+    globalThis.fetch = async (input) => {
+      fetchUrls.push(String(input));
+      return Response.json({ version: browserVersion });
+    };
+
+    await handleUpdate({
+      ui: {
+        notify(message: string, level: string) {
+          notifications.push({ message, level });
+        },
+      },
+    } as any, "browser");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.deepEqual(fetchUrls, ["https://registry.npmjs.org/@opengsd%2fgsd-browser/latest"]);
   assert.ok(notifications.some((notification) => notification.message.includes("Already up to date")));
 });
 

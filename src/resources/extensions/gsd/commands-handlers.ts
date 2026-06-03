@@ -7,6 +7,7 @@
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, resolve as resolvePath, sep } from "node:path";
 import { homedir } from "node:os";
 import { deriveState } from "./state.js";
@@ -37,7 +38,10 @@ import {
   scopeGsdWorkflowToolsForDispatch,
 } from "./bootstrap/register-hooks.js";
 
+const GSD_PI_PACKAGE = "@opengsd/gsd-pi";
+const GSD_BROWSER_PACKAGE = "@opengsd/gsd-browser";
 const UPDATE_REGISTRY_URL = "https://registry.npmjs.org/@opengsd%2fgsd-pi/latest";
+const BROWSER_UPDATE_REGISTRY_URL = "https://registry.npmjs.org/@opengsd%2fgsd-browser/latest";
 const UPDATE_FETCH_TIMEOUT_MS = 5000;
 
 // Detects a bun-installed gsd via `process.argv[1]`. Mirrors isBunInstall in
@@ -62,12 +66,12 @@ function resolveInstallCommand(pkg: string): string {
   return `npm install -g ${pkg}`;
 }
 
-async function fetchLatestVersionForCommand(): Promise<string | null> {
+async function fetchLatestVersionForCommand(registryUrl: string = UPDATE_REGISTRY_URL): Promise<string | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPDATE_FETCH_TIMEOUT_MS);
 
   try {
-    const res = await fetch(UPDATE_REGISTRY_URL, { signal: controller.signal });
+    const res = await fetch(registryUrl, { signal: controller.signal });
     if (!res.ok) return null;
     const data = (await res.json()) as { version?: string };
     const latest = typeof data.version === "string" ? data.version.trim().replace(/^v/, "") : "";
@@ -76,6 +80,19 @@ async function fetchLatestVersionForCommand(): Promise<string | null> {
     return null;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+function resolveInstalledPackageVersionForCommand(packageName: string): string | null {
+  try {
+    const requireFromHere = createRequire(import.meta.url);
+    const packageJsonPath = requireFromHere.resolve(`${packageName}/package.json`);
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as { version?: unknown };
+    return typeof pkg.version === "string" && pkg.version.trim().length > 0
+      ? pkg.version.trim().replace(/^v/, "")
+      : null;
+  } catch {
+    return null;
   }
 }
 
@@ -473,26 +490,41 @@ function compareSemverLocal(a: string, b: string): number {
   return 0
 }
 
-export async function handleUpdate(ctx: ExtensionCommandContext): Promise<void> {
+function formatCommandVersion(version: string | null): string {
+  return version ? `v${version}` : "unknown";
+}
+
+export async function handleUpdate(ctx: ExtensionCommandContext, args = ""): Promise<void> {
   const { execSync } = await import("node:child_process");
 
-  const NPM_PACKAGE = "@opengsd/gsd-pi";
-  const current = process.env.GSD_VERSION || "0.0.0";
+  const target = args.trim();
+  const browserUpdate = target === "browser" || target === "gsd-browser";
+  if (target && !browserUpdate) {
+    ctx.ui.notify("Usage: /gsd update [browser]", "warning");
+    return;
+  }
 
-  ctx.ui.notify(`Current version: v${current}\nChecking npm registry...`, "info");
+  const NPM_PACKAGE = browserUpdate ? GSD_BROWSER_PACKAGE : GSD_PI_PACKAGE;
+  const registryUrl = browserUpdate ? BROWSER_UPDATE_REGISTRY_URL : UPDATE_REGISTRY_URL;
+  const current = browserUpdate
+    ? resolveInstalledPackageVersionForCommand(GSD_BROWSER_PACKAGE)
+    : process.env.GSD_VERSION || "0.0.0";
+  const label = browserUpdate ? "gsd-browser version" : "version";
 
-  const latest = await fetchLatestVersionForCommand();
+  ctx.ui.notify(`Current ${label}: ${formatCommandVersion(current)}\nChecking npm registry...`, "info");
+
+  const latest = await fetchLatestVersionForCommand(registryUrl);
   if (!latest) {
     ctx.ui.notify("Failed to reach npm registry. Check your network connection.", "error");
     return;
   }
 
-  if (compareSemverLocal(latest, current) <= 0) {
-    ctx.ui.notify(`Already up to date (v${current}).`, "info");
+  if (current && compareSemverLocal(latest, current) <= 0) {
+    ctx.ui.notify(`Already up to date (${formatCommandVersion(current)}).`, "info");
     return;
   }
 
-  ctx.ui.notify(`Updating: v${current} → v${latest}...`, "info");
+  ctx.ui.notify(`Updating: ${formatCommandVersion(current)} → v${latest}...`, "info");
 
   const installCmd = resolveInstallCommand(`${NPM_PACKAGE}@latest`);
   try {
@@ -500,7 +532,9 @@ export async function handleUpdate(ctx: ExtensionCommandContext): Promise<void> 
       stdio: ["ignore", "pipe", "ignore"],
     });
     ctx.ui.notify(
-      `Updated to v${latest}. Restart your GSD session to use the new version.`,
+      browserUpdate
+        ? `Updated gsd-browser to v${latest}. Restart your GSD session to use the new browser automation version.`
+        : `Updated to v${latest}. Restart your GSD session to use the new version.`,
       "info",
     );
   } catch {

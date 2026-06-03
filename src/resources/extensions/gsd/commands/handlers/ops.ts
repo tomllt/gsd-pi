@@ -282,8 +282,8 @@ Examples:
     await handleInspect(ctx);
     return true;
   }
-  if (trimmed === "update" || trimmed === "upgrade") {
-    await handleUpdate(ctx);
+  if (trimmed === "update" || trimmed.startsWith("update ") || trimmed === "upgrade" || trimmed.startsWith("upgrade ")) {
+    await handleUpdate(ctx, trimmed.replace(/^(?:update|upgrade)\s*/, "").trim());
     return true;
   }
   if (trimmed === "fast" || trimmed.startsWith("fast ")) {

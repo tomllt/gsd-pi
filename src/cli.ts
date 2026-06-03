@@ -13,7 +13,7 @@ import { loadStoredEnvKeys } from './wizard.js'
 import { migratePiCredentials } from './pi-migration.js'
 import { shouldRunOnboarding, runOnboarding } from './onboarding.js'
 import chalk from 'chalk'
-import { checkForUpdates } from './update-check.js'
+import { checkForGsdBrowserUpdates, checkForUpdates } from './update-check.js'
 import { shouldBypassManagedResourceMismatchGate } from './cli-policy.js'
 import { shouldRedirectAutoToHeadless } from './cli-auto-routing.js'
 import { printHelp, printSubcommandHelp } from './help-text.js'
@@ -246,7 +246,7 @@ function ensureRtkBootstrap(): Promise<void> {
 // actually upgrade out of the broken state. See shouldBypassManagedResourceMismatchGate.
 if (shouldBypassManagedResourceMismatchGate(cliFlags.messages[0])) {
   const { runUpdate } = await import('./update-cmd.js')
-  await runUpdate()
+  await runUpdate({ target: cliFlags.messages[1] })
   process.exit(0)
 }
 
@@ -616,6 +616,7 @@ if (!isPrintMode && shouldRunOnboarding(authStorage, settingsManager.getDefaultP
 // available (using cached data or a background fetch) without blocking the TUI.
 if (!isPrintMode) {
   checkForUpdates().catch(() => {})
+  checkForGsdBrowserUpdates().catch(() => {})
 }
 
 // Warn if terminal is too narrow for readable output

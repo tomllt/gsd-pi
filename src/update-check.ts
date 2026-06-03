@@ -2,17 +2,23 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { dirname, join, resolve as resolvePath, sep } from 'node:path'
 import { homedir } from 'node:os'
+import { createRequire } from 'node:module'
 import chalk from 'chalk'
 import { appRoot } from './app-paths.js'
 import { isPnpmInstall } from './resources/shared/package-manager-detection.js'
 
 export { isPnpmInstall }
 
+export const GSD_PI_PACKAGE_NAME = '@opengsd/gsd-pi'
+export const GSD_BROWSER_PACKAGE_NAME = '@opengsd/gsd-browser'
+
 const CACHE_FILE = join(appRoot, '.update-check')
-const NPM_PACKAGE_NAME = '@opengsd/gsd-pi'
+const GSD_BROWSER_CACHE_FILE = join(appRoot, '.update-check-gsd-browser')
+const NPM_PACKAGE_NAME = GSD_PI_PACKAGE_NAME
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 hours
 const FETCH_TIMEOUT_MS = 5000
-const DEFAULT_REGISTRY_URL = `https://registry.npmjs.org/@opengsd%2fgsd-pi/latest`
+export const DEFAULT_REGISTRY_URL = `https://registry.npmjs.org/@opengsd%2fgsd-pi/latest`
+export const GSD_BROWSER_REGISTRY_URL = `https://registry.npmjs.org/@opengsd%2fgsd-browser/latest`
 
 interface UpdateCheckCache {
   lastCheck: number
@@ -65,6 +71,17 @@ function normalizeLatestVersion(version: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
+export function resolveInstalledPackageVersion(packageName: string): string | null {
+  try {
+    const requireFromHere = createRequire(import.meta.url)
+    const packageJsonPath = requireFromHere.resolve(`${packageName}/package.json`)
+    const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { version?: unknown }
+    return normalizeLatestVersion(pkg.version)
+  } catch {
+    return null
+  }
+}
+
 export async function fetchLatestVersionFromRegistry(
   registryUrl: string = DEFAULT_REGISTRY_URL,
   fetchTimeoutMs: number = FETCH_TIMEOUT_MS,
@@ -115,8 +132,16 @@ export function resolveInstallCommand(
   return `npm install -g ${pkg}`
 }
 
-function printUpdateBanner(current: string, latest: string): void {
-  const installCmd = resolveInstallCommand('@opengsd/gsd-pi@latest')
+function printUpdateBanner(current: string, latest: string, packageName: string = GSD_PI_PACKAGE_NAME): void {
+  if (packageName === GSD_BROWSER_PACKAGE_NAME) {
+    process.stderr.write(
+      `  ${chalk.yellow('gsd-browser update available:')} ${chalk.dim(`v${current}`)} → ${chalk.bold(`v${latest}`)}\n` +
+      `  ${chalk.dim('Run')} gsd update browser ${chalk.dim('to upgrade browser automation')}\n\n`,
+    )
+    return
+  }
+
+  const installCmd = resolveInstallCommand(`${GSD_PI_PACKAGE_NAME}@latest`)
   process.stderr.write(
     `  ${chalk.yellow('Update available:')} ${chalk.dim(`v${current}`)} → ${chalk.bold(`v${latest}`)}\n` +
     `  ${chalk.dim('Run')} ${installCmd} ${chalk.dim('or')} /gsd upgrade ${chalk.dim('to upgrade')}\n\n`,
@@ -124,12 +149,28 @@ function printUpdateBanner(current: string, latest: string): void {
 }
 
 export interface UpdateCheckOptions {
+  packageName?: string
   currentVersion?: string
   cachePath?: string
   registryUrl?: string
   checkIntervalMs?: number
   fetchTimeoutMs?: number
-  onUpdate?: (current: string, latest: string) => void
+  onUpdate?: (current: string, latest: string, packageName: string) => void
+}
+
+function defaultCurrentVersion(packageName: string): string | null {
+  if (packageName === GSD_PI_PACKAGE_NAME) {
+    return process.env.GSD_VERSION || '0.0.0'
+  }
+  return resolveInstalledPackageVersion(packageName)
+}
+
+function defaultCachePath(packageName: string): string {
+  return packageName === GSD_BROWSER_PACKAGE_NAME ? GSD_BROWSER_CACHE_FILE : CACHE_FILE
+}
+
+function defaultRegistryUrl(packageName: string): string {
+  return packageName === GSD_BROWSER_PACKAGE_NAME ? GSD_BROWSER_REGISTRY_URL : DEFAULT_REGISTRY_URL
 }
 
 /**
@@ -137,18 +178,21 @@ export interface UpdateCheckOptions {
  * caches the result, and prints a banner if a newer version is available.
  */
 export async function checkForUpdates(options: UpdateCheckOptions = {}): Promise<void> {
-  const currentVersion = options.currentVersion || process.env.GSD_VERSION || '0.0.0'
-  const cachePath = options.cachePath || CACHE_FILE
-  const registryUrl = options.registryUrl || DEFAULT_REGISTRY_URL
+  const packageName = options.packageName || GSD_PI_PACKAGE_NAME
+  const currentVersion = options.currentVersion || defaultCurrentVersion(packageName)
+  if (!currentVersion) return
+
+  const cachePath = options.cachePath || defaultCachePath(packageName)
+  const registryUrl = options.registryUrl || defaultRegistryUrl(packageName)
   const checkIntervalMs = options.checkIntervalMs ?? CHECK_INTERVAL_MS
   const fetchTimeoutMs = options.fetchTimeoutMs ?? FETCH_TIMEOUT_MS
   const onUpdate = options.onUpdate || printUpdateBanner
 
   // Check cache — skip network if checked recently
-  const cache = readUpdateCache(cachePath)
+  const cache = readUpdateCache(cachePath, packageName)
   if (cache && Date.now() - cache.lastCheck < checkIntervalMs) {
     if (compareSemver(cache.latestVersion, currentVersion) > 0) {
-      onUpdate(currentVersion, cache.latestVersion)
+      onUpdate(currentVersion, cache.latestVersion, packageName)
     }
     return
   }
@@ -157,14 +201,21 @@ export async function checkForUpdates(options: UpdateCheckOptions = {}): Promise
     const latestVersion = await fetchLatestVersionFromRegistry(registryUrl, fetchTimeoutMs)
     if (!latestVersion) return
 
-    writeUpdateCache({ lastCheck: Date.now(), latestVersion }, cachePath)
+    writeUpdateCache({ lastCheck: Date.now(), latestVersion }, cachePath, packageName)
 
     if (compareSemver(latestVersion, currentVersion) > 0) {
-      onUpdate(currentVersion, latestVersion)
+      onUpdate(currentVersion, latestVersion, packageName)
     }
   } catch {
     // Network error or timeout — silently ignore, don't block startup
   }
+}
+
+export async function checkForGsdBrowserUpdates(options: UpdateCheckOptions = {}): Promise<void> {
+  await checkForUpdates({
+    ...options,
+    packageName: GSD_BROWSER_PACKAGE_NAME,
+  })
 }
 
 const PROMPT_TIMEOUT_MS = 30_000

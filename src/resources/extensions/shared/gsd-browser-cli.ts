@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +37,57 @@ function sanitizeSessionSegment(value: string): string {
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
+}
+
+function compareSemverLocal(a: string, b: string): number {
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const leftValue = left[index] || 0;
+    const rightValue = right[index] || 0;
+    if (leftValue > rightValue) return 1;
+    if (leftValue < rightValue) return -1;
+  }
+  return 0;
+}
+
+function parseGsdBrowserVersion(output: string): string | null {
+  return output.match(/\b(\d+\.\d+\.\d+)\b/)?.[1] ?? null;
+}
+
+function resolveBundledGsdBrowserPackageVersion(): string | null {
+  try {
+    const requireFromHere = createRequire(import.meta.url);
+    const packageJsonPath = requireFromHere.resolve("@opengsd/gsd-browser/package.json");
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as { version?: unknown };
+    return typeof pkg.version === "string" ? parseGsdBrowserVersion(pkg.version) : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePathGsdBrowserVersion(env: NodeJS.ProcessEnv): string | null {
+  const explicit = env.GSD_BROWSER_PATH_VERSION?.trim();
+  if (explicit) return parseGsdBrowserVersion(explicit);
+
+  try {
+    return parseGsdBrowserVersion(execFileSync("gsd-browser", ["--version"], {
+      encoding: "utf-8",
+      env,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 2000,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+function shouldPreferPathGsdBrowser(env: NodeJS.ProcessEnv): boolean {
+  const pathVersion = resolvePathGsdBrowserVersion(env);
+  if (!pathVersion) return false;
+
+  const bundledVersion = resolveBundledGsdBrowserPackageVersion();
+  return !bundledVersion || compareSemverLocal(pathVersion, bundledVersion) > 0;
 }
 
 export function resolveBundledGsdBrowserCliPath(env: NodeJS.ProcessEnv = process.env): string | null {
@@ -82,12 +134,16 @@ export function resolveGsdBrowserMcpLaunchConfig(
   const explicitEnv = parseJsonEnv<Record<string, string>>(env, "GSD_BROWSER_MCP_ENV");
   const explicitCommand = env.GSD_BROWSER_MCP_COMMAND?.trim();
   const explicitCliPath = env.GSD_BROWSER_CLI_PATH?.trim() || env.GSD_BROWSER_BIN_PATH?.trim();
-  const bundledCliPath = !explicitCommand && !explicitCliPath ? resolveBundledGsdBrowserCliPath(env) : null;
+  const preferPathCli = !explicitCommand && !explicitCliPath && shouldPreferPathGsdBrowser(env);
+  const bundledCliPath = !explicitCommand && !explicitCliPath && !preferPathCli
+    ? resolveBundledGsdBrowserCliPath(env)
+    : null;
   const sessionName =
     options.sessionName?.trim() || buildGsdBrowserSessionName(resolvedProjectRoot, options.sessionSuffix);
   const command =
     explicitCommand
     || explicitCliPath
+    || (preferPathCli ? "gsd-browser" : undefined)
     || (bundledCliPath ? process.execPath : undefined)
     || "gsd-browser";
   const args = Array.isArray(explicitArgs) && explicitArgs.length > 0

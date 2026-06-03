@@ -22,19 +22,23 @@ const SUBCOMMAND_HELP: Record<string, string> = {
   ].join('\n'),
 
   update: [
-    'Usage: gsd update',
+    'Usage: gsd update [browser]',
     '',
-    'Update GSD to the latest version.',
+    'Update GSD to the latest version, or update browser automation only.',
     '',
-    'Equivalent to: npm install -g @opengsd/gsd-pi@latest',
+    'Examples:',
+    '  gsd update',
+    '  gsd update browser',
   ].join('\n'),
 
   upgrade: [
-    'Usage: gsd upgrade',
+    'Usage: gsd upgrade [browser]',
     '',
-    'Upgrade GSD to the latest @opengsd package.',
+    'Alias for update. Upgrade GSD, or upgrade browser automation only.',
     '',
-    'Equivalent to: npm install -g @opengsd/gsd-pi@latest',
+    'Examples:',
+    '  gsd upgrade',
+    '  gsd upgrade browser',
   ].join('\n'),
 
   sessions: [

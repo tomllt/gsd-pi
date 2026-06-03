@@ -103,6 +103,7 @@
     "gsd:web": "pnpm run build:contracts && pnpm run build:pi && pnpm run copy-resources && node scripts/build-web-if-stale.cjs && node scripts/dev-cli.js --web",
     "gsd:web:stop": "node scripts/dev-cli.js web stop",
     "gsd:web:stop:all": "node scripts/dev-cli.js web stop all",
+    "update:gsd-browser": "node scripts/update-gsd-browser-local.mjs",
     "postinstall": "node scripts/install.js",
     "pi:install-global": "node scripts/install-pi-global.js",
     "pi:uninstall-global": "node scripts/uninstall-pi-global.js",

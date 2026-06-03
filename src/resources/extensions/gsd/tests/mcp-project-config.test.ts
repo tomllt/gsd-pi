@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
+  buildProjectBrowserMcpServerConfig,
   ensureClaudeCodeMcpJsonServerEnabled,
   ensureProjectWorkflowMcpConfig,
   GSD_BROWSER_MCP_SERVER_NAME,
@@ -155,6 +156,37 @@ test("ensureProjectWorkflowMcpConfig can disable the default browser MCP server"
       enabledMcpjsonServers?: string[];
     };
     assert.deepEqual(settings.enabledMcpjsonServers, [GSD_WORKFLOW_MCP_SERVER_NAME]);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("buildProjectBrowserMcpServerConfig prefers newer gsd-browser on PATH", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-browser-"));
+
+  try {
+    const config = buildProjectBrowserMcpServerConfig(projectRoot, {
+      GSD_BROWSER_PATH_VERSION: "99.0.0",
+    });
+
+    assert.equal(config?.command, "gsd-browser");
+    assert.equal(config?.args?.[0], "mcp");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("buildProjectBrowserMcpServerConfig keeps bundled browser when PATH version is older", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "gsd-mcp-browser-"));
+
+  try {
+    const config = buildProjectBrowserMcpServerConfig(projectRoot, {
+      GSD_BROWSER_PATH_VERSION: "0.0.1",
+    });
+
+    assert.equal(config?.command, process.execPath);
+    assert.match(config?.args?.[0] ?? "", /@opengsd[\/\\]gsd-browser[\/\\]bin[\/\\]gsd-browser/);
+    assert.equal(config?.args?.[1], "mcp");
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }
