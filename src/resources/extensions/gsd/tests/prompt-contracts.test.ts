@@ -475,6 +475,27 @@ test("reactive-execute prompt references tool calls instead of checkbox updates"
   assert.match(prompt, /completion tool calls/);
 });
 
+test("parallel subagent prompts forbid serialized tasks arrays", () => {
+  const expectations = [
+    { name: "reactive-execute", agent: "worker" },
+    { name: "parallel-research-slices", agent: "scout" },
+    { name: "gate-evaluate", agent: "tester" },
+  ] as const;
+
+  for (const { name, agent } of expectations) {
+    const prompt = readPrompt(name);
+    assert.match(prompt, /tasks:\s*\[\.\.\.\]/, `${name} must show the native array placeholder`);
+    assert.match(prompt, /native JSON array/i, `${name} must explicitly require a native JSON array`);
+    assert.match(prompt, /Do NOT JSON\.stringify/i, `${name} must forbid JSON.stringify on tasks`);
+    assert.match(prompt, /must be array/i, `${name} must mention the subagent validation failure`);
+    assert.match(
+      prompt,
+      new RegExp(`tasks:\\s*\\[\\{\\s*agent:\\s*"${agent}"`, "i"),
+      `${name} must show the concrete ${agent} task call shape`,
+    );
+  }
+});
+
 // ─── Project-shape classifier + 3-or-4-options-with-Other-hatch contract ──
 
 test("guided-discuss-project classifies project shape and persists the verdict to PROJECT.md", () => {

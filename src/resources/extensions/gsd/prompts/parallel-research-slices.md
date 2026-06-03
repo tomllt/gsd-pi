@@ -12,9 +12,11 @@ You are dispatching parallel research agents for **{{sliceCount}} slices** in mi
 
 Dispatch ALL slices simultaneously using the `subagent` tool in **parallel mode**. Each subagent will independently research its slice and write a RESEARCH file.
 
+**Tool call format:** Call `subagent` with `tasks: [...]` as a **native JSON array** — one object per slice. Do NOT JSON.stringify the array into a string; the tool validates that `tasks` is an array, and a serialized string will be rejected with "must be array".
+
 ## Execution Protocol
 
-1. Call `subagent` with `tasks: [...]` containing one entry per slice below
+1. Call `subagent` with `tasks: [{ agent: "scout", task: "<prompt>" }, ...]` containing one entry per slice below
 2. Wait for ALL subagents to complete
 3. Verify each slice's RESEARCH file was written (check `.gsd/milestones/{{mid}}/slices/<slice-id>/`)
 4. If a subagent failed to write its RESEARCH file, retry it **once** individually

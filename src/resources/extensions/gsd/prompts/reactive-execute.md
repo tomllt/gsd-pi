@@ -10,6 +10,8 @@ You are executing **multiple tasks in parallel** for this slice. The task graph 
 
 **Critical rule:** Use the `subagent` tool in **parallel mode** to dispatch all ready tasks simultaneously. Each subagent gets a task-specific execution packet (task plan + dependency carry-forward + completion contract) and is responsible for its own implementation, verification, task summary, and completion tool calls. The parent batch agent orchestrates, verifies, and records failures only when a dispatched task failed before it could leave its own summary behind.
 
+**Tool call format:** Call `subagent` with `tasks: [...]` as a **native JSON array** — one object per ready task. Do NOT JSON.stringify the array into a string; the tool validates that `tasks` is an array, and a serialized string will be rejected with "must be array".
+
 ## Task Dependency Graph
 
 {{graphContext}}
@@ -22,7 +24,7 @@ You are executing **multiple tasks in parallel** for this slice. The task graph 
 
 ## Execution Protocol
 
-1. **Dispatch all ready tasks** using `subagent` in parallel mode. Each subagent prompt is provided below.
+1. **Dispatch all ready tasks** using `subagent` in parallel mode. Call `subagent` with `tasks: [{ agent: "worker", task: "<prompt>" }, ...]` — one object per ready task. Each subagent prompt is provided below.
 2. **Wait for all subagents** to complete.
 3. **Verify each dispatched task's outputs** — check that expected files were created/modified, that verification commands pass where applicable, and that each task wrote its own `T##-SUMMARY.md`.
 4. **Do not rewrite successful task summaries or duplicate completion tool calls.** Treat a subagent-written summary as authoritative for that task.
