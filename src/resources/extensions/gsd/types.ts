@@ -707,7 +707,8 @@ export interface CompleteSliceParams {
   sliceTitle: string;
   oneLiner: string;
   narrative: string;
-  verification: string;
+  /** @optional — if omitted, verification section is left blank in summary */
+  verification?: string;
   uatContent: string;
   /** @optional — defaults to [] when omitted by models with limited tool-calling */
   keyFiles?: string[];

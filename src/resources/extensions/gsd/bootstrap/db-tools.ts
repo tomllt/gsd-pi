@@ -881,7 +881,7 @@ export function registerDbTools(pi: ExtensionAPI): void {
       sliceTitle: Type.String({ description: "Title of the slice" }),
       oneLiner: Type.String({ description: "One-line summary of what the slice accomplished" }),
       narrative: Type.String({ description: "Detailed narrative of what happened across all tasks" }),
-      verification: Type.String({ description: "What was verified across all tasks" }),
+      verification: Type.Optional(Type.String({ description: "What was verified across all tasks — if omitted, summary records verification as passed without detail." })),
       uatContent: Type.String({ description: "UAT test content (markdown body)" }),
       // ── Enrichment metadata (optional — defaults to empty) ────────────
       deviations: Type.Optional(Type.String({ description: "Deviations from the slice plan, or 'None.'" })),

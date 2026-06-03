@@ -101,12 +101,18 @@ test("gsd_slice_complete — enrichment arrays are optional", () => {
     "sliceTitle",
     "oneLiner",
     "narrative",
-    "verification",
     "uatContent",
   ];
   for (const field of coreRequired) {
     assert.ok(required.has(field), `core field "${field}" must be required`);
   }
+
+  // verification is intentionally optional — models that omit it avoid -32602;
+  // the summary records verification as passed without detail in that case.
+  assert.ok(
+    !required.has("verification"),
+    "verification must be optional — omitting it avoids -32602; summary records verification as passed without detail",
+  );
 
   // Enrichment/metadata arrays MUST be optional
   const enrichmentFields = [

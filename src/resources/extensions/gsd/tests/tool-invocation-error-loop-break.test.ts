@@ -102,6 +102,25 @@ describe("#2883: isToolInvocationError classification", () => {
     );
   });
 
+  test("detects MCP -32602 Input validation error (wire format)", () => {
+    assert.equal(
+      isToolInvocationError("MCP error -32602: Input validation error: Invalid arguments for tool gsd_slice_complete [path: verification, expected string, invalid_type]"),
+      true,
+    );
+  });
+
+  test("detects standalone 'Input validation error' prefix", () => {
+    assert.equal(isToolInvocationError("Input validation error: expected string"), true);
+  });
+
+  test("detects 'Invalid arguments for tool' prefix", () => {
+    assert.equal(isToolInvocationError("Invalid arguments for tool gsd_slice_complete"), true);
+  });
+
+  test("detects 'No such tool available' error", () => {
+    assert.equal(isToolInvocationError("No such tool available: mcp__gsd-workflow__memory_query"), true);
+  });
+
   test("detects ESM export-link errors", () => {
     assert.equal(
       isToolInvocationError("The requested module '../paths.js' does not provide an export named 'gsdProjectionRoot'"),

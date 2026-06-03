@@ -217,7 +217,7 @@ ${params.narrative}
 
 ## Verification
 
-${params.verification}
+${params.verification ?? ""}
 
 ## Requirements Advanced
 
@@ -439,6 +439,19 @@ export async function handleCompleteSlice(
     if (effectiveParams.requirementsInvalidated === undefined) {
       const parsed = parseRequirementSection(existingSummaryMd, "Requirements Invalidated or Re-scoped", "what");
       if (parsed.length > 0) effectiveParams.requirementsInvalidated = parsed as Array<{ id: string; what: string }>;
+    }
+    if (effectiveParams.verification === undefined) {
+      const headingLine = "## Verification\n\n";
+      const start = existingSummaryMd.indexOf(headingLine);
+      if (start !== -1) {
+        const contentStart = start + headingLine.length;
+        const nextHeading = existingSummaryMd.indexOf("\n\n## ", contentStart);
+        const prior = nextHeading === -1
+          ? existingSummaryMd.slice(contentStart)
+          : existingSummaryMd.slice(contentStart, nextHeading);
+        const trimmed = prior.trim();
+        if (trimmed) effectiveParams.verification = trimmed;
+      }
     }
   }
 
