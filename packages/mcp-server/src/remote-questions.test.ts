@@ -282,10 +282,7 @@ describe('tryRemoteQuestions returns error result on auth failure', () => {
     // Set up a valid discord config pointing at an unreachable/fake endpoint
     makePrefsFile(tmpDir, '---\nremote_questions:\n  channel: discord\n  channel_id: "123456789012345678"\n---\n');
     process.env['GSD_HOME'] = tmpDir;
-    // Use an obviously invalid token — the Discord API will reject it
-    // but we don't actually call the live Discord API in unit tests.
-    // Instead we rely on the fact that fetch() to Discord API will fail
-    // in a test environment (no network or invalid token → error result).
+    // Use an obviously invalid token while the test mocks Discord's response.
     process.env['DISCORD_BOT_TOKEN'] = 'invalid-fake-token-for-test';
   });
 
@@ -303,7 +300,9 @@ describe('tryRemoteQuestions returns error result on auth failure', () => {
     }
   });
 
-  it('returns an error result (not null) when auth fails', async () => {
+  it('returns an error result (not null) when auth fails', async (t) => {
+    t.mock.method(globalThis, 'fetch', async () => new Response('invalid token', { status: 401 }));
+
     const controller = new AbortController();
     // Abort immediately so we don't actually poll
     controller.abort();
