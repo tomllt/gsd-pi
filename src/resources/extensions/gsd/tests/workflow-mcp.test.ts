@@ -852,9 +852,8 @@ test("transport compatibility still blocks units whose MCP tools are not exposed
 });
 
 test("discuss-milestone guided flow does not abort when all required tools are on MCP surface (regression #469)", () => {
-  // Before the fix, activeTools being non-empty caused uniqueRequired to be filtered
-  // against the pi host tool list instead of MCP_WORKFLOW_TOOL_SURFACE, making every
-  // surface tool appear missing and aborting the guided flow with a false error.
+  // Guided flow starts the workflow MCP server as part of dispatch, so the
+  // parent session active-tool list is not authoritative for MCP tools.
   const discussMilestoneTools = [
     "gsd_summary_save",
     "gsd_requirement_save",
@@ -872,7 +871,6 @@ test("discuss-milestone guided flow does not abort when all required tools are o
       unitType: "discuss-milestone",
       authMode: "externalCli",
       baseUrl: "local://claude-code",
-      activeTools: ["ScheduleWakeup", "ToolSearch", "bash", "read", "write"],
     },
   );
 

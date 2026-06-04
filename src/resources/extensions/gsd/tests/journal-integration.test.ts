@@ -200,6 +200,7 @@ function makeSession() {
     unitLifetimeDispatches: new Map<string, number>(),
     unitRecoveryCount: new Map<string, number>(),
     verificationRetryCount: new Map<string, number>(),
+    zeroToolRetryCount: new Map<string, number>(),
     gitService: null,
     autoStartTime: Date.now(),
     cmdCtx: {
