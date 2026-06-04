@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { minimatch } from "minimatch";
 
-import { shouldBlockAutoUnitToolCall } from "../auto-unit-tool-scope.js";
+import { GSD_PHASE_SCOPE_DISPLAY_REASON, shouldBlockAutoUnitToolCall } from "../auto-unit-tool-scope.js";
 import { getIsolationMode } from "../preferences.js";
 import { compileSubagentPermissionContract, type ToolsPolicy } from "../unit-context-manifest.js";
 import { logWarning } from "../workflow-logger.js";
@@ -772,6 +772,20 @@ function blockReason(unitType: string, mode: string, what: string): string {
   ].join(" ");
 }
 
+function planningBlock(unitType: string, mode: string, what: string): PlanningUnitBlockResult {
+  return {
+    block: true,
+    reason: blockReason(unitType, mode, what),
+    displayReason: GSD_PHASE_SCOPE_DISPLAY_REASON,
+  };
+}
+
+type PlanningUnitBlockResult = {
+  block: boolean;
+  reason?: string;
+  displayReason?: string;
+};
+
 /**
  * Planning-unit tool-policy enforcement. Returns { block } per the policy
  * resolved from the active unit's manifest:
@@ -812,7 +826,7 @@ export function shouldBlockPlanningUnit(
   agentClasses?: readonly string[],
   toolInput?: unknown,
   unitId?: string,
-): { block: boolean; reason?: string } {
+): PlanningUnitBlockResult {
   const tool = canonicalToolName(toolName);
   const autoScopeGuard = shouldBlockAutoUnitToolCall(unitType, toolName, toolInput, unitId);
   if (autoScopeGuard.block) return autoScopeGuard;
@@ -825,10 +839,10 @@ export function shouldBlockPlanningUnit(
     if (PLANNING_SAFE_TOOLS.has(tool)) return { block: false };
     if (tool.startsWith("gsd_")) return { block: false };
     if (PLANNING_WRITE_TOOLS.has(tool) || tool === "bash" || PLANNING_SUBAGENT_TOOLS.has(tool)) {
-      return { block: true, reason: blockReason(unitType, policy.mode, `${tool} is not permitted (read-only)`) };
+      return planningBlock(unitType, policy.mode, `${tool} is not permitted (read-only)`);
     }
     // Unknown tool in read-only mode — block by default.
-    return { block: true, reason: blockReason(unitType, policy.mode, `tool "${tool}" is not on the read-only allowlist`) };
+    return planningBlock(unitType, policy.mode, `tool "${tool}" is not on the read-only allowlist`);
   }
 
   // planning / planning-dispatch / docs / verification modes share the same surface for safe tools, bash, and subagent.
@@ -846,14 +860,11 @@ export function shouldBlockPlanningUnit(
       // instead of silently bypassing the gate.
       if (agentClasses === undefined) {
         warnMissingControlledDispatchAgentClasses(unitType, policy.mode, tool);
-        return {
-          block: true,
-          reason: blockReason(
-            unitType,
-            policy.mode,
-            `subagent dispatch blocked: stale caller did not supply agent identities for "${tool}"; update extractSubagentAgentClasses to handle this input shape`,
-          ),
-        };
+        return planningBlock(
+          unitType,
+          policy.mode,
+          `subagent dispatch blocked: stale caller did not supply agent identities for "${tool}"; update extractSubagentAgentClasses to handle this input shape`,
+        );
       }
       // agentClasses was explicitly provided but resolved to an empty list (for
       // example, a bare tool call with no agent field). Pass through; no agents
@@ -863,57 +874,45 @@ export function shouldBlockPlanningUnit(
       }
       const globallyDisallowed = requested.find(a => !isReadOnlySpecialist(a));
       if (globallyDisallowed) {
-        return {
-          block: true,
-          reason: blockReason(
-            unitType,
-            policy.mode,
-            `subagent dispatch of "${globallyDisallowed}" not permitted; only read-only specialists (${allowedPlanningDispatchAgentsList()}) may be dispatched from ${policy.mode} units`,
-          ),
-        };
+        return planningBlock(
+          unitType,
+          policy.mode,
+          `subagent dispatch of "${globallyDisallowed}" not permitted; only read-only specialists (${allowedPlanningDispatchAgentsList()}) may be dispatched from ${policy.mode} units`,
+        );
       }
       const disallowedByPolicy = requested.find(a => !allowed.has(a));
       if (disallowedByPolicy) {
-        return {
-          block: true,
-          reason: blockReason(
-            unitType,
-            policy.mode,
-            `subagent dispatch of "${disallowedByPolicy}" not permitted by ToolsPolicy.allowedSubagents; permitted agents for this unit: ${allowedSubagents.join(", ")}`,
-          ),
-        };
+        return planningBlock(
+          unitType,
+          policy.mode,
+          `subagent dispatch of "${disallowedByPolicy}" not permitted by ToolsPolicy.allowedSubagents; permitted agents for this unit: ${allowedSubagents.join(", ")}`,
+        );
       }
       return { block: false };
     }
-    return { block: true, reason: blockReason(unitType, policy.mode, `subagent dispatch is not permitted in planning units`) };
+    return planningBlock(unitType, policy.mode, "subagent dispatch is not permitted in planning units");
   }
 
   if (tool === "bash") {
     if (policy.mode === "verification") {
       if (BASH_VERIFICATION_RE.test(pathOrCommand) || BASH_READ_ONLY_RE.test(pathOrCommand)) return { block: false };
-      return {
-        block: true,
-        reason: blockReason(
-          unitType,
-          policy.mode,
-          `bash is restricted to build/test verification commands (npm run build, npm test, etc.); cannot run "${pathOrCommand.slice(0, 80)}${pathOrCommand.length > 80 ? "…" : ""}"`,
-        ),
-      };
-    }
-    if (BASH_READ_ONLY_RE.test(pathOrCommand)) return { block: false };
-    return {
-      block: true,
-      reason: blockReason(
+      return planningBlock(
         unitType,
         policy.mode,
-        `bash is restricted to read-only commands (cat/grep/git log/etc); cannot run "${pathOrCommand.slice(0, 80)}${pathOrCommand.length > 80 ? "…" : ""}"`,
-      ),
-    };
+        `bash is restricted to build/test verification commands (npm run build, npm test, etc.); cannot run "${pathOrCommand.slice(0, 80)}${pathOrCommand.length > 80 ? "…" : ""}"`,
+      );
+    }
+    if (BASH_READ_ONLY_RE.test(pathOrCommand)) return { block: false };
+    return planningBlock(
+      unitType,
+      policy.mode,
+      `bash is restricted to read-only commands (cat/grep/git log/etc); cannot run "${pathOrCommand.slice(0, 80)}${pathOrCommand.length > 80 ? "…" : ""}"`,
+    );
   }
 
   if (PLANNING_WRITE_TOOLS.has(tool)) {
     if (!pathOrCommand) {
-      return { block: true, reason: blockReason(unitType, policy.mode, `${tool} called with empty path`) };
+      return planningBlock(unitType, policy.mode, `${tool} called with empty path`);
     }
     const absPath = isAbsolute(pathOrCommand) ? pathOrCommand : resolve(basePath, pathOrCommand);
 
@@ -925,14 +924,11 @@ export function shouldBlockPlanningUnit(
       return { block: false };
     }
 
-    return {
-      block: true,
-      reason: blockReason(
-        unitType,
-        policy.mode,
-        `cannot ${tool} "${pathOrCommand}" — writes are restricted to .gsd/${policy.mode === "docs" ? " and " + policy.allowedPathGlobs.join(", ") : ""}`,
-      ),
-    };
+    return planningBlock(
+      unitType,
+      policy.mode,
+      `cannot ${tool} "${pathOrCommand}" — writes are restricted to .gsd/${policy.mode === "docs" ? " and " + policy.allowedPathGlobs.join(", ") : ""}`,
+    );
   }
 
   // Unknown tool name — pass through. Other layers (queue, pending-gate,

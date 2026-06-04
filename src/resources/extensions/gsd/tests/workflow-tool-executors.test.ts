@@ -1409,6 +1409,10 @@ test("executeSummarySave blocks final root artifacts while approval gate is pend
 
     assert.equal(result.isError, true);
     assert.equal(result.details.error, "root_artifact_write_blocked");
+    assert.equal(
+      result.details.displayReason,
+      "Approval confirmation required before saving final project setup artifacts.",
+    );
     assert.match(result.content[0].text, /has not been confirmed/);
     assert.equal(existsSync(join(base, ".gsd", "REQUIREMENTS.md")), false);
 
@@ -1451,6 +1455,10 @@ test("executeSummarySave requires verified root approval in deep mode", async ()
 
     assert.equal(blocked.isError, true);
     assert.equal(blocked.details.error, "root_artifact_write_blocked");
+    assert.equal(
+      blocked.details.displayReason,
+      "Approval confirmation required before saving final project setup artifacts.",
+    );
     assert.match(blocked.content[0].text, /fail-closed/);
     assert.equal(existsSync(join(base, ".gsd", "PROJECT.md")), false);
 
@@ -1667,6 +1675,10 @@ test("executeSummarySave CONTEXT HARD BLOCK clears after write-gate state file i
       content: "# Context\n\ncontent",
     }, base));
     assert.equal(blocked.isError, true, "should be blocked without depth verification");
+    assert.equal(
+      blocked.details.displayReason,
+      "Depth check required before writing milestone context.",
+    );
     assert.match(
       blocked.content[0].text,
       /HARD BLOCK/,

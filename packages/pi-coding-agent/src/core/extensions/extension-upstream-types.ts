@@ -1026,7 +1026,10 @@ export type BeforeProviderRequestEventResult = unknown;
 export interface ToolCallEventResult {
 	/** Block tool execution. To modify arguments, mutate `event.input` in place instead. */
 	block?: boolean;
+	/** Model-facing reason returned to the agent as the blocked tool result. */
 	reason?: string;
+	/** Optional UI-facing summary for renderers; the model still receives `reason`. */
+	displayReason?: string;
 }
 
 /** Result from user_bash event handler */

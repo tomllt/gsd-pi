@@ -70,6 +70,50 @@ test("register-hooks hard-blocks destructive bash commands outside auto-mode", a
   assert.match(block?.reason ?? "", /IaC apply\/destroy/);
 });
 
+test("register-hooks keeps depth-gate reason model-facing and adds displayReason", async (t) => {
+  const dir = makeTempDir("display-reason");
+  const originalCwd = process.cwd();
+  process.chdir(dir);
+  resetWriteGateState(dir);
+
+  t.after(() => {
+    try {
+      resetWriteGateState(dir);
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  const handlers = new Map<string, Array<(event: any, ctx?: any) => Promise<any> | any>>();
+  const pi = {
+    on(event: string, handler: (event: any, ctx?: any) => Promise<any> | any) {
+      const existing = handlers.get(event) ?? [];
+      existing.push(handler);
+      handlers.set(event, existing);
+    },
+  } as any;
+
+  registerHooks(pi, []);
+
+  let block: any;
+  for (const handler of handlers.get("tool_call") ?? []) {
+    const result = await handler({
+      toolName: "write",
+      input: {
+        path: join(dir, ".gsd", "milestones", "M001", "M001-CONTEXT.md"),
+        content: "# M001 Context\n",
+      },
+    });
+    if (result?.block) block = result;
+  }
+
+  assert.equal(block?.block, true);
+  assert.match(block?.reason ?? "", /HARD BLOCK: Cannot write to milestone CONTEXT\.md/);
+  assert.match(block?.reason ?? "", /ask_user_questions/);
+  assert.equal(block?.displayReason, "Depth check required before writing milestone context.");
+});
+
 test("register-hooks unlocks milestone depth verification from question id without guided-flow state (#4047)", async (t) => {
   const dir = makeTempDir("manual");
   const originalCwd = process.cwd();

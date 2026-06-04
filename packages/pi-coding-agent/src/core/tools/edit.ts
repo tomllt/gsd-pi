@@ -20,7 +20,7 @@ import {
 } from "./edit-diff.js";
 import { withFileMutationQueue } from "./file-mutation-queue.js";
 import { resolveToCwd } from "./path-utils.js";
-import { invalidArgText, shortenPath, str } from "./render-utils.js";
+import { getDisplayReason, invalidArgText, shortenPath, str } from "./render-utils.js";
 import { wrapToolDefinition } from "./tool-definition-wrapper.js";
 
 type EditPreview = EditDiffResult | EditDiffError;
@@ -210,10 +210,11 @@ function formatEditResult(
 	const previewDiff = preview && !("error" in preview) ? preview.diff : undefined;
 	const previewError = preview && "error" in preview ? preview.error : undefined;
 	if (isError) {
-		const errorText = result.content
+		const contentErrorText = result.content
 			.filter((c) => c.type === "text")
 			.map((c) => c.text || "")
 			.join("\n");
+		const errorText = getDisplayReason(result.details) ?? contentErrorText;
 		if (!errorText || errorText === previewError) {
 			return undefined;
 		}

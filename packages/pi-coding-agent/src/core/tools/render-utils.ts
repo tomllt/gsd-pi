@@ -59,6 +59,12 @@ export type ToolRenderResultLike<TDetails> = {
 	details: TDetails;
 };
 
+export function getDisplayReason(details: unknown): string | undefined {
+	if (!details || typeof details !== "object") return undefined;
+	const value = (details as { displayReason?: unknown }).displayReason;
+	return typeof value === "string" && value ? value : undefined;
+}
+
 export function invalidArgText(theme: { fg: (name: any, text: string) => string }): string {
 	return theme.fg("error", "[invalid arg]");
 }

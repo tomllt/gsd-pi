@@ -747,9 +747,10 @@ async function prepareToolCall(
 				};
 			}
 			if (beforeResult?.block) {
+				const reason = beforeResult.reason || "Tool execution was blocked";
 				return {
 					kind: "immediate",
-					result: createErrorToolResult(beforeResult.reason || "Tool execution was blocked"),
+					result: createErrorToolResult(reason, beforeResult.displayReason),
 					isError: true,
 				};
 			}
@@ -858,10 +859,10 @@ async function finalizeExecutedToolCall(
 	};
 }
 
-function createErrorToolResult(message: string): AgentToolResult<any> {
+function createErrorToolResult(message: string, displayReason?: string): AgentToolResult<any> {
 	return {
 		content: [{ type: "text", text: message }],
-		details: {},
+		details: displayReason ? { displayReason } : {},
 	};
 }
 

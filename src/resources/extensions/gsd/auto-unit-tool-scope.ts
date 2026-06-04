@@ -97,6 +97,14 @@ const SCOPED_GSD_LIFECYCLE_TOOLS = new Set(
     .map(canonicalWorkflowToolName),
 );
 
+export const GSD_PHASE_SCOPE_DISPLAY_REASON = "This GSD phase only allows its scoped workflow tools.";
+
+type AutoUnitToolScopeResult = {
+  block: boolean;
+  reason?: string;
+  displayReason?: string;
+};
+
 function stripMcpToolPrefix(toolName: string): string {
   if (!toolName.startsWith("mcp__")) return toolName;
   const toolSeparator = toolName.indexOf("__", "mcp__".length);
@@ -112,12 +120,16 @@ export function isWorkflowAliasTool(toolName: string): boolean {
   return Object.prototype.hasOwnProperty.call(WORKFLOW_TOOL_ALIASES, stripMcpToolPrefix(toolName));
 }
 
-function hardBlockReason(unitType: string, what: string): string {
-  return [
-    `HARD BLOCK: unit "${unitType}" is constrained by auto-unit tool scope — ${what}.`,
-    "This is a mechanical phase-boundary gate. You MUST NOT proceed, retry the same call,",
-    "or route around this block; the orchestrator owns phase transitions.",
-  ].join(" ");
+function hardBlock(unitType: string, what: string): AutoUnitToolScopeResult {
+  return {
+    block: true,
+    reason: [
+      `HARD BLOCK: unit "${unitType}" is constrained by auto-unit tool scope — ${what}.`,
+      "This is a mechanical phase-boundary gate. You MUST NOT proceed, retry the same call,",
+      "or route around this block; the orchestrator owns phase transitions.",
+    ].join(" "),
+    displayReason: GSD_PHASE_SCOPE_DISPLAY_REASON,
+  };
 }
 
 function allowedGsdToolsForUnit(unitType: string): string[] {
@@ -144,7 +156,7 @@ function shouldBlockTaskCompletionScope(
   unitId: string | undefined,
   toolName: string,
   input: unknown,
-): { block: boolean; reason?: string } {
+): AutoUnitToolScopeResult {
   if (!EXECUTE_TASK_UNIT_TYPES.has(unitType)) return { block: false };
   if (canonicalWorkflowToolName(toolName) !== "gsd_task_complete") return { block: false };
   if (!unitId) return { block: false };
@@ -165,13 +177,10 @@ function shouldBlockTaskCompletionScope(
     return { block: false };
   }
 
-  return {
-    block: true,
-    reason: hardBlockReason(
-      unitType,
-      `gsd_task_complete may only complete the active task ${expected.milestone}/${expected.slice}/${expected.task}; requested ${actualMilestone}/${actualSlice}/${actualTask}`,
-    ),
-  };
+  return hardBlock(
+    unitType,
+    `gsd_task_complete may only complete the active task ${expected.milestone}/${expected.slice}/${expected.task}; requested ${actualMilestone}/${actualSlice}/${actualTask}`,
+  );
 }
 
 export function shouldBlockAutoUnitToolCall(
@@ -179,15 +188,12 @@ export function shouldBlockAutoUnitToolCall(
   toolName: string,
   input?: unknown,
   unitId?: string,
-): { block: boolean; reason?: string } {
+): AutoUnitToolScopeResult {
   const scopedTools = AUTO_UNIT_SCOPED_TOOLS[unitType];
   if (!scopedTools) return { block: false };
 
   if (isNativeWorkflowTool(toolName)) {
-    return {
-      block: true,
-      reason: hardBlockReason(unitType, "native Workflow is not permitted inside a dispatched GSD auto-mode unit"),
-    };
+    return hardBlock(unitType, "native Workflow is not permitted inside a dispatched GSD auto-mode unit");
   }
 
   const taskScope = shouldBlockTaskCompletionScope(unitType, unitId, toolName, input);
@@ -199,11 +205,8 @@ export function shouldBlockAutoUnitToolCall(
   const allowedTools = allowedGsdToolsForUnit(unitType);
   if (allowedTools.includes(canonicalTool)) return { block: false };
 
-  return {
-    block: true,
-    reason: hardBlockReason(
-      unitType,
-      `GSD lifecycle tool "${canonicalTool}" is not permitted; allowed GSD tools: ${allowedTools.length > 0 ? allowedTools.join(", ") : "(none)"}`,
-    ),
-  };
+  return hardBlock(
+    unitType,
+    `GSD lifecycle tool "${canonicalTool}" is not permitted; allowed GSD tools: ${allowedTools.length > 0 ? allowedTools.join(", ") : "(none)"}`,
+  );
 }

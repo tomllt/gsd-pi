@@ -369,6 +369,75 @@ describe("agentLoop with AgentMessage", () => {
 		expect(executed).toEqual([123]);
 	});
 
+	it("should preserve blocked tool reason for the model and displayReason for UI", async () => {
+		const toolSchema = Type.Object({ value: Type.String() });
+		const tool: AgentTool<typeof toolSchema> = {
+			name: "echo",
+			label: "Echo",
+			description: "Echo tool",
+			parameters: toolSchema,
+			async execute() {
+				throw new Error("tool should have been blocked");
+			},
+		};
+
+		const context: AgentContext = {
+			systemPrompt: "",
+			messages: [],
+			tools: [tool],
+		};
+
+		const userPrompt: AgentMessage = createUserMessage("echo something");
+
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			beforeToolCall: async () => ({
+				block: true,
+				reason: "HARD BLOCK: call ask_user_questions before writing context.",
+				displayReason: "Depth check required before writing milestone context.",
+			}),
+		};
+
+		let callIndex = 0;
+		const streamFn = () => {
+			const stream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					const message = createAssistantMessage(
+						[{ type: "toolCall", id: "tool-1", name: "echo", arguments: { value: "hello" } }],
+						"toolUse",
+					);
+					stream.push({ type: "done", reason: "toolUse", message });
+				} else {
+					const message = createAssistantMessage([{ type: "text", text: "done" }]);
+					stream.push({ type: "done", reason: "stop", message });
+				}
+				callIndex++;
+			});
+			return stream;
+		};
+
+		const events: AgentEvent[] = [];
+		const stream = agentLoop([userPrompt], context, config, undefined, streamFn);
+
+		for await (const event of stream) {
+			events.push(event);
+		}
+
+		const blockedResult = events.find(
+			(event): event is Extract<AgentEvent, { type: "tool_execution_end" }> =>
+				event.type === "tool_execution_end" && event.toolCallId === "tool-1",
+		);
+		expect(blockedResult?.isError).toBe(true);
+		expect(blockedResult?.result.content[0]?.text).toBe(
+			"HARD BLOCK: call ask_user_questions before writing context.",
+		);
+		expect(blockedResult?.result.details?.displayReason).toBe(
+			"Depth check required before writing milestone context.",
+		);
+	});
+
 	it("should prepare tool arguments for validation", async () => {
 		const replaceSchema = Type.Object({ oldText: Type.String(), newText: Type.String() });
 		const toolSchema = Type.Object({ edits: Type.Array(replaceSchema) });

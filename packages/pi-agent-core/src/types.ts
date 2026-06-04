@@ -50,11 +50,13 @@ export type AgentToolCall = Extract<AssistantMessage["content"][number], { type:
  * Result returned from `beforeToolCall`.
  *
  * Returning `{ block: true }` prevents the tool from executing. The loop emits an error tool result instead.
- * `reason` becomes the text shown in that error result. If omitted, a default blocked message is used.
+ * `reason` becomes the model-facing error result text. If omitted, a default blocked message is used.
+ * `displayReason` optionally replaces `reason` in UI renderers without changing what the model receives.
  */
 export interface BeforeToolCallResult {
 	block?: boolean;
 	reason?: string;
+	displayReason?: string;
 }
 
 /**

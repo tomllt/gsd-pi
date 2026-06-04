@@ -20,6 +20,7 @@ import type { ToolDefinition, ToolRenderContext } from "@gsd/pi-coding-agent/cor
 import { computeEditDiff, type EditDiffError, type EditDiffResult } from "@gsd/pi-coding-agent/core/tools/edit-diff.js";
 import { allTools } from "@gsd/pi-coding-agent/core/tools/index.js";
 import { getReadTuiMaxDisplayLines } from "@gsd/pi-coding-agent/core/tools/read.js";
+import { getDisplayReason } from "@gsd/pi-coding-agent/core/tools/render-utils.js";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@gsd/pi-coding-agent/core/tools/truncate.js";
 import { convertToPng } from "@gsd/pi-coding-agent/utils/image-convert.js";
 import { sanitizeBinaryOutput } from "@gsd/pi-coding-agent/utils/shell.js";
@@ -1089,6 +1090,11 @@ export class ToolExecutionComponent extends Container {
 
 	private getTextOutput(): string {
 		if (!this.result) return "";
+
+		const displayReason = this.result.isError ? getDisplayReason(this.result.details) : undefined;
+		if (displayReason) {
+			return sanitizeBinaryOutput(stripAnsi(displayReason)).replace(/\r/g, "");
+		}
 
 		const textBlocks = this.result.content?.filter((c: any) => c.type === "text") || [];
 		const imageBlocks = this.result.content?.filter((c: any) => c.type === "image") || [];

@@ -480,22 +480,30 @@ function isContextDraftSummarySave(toolName: string, input: unknown): boolean {
   return (input as { artifact_type?: unknown }).artifact_type === "CONTEXT-DRAFT";
 }
 
+function withDepthGateDisplayReason<T extends { block: boolean; reason?: string }>(
+  result: T,
+  displayReason = "Depth confirmation is waiting for your answer.",
+): T & { displayReason?: string } {
+  if (!result.block) return result;
+  return { ...result, displayReason };
+}
+
 function shouldBlockDeferredApprovalTool(
   toolName: string,
   input: unknown,
   basePath: string,
-): { block: boolean; reason?: string } {
+): { block: boolean; reason?: string; displayReason?: string } {
   if (deferredApprovalGate?.basePath !== basePath) return { block: false };
   if (toolName === "ask_user_questions") return { block: false };
   if (isContextDraftSummarySave(toolName, input)) return { block: false };
-  return {
+  return withDepthGateDisplayReason({
     block: true,
     reason: [
       `HARD BLOCK: Approval question "${deferredApprovalGate.gateId}" has been shown to the user.`,
       `Only CONTEXT-DRAFT persistence may finish in this same assistant turn.`,
       `Wait for the user's answer before calling additional tools.`,
     ].join(" "),
-  };
+  });
 }
 
 export function resolveNotificationStoreBasePath(basePath: string): string {
@@ -917,7 +925,7 @@ export function registerHooks(
               "Depth confirmation is waiting for your answer — pausing auto-mode.",
             );
           }
-          return bashGuard;
+          return withDepthGateDisplayReason(bashGuard);
         }
       } else {
         const gateGuard = shouldBlockPendingGate(
@@ -935,7 +943,7 @@ export function registerHooks(
               "Depth confirmation is waiting for your answer — pausing auto-mode.",
             );
           }
-          return gateGuard;
+          return withDepthGateDisplayReason(gateGuard);
         }
       }
     }
@@ -1040,7 +1048,9 @@ export function registerHooks(
       isQueuePhaseActive(discussionBasePath),
       discussionBasePath,
     );
-    if (result.block) return result;
+    if (result.block) {
+      return withDepthGateDisplayReason(result, "Depth check required before writing milestone context.");
+    }
   });
 
   // ── Safety harness: evidence collection + destructive command blocking ──

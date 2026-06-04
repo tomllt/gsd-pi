@@ -662,6 +662,7 @@ export interface BeforeProviderPayloadResult {
 export interface ToolCallResult {
 	block?: boolean;
 	reason?: string;
+	displayReason?: string;
 }
 
 export interface ToolResultPatch {

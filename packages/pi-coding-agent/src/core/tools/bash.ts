@@ -17,7 +17,7 @@ import {
 } from "../../utils/shell.js";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
 import { OutputAccumulator } from "./output-accumulator.js";
-import { getTextOutput, invalidArgText, str } from "./render-utils.js";
+import { getDisplayReason, getTextOutput, invalidArgText, str } from "./render-utils.js";
 import { wrapToolDefinition } from "./tool-definition-wrapper.js";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult } from "./truncate.js";
 
@@ -188,7 +188,7 @@ function rebuildBashResultRenderComponent(
 	component: BashResultRenderComponent,
 	result: {
 		content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
-		details?: BashToolDetails;
+		details?: BashToolDetails & { displayReason?: string };
 	},
 	options: ToolRenderResultOptions,
 	showImages: boolean,
@@ -198,7 +198,7 @@ function rebuildBashResultRenderComponent(
 	const state = component.state;
 	component.clear();
 
-	let output = getTextOutput(result as any, showImages).trim();
+	let output = getDisplayReason(result.details) ?? getTextOutput(result as any, showImages).trim();
 	const truncation = result.details?.truncation;
 	const fullOutputPath = result.details?.fullOutputPath;
 	if (!options.isPartial && truncation?.truncated && fullOutputPath && output.endsWith("]")) {

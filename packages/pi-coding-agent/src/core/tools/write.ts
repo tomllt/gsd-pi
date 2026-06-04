@@ -8,7 +8,7 @@ import { getLanguageFromPath, highlightCode } from "../../theme/theme.js";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
 import { withFileMutationQueue } from "./file-mutation-queue.js";
 import { resolveToCwd } from "./path-utils.js";
-import { invalidArgText, normalizeDisplayText, replaceTabs, shortenPath, str } from "./render-utils.js";
+import { getDisplayReason, invalidArgText, normalizeDisplayText, replaceTabs, shortenPath, str } from "./render-utils.js";
 import { wrapToolDefinition } from "./tool-definition-wrapper.js";
 
 const writeSchema = Type.Object({
@@ -162,16 +162,21 @@ function formatWriteCall(
 }
 
 function formatWriteResult(
-	result: { content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>; isError?: boolean },
+	result: {
+		content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+		details?: unknown;
+		isError?: boolean;
+	},
 	theme: typeof import("../../theme/theme.js").theme,
 ): string | undefined {
 	if (!result.isError) {
 		return undefined;
 	}
-	const output = result.content
+	const contentOutput = result.content
 		.filter((c) => c.type === "text")
 		.map((c) => c.text || "")
 		.join("\n");
+	const output = getDisplayReason(result.details) ?? contentOutput;
 	if (!output) {
 		return undefined;
 	}

@@ -78,6 +78,9 @@ function readDetails(result: any): any {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- result shape varies by tool
 function formatToolErrorText(result: any, details: any): string {
+  if (typeof details?.displayReason === "string" && details.displayReason) {
+    return details.displayReason;
+  }
   const message = details?.error
     ?? result?.content?.find((entry: { type?: string; text?: string }) => entry.type === "text")?.text
     ?? "unknown";

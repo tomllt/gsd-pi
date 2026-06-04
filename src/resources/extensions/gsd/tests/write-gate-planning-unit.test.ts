@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join, sep } from 'node:path';
 
+import { GSD_PHASE_SCOPE_DISPLAY_REASON } from '../auto-unit-tool-scope.ts';
 import { ALLOWED_PLANNING_DISPATCH_AGENTS, shouldBlockPlanningUnit } from '../bootstrap/write-gate.ts';
 import { extractSubagentAgentClasses } from '../bootstrap/subagent-input.ts';
 import { isDeterministicPolicyError } from '../auto-tool-tracking.ts';
@@ -63,6 +64,19 @@ test('planning-unit: deterministic block reason is suitable for retry short-circ
   assert.match(r.reason!, /HARD BLOCK/);
   assert.match(r.reason!, /tools-policy/);
   assert.strictEqual(isDeterministicPolicyError(r.reason!), true);
+});
+
+test('planning-unit: blocked tool-policy calls include UI-safe display reason', () => {
+  const r = shouldBlockPlanningUnit(
+    'edit',
+    'src/main.ts',
+    BASE,
+    'discuss-milestone',
+    PLANNING,
+  );
+  assert.strictEqual(r.block, true);
+  assert.match(r.reason!, /HARD BLOCK/);
+  assert.strictEqual(r.displayReason, GSD_PHASE_SCOPE_DISPLAY_REASON);
 });
 
 test('planning-unit: blocks write to user source via relative path', () => {
@@ -367,6 +381,7 @@ test('auto-unit scope: execute-task allows only its task completion lifecycle to
   assert.strictEqual(blocked.block, true);
   assert.match(blocked.reason!, /HARD BLOCK/);
   assert.match(blocked.reason!, /gsd_save_gate_result/);
+  assert.strictEqual(blocked.displayReason, GSD_PHASE_SCOPE_DISPLAY_REASON);
   assert.strictEqual(isDeterministicPolicyError(blocked.reason!), true);
 });
 

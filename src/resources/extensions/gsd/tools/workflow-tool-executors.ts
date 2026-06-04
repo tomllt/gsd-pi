@@ -178,7 +178,11 @@ export async function executeSummarySave(
   if (rootArtifactGuard.block) {
     return {
       content: [{ type: "text", text: `Error saving artifact: ${rootArtifactGuard.reason ?? "root artifact write blocked"}` }],
-      details: { operation: "save_summary", error: "root_artifact_write_blocked" },
+      details: {
+        operation: "save_summary",
+        error: "root_artifact_write_blocked",
+        displayReason: "Approval confirmation required before saving final project setup artifacts.",
+      },
       isError: true,
     };
   }
@@ -191,9 +195,13 @@ export async function executeSummarySave(
   if (contextGuard.block) {
     return {
       content: [{ type: "text", text: `Error saving artifact: ${contextGuard.reason ?? "context write blocked"}` }],
-      details: { operation: "save_summary", error: "context_write_blocked" },
-    isError: true,
-      };
+      details: {
+        operation: "save_summary",
+        error: "context_write_blocked",
+        displayReason: "Depth check required before writing milestone context.",
+      },
+      isError: true,
+    };
   }
   try {
     let relativePath: string;

@@ -118,6 +118,35 @@ describe("ToolExecutionComponent", () => {
 		assert.match(rendered, /boom/);
 	});
 
+	test("generic failed tools render displayReason instead of model-facing policy text", () => {
+		const modelFacingReason = [
+			'HARD BLOCK: unit "discuss-requirements" is constrained by auto-unit tool scope.',
+			'GSD lifecycle tool "gsd_milestone_status" is not permitted.',
+			"This is a mechanical phase-boundary gate. You MUST NOT proceed, retry the same call, or route around this block.",
+		].join(" ");
+		const rendered = renderTool(
+			"gsd_milestone_status",
+			{ milestoneId: "M001" },
+			{
+				content: [
+					{
+						type: "text",
+						text: modelFacingReason,
+					},
+				],
+				isError: true,
+				details: {
+					displayReason: "This GSD phase only allows its scoped workflow tools.",
+				},
+			},
+		);
+
+		assert.match(rendered, /This GSD phase only allows its scoped workflow tools/);
+		assert.doesNotMatch(rendered, /HARD BLOCK/);
+		assert.doesNotMatch(rendered, /phase-boundary gate/);
+		assert.doesNotMatch(rendered, /MUST NOT proceed/);
+	});
+
 	test("collapses successful low-signal tool cards by default", () => {
 		const rendered = renderToolCollapsed(
 			"mcp__demo__noop",
