@@ -140,6 +140,10 @@ export function resolveGsdBrowserMcpLaunchConfig(
     : null;
   const sessionName =
     options.sessionName?.trim() || buildGsdBrowserSessionName(resolvedProjectRoot, options.sessionSuffix);
+  // Stable per-project identity key (no per-session suffix) so the browser
+  // profile/cookies persist across pi sessions for the same project. gsd-browser
+  // rejects --identity-scope unless --identity-key is also supplied.
+  const identityKey = env.GSD_BROWSER_IDENTITY_KEY?.trim() || buildGsdBrowserSessionName(resolvedProjectRoot);
   const command =
     explicitCommand
     || explicitCliPath
@@ -155,6 +159,8 @@ export function resolveGsdBrowserMcpLaunchConfig(
         sessionName,
         "--identity-scope",
         "project",
+        "--identity-key",
+        identityKey,
         "--identity-project",
         resolvedProjectRoot,
       ];

@@ -520,6 +520,25 @@ function formatManagedBrowserError(toolName: string, error: unknown): string {
   ].join("\n");
 }
 
+/**
+ * Eagerly establish the managed gsd-browser connection so browser tools are
+ * ready before first use. Best-effort: returns the error instead of throwing so
+ * callers (e.g. session-start warm-up) can surface a warning without failing the
+ * session. Connecting only spawns the gsd-browser MCP daemon; it does not launch
+ * Chrome (that happens lazily on the first navigation).
+ */
+export async function warmUpManagedGsdBrowser(
+  ctx?: ExtensionContext,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await getOrConnectManagedGsdBrowser(ctx, signal);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export function registerManagedGsdBrowserTools(pi: ExtensionAPI): void {
   for (const tool of MANAGED_BROWSER_TOOLS) {
     pi.registerTool({

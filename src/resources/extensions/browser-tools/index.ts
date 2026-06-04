@@ -1,8 +1,9 @@
 /** browser-tools — Pi Browser Automation Contract adapter. */
-import { importExtensionModule, type ExtensionAPI } from "@gsd/pi-coding-agent";
+import { importExtensionModule, type ExtensionAPI, type ExtensionContext } from "@gsd/pi-coding-agent";
 
-import { closeManagedGsdBrowser, registerManagedGsdBrowserTools } from "./engine/managed-gsd-browser.js";
+import { closeManagedGsdBrowser, registerManagedGsdBrowserTools, warmUpManagedGsdBrowser } from "./engine/managed-gsd-browser.js";
 import { resolveBrowserEngineMode, type BrowserEngineMode } from "./engine/selection.js";
+import { detectWebApp } from "./web-app-detect.js";
 
 let legacyRegistrationPromise: Promise<void> | null = null;
 let managedRegistrationPromise: Promise<void> | null = null;
@@ -184,6 +185,34 @@ async function registerBrowserTools(pi: ExtensionAPI): Promise<void> {
   }
 }
 
+function isWarmUpDisabled(): boolean {
+  const value = process.env.GSD_BROWSER_WARMUP?.trim().toLowerCase();
+  return value === "0" || value === "false" || value === "off";
+}
+
+/**
+ * Auto-initialize the managed gsd-browser engine when the project under
+ * development is a web app, so browser UAT tools are connected and ready instead
+ * of failing lazily on first use. Best-effort and non-blocking: warm-up runs in
+ * the background and only surfaces a warning if it fails.
+ */
+function maybeWarmUpManagedEngine(pi: ExtensionAPI, ctx: ExtensionContext): void {
+  if (isWarmUpDisabled()) return;
+  if (resolveBrowserEngineMode() !== "gsd-browser") return;
+
+  const projectRoot = ctx.cwd || process.cwd();
+  if (!detectWebApp(projectRoot)) return;
+
+  void warmUpManagedGsdBrowser(ctx).then((result) => {
+    if (!result.ok && ctx.hasUI) {
+      ctx.ui.notify(
+        `gsd-browser auto-init failed: ${result.error}. Browser UAT tools will retry on first use; run /gsd doctor if this persists.`,
+        "warning",
+      );
+    }
+  });
+}
+
 async function closeActiveBrowserEngines(): Promise<void> {
   await closeManagedGsdBrowser();
   if (legacyRegistrationPromise) {
@@ -195,13 +224,16 @@ async function closeActiveBrowserEngines(): Promise<void> {
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     if (ctx.hasUI) {
-      void registerBrowserTools(pi).catch((error) => {
-        ctx.ui.notify(`browser-tools failed to load: ${error instanceof Error ? error.message : String(error)}`, "warning");
-      });
+      void registerBrowserTools(pi)
+        .then(() => maybeWarmUpManagedEngine(pi, ctx))
+        .catch((error) => {
+          ctx.ui.notify(`browser-tools failed to load: ${error instanceof Error ? error.message : String(error)}`, "warning");
+        });
       return;
     }
 
     await registerBrowserTools(pi);
+    maybeWarmUpManagedEngine(pi, ctx);
   });
 
   pi.on("session_shutdown", async () => {

@@ -54,7 +54,13 @@ test("ensureProjectWorkflowMcpConfig creates .mcp.json with workflow and browser
       "--identity-scope",
       "project",
     ]);
-    assert.equal(browserArgs[mcpArgIndex + 6], projectRoot);
+    // --identity-scope requires a non-empty --identity-key or gsd-browser exits
+    // immediately ("Connection closed"); the key must be stable per project.
+    assert.equal(browserArgs[mcpArgIndex + 5], "--identity-key");
+    assert.equal(typeof browserArgs[mcpArgIndex + 6], "string");
+    assert.ok((browserArgs[mcpArgIndex + 6] ?? "").length > 0, "identity-key must be non-empty");
+    assert.equal(browserArgs[mcpArgIndex + 7], "--identity-project");
+    assert.equal(browserArgs[mcpArgIndex + 8], projectRoot);
     assert.equal((browserServer as { cwd?: string })?.cwd, projectRoot);
 
     const settings = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.local.json"), "utf-8")) as {
