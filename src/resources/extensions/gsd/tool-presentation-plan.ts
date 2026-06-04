@@ -123,12 +123,31 @@ export function buildRunUatCanonicalToolNames(options: { includeBrowserTools?: r
   ]);
 }
 
+// UAT modes whose run-uat instructions direct the runner to exercise the live
+// app in a browser. These modes receive the gsd-browser tool surface so the
+// runner can actually launch gsd-browser instead of silently deferring browser
+// checks to a human. See run-uat.md automation rules: `browser-executable`,
+// `live-runtime`, and `mixed` are all told to drive a browser/runtime path, and
+// `human-experience` is told to capture screenshots. Without this, a webpage
+// UAT classified as anything but `browser-executable` had no browser tools and
+// downgraded its live checks to NEEDS-HUMAN (M001/S03 regression).
+export const BROWSER_INCLUSIVE_UAT_TYPES: readonly string[] = [
+  "browser-executable",
+  "live-runtime",
+  "mixed",
+  "human-experience",
+];
+
+function uatTypeIncludesBrowser(uatType: string | undefined): boolean {
+  return uatType !== undefined && BROWSER_INCLUSIVE_UAT_TYPES.includes(uatType);
+}
+
 export function runUatBrowserToolsForType(uatType: string | undefined): readonly string[] {
-  return uatType === "browser-executable" ? RUN_UAT_BROWSER_TOOL_NAMES : [];
+  return uatTypeIncludesBrowser(uatType) ? RUN_UAT_BROWSER_TOOL_NAMES : [];
 }
 
 export function runUatPresentationSurfaceForType(uatType: string | undefined): ToolPresentationSurface {
-  return uatType === "browser-executable" ? "hybrid" : "mcp";
+  return uatTypeIncludesBrowser(uatType) ? "hybrid" : "mcp";
 }
 
 export function buildRunUatPresentationForType(

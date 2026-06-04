@@ -34,7 +34,8 @@ import { getGatesForTurn } from "../gate-registry.js";
 import { gsdProjectionRoot, clearPathCache, resolveMilestoneFile } from "../paths.js";
 import { resolveCanonicalMilestoneRoot } from "../worktree-manager.js";
 import { checkOwnership, sliceUnitKey } from "../unit-ownership.js";
-import { saveFile, clearParseCache } from "../files.js";
+import { saveFile, clearParseCache, extractUatType } from "../files.js";
+import { hasBrowserRequiredText } from "../browser-evidence.js";
 import { invalidateStateCache } from "../state.js";
 import { renderRoadmapFromDb } from "../markdown-renderer.js";
 import { parseRoadmap } from "../parsers-legacy.js";
@@ -340,6 +341,33 @@ export async function handleCompleteSlice(
   const BLOCKED_SIGNALS = /\b(status:\s*blocked|verification_result:\s*failed|slice is blocked|cannot complete|verification failed)\b/i;
   if (BLOCKED_SIGNALS.test(params.verification || "") || BLOCKED_SIGNALS.test(params.uatContent || "")) {
     return { error: `slice verification indicates blocked/failed state — do not complete a slice that has not passed verification. Address the blockers and re-verify first.` };
+  }
+
+  // ── Browser/web UAT classification gate ────────────────────────────────
+  // A UAT that drives a running web UI (opening a page in a browser,
+  // navigating to a page/localhost) must declare a browser-capable mode so the
+  // run-uat runner surfaces gsd-browser and actually launches it. Otherwise the
+  // browser checks get silently deferred to a human and the slice passes on
+  // static checks alone (M001/S03 regression). `browser-executable`,
+  // `live-runtime`, and `mixed` all receive browser tools (see
+  // BROWSER_INCLUSIVE_UAT_TYPES); only the non-browser modes are rejected here.
+  //
+  // Reuse the canonical hasBrowserRequiredText detector (also used by dispatch
+  // and milestone validation): it skips Not-Proven/Out-of-Scope disclaimer
+  // sections and only treats verbs like navigate/open as web when they sit next
+  // to browser/page/localhost — avoiding false positives on CLI/file/API steps.
+  //
+  // Only `artifact-driven` is gated. It is the one mode that performs no
+  // execution at all (static/file checks), so a browser-requiring UAT under it
+  // genuinely defers verification to a human. Every other mode has a real
+  // verification path: `runtime-executable` runs browser test commands like
+  // `npx playwright test` via gsd_uat_exec, and live-runtime/mixed/
+  // browser-executable receive gsd-browser tools (BROWSER_INCLUSIVE_UAT_TYPES).
+  const declaredUatMode = extractUatType(params.uatContent || "") ?? "artifact-driven";
+  if (declaredUatMode === "artifact-driven" && hasBrowserRequiredText(params.uatContent || "")) {
+    return {
+      error: `UAT requires browser verification (opening a page in a browser, navigating to a page or localhost, screenshots) but declares "UAT mode: artifact-driven", which only runs static/file checks and would defer the browser work to a human. Use a mode that actually verifies the UI: "browser-executable" (interactive gsd-browser), "runtime-executable" (a browser test command such as playwright), or a browser-inclusive "mixed"/"live-runtime". Re-author the UAT Type section and complete the slice again.`,
+    };
   }
 
   // ── Guards + DB writes inside a single transaction (prevents TOCTOU) ───

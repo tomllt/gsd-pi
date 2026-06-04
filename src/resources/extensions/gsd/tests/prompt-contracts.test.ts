@@ -93,6 +93,33 @@ test("browser-executable UAT presentation uses direct managed browser tools", ()
   assert.ok(!presentation.presentedTools.some((toolName) => toolName.startsWith("mcp__gsd-browser__")));
 });
 
+test("live-runtime and mixed UAT presentations also surface gsd-browser tools", () => {
+  // Regression (M001/S03): the run-uat prompt tells live-runtime and mixed to
+  // drive a browser, so the runner must actually receive the browser tools and
+  // a hybrid surface — otherwise live checks silently downgrade to NEEDS-HUMAN.
+  for (const uatType of ["live-runtime", "mixed", "human-experience"] as const) {
+    const presentation = buildRunUatPresentationForType(uatType);
+    assert.equal(presentation.surface, "hybrid", `${uatType} should use the hybrid surface`);
+    for (const toolName of RUN_UAT_BROWSER_TOOL_NAMES) {
+      assert.ok(
+        presentation.presentedTools.includes(toolName),
+        `${uatType} presentation should include browser tool ${toolName}`,
+      );
+    }
+  }
+});
+
+test("artifact-driven and runtime-executable UAT presentations stay browser-free", () => {
+  for (const uatType of ["artifact-driven", "runtime-executable"] as const) {
+    const presentation = buildRunUatPresentationForType(uatType);
+    assert.equal(presentation.surface, "mcp", `${uatType} should use the mcp surface`);
+    assert.ok(
+      !RUN_UAT_BROWSER_TOOL_NAMES.some((toolName) => presentation.presentedTools.includes(toolName)),
+      `${uatType} presentation should not include browser tools`,
+    );
+  }
+});
+
 test("workflow-start prompt defaults to autonomy instead of per-phase confirmation", () => {
   const prompt = readPrompt("workflow-start");
   assert.match(prompt, /Keep moving by default/i);
