@@ -91,6 +91,24 @@ export function clearToolBaseline(pi: ExtensionAPI | object): void {
 }
 
 /**
+ * Return the pre-dispatch baseline tool set captured at auto-mode start, or
+ * the current active tools if no baseline has been recorded yet (first
+ * iteration).
+ *
+ * Use this instead of `pi.getActiveTools()` anywhere you need the full tool
+ * surface for a preflight/routing check that runs BEFORE `selectAndApplyModel`
+ * restores the baseline — e.g. in `runDispatch` and `decideNextUnit`.  Without
+ * this, a prior unit's per-provider narrowing (hook overrides, Groq 128-tool
+ * cap, etc.) can make required MCP tools appear absent and trigger a false
+ * transport-preflight warning.
+ */
+export function getToolBaselineSnapshot(pi: ExtensionAPI): string[] {
+  const baseline = TOOL_BASELINE.get(pi as unknown as object);
+  if (baseline !== undefined) return [...baseline];
+  return typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
+}
+
+/**
  * Models eligible for the pre-dispatch policy gate. Prefer registry-available
  * models; when that list is empty (common after worktree resume before registry
  * refresh), fall back to the live session / auto-start / pinned models that are

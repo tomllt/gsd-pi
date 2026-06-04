@@ -107,7 +107,7 @@ import {
 } from "./auto-tool-tracking.js";
 import { closeoutUnit } from "./auto-unit-closeout.js";
 import { recoverTimedOutUnit } from "./auto-timeout-recovery.js";
-import { selectAndApplyModel, resolveModelId, clearToolBaseline } from "./auto-model-selection.js";
+import { selectAndApplyModel, resolveModelId, clearToolBaseline, getToolBaselineSnapshot } from "./auto-model-selection.js";
 import { resetRoutingHistory, recordOutcome } from "./routing-history.js";
 import {
   checkPostUnitHooks,
@@ -2154,7 +2154,10 @@ export function createWiredDispatchAdapter(
         sessionProvider && typeof ctx.modelRegistry?.getProviderAuthMode === "function"
           ? ctx.modelRegistry.getProviderAuthMode(sessionProvider)
           : undefined;
-      const activeTools = typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
+      // Use baseline snapshot — same reason as phases.ts:runDispatch: the live
+      // active set may be narrowed by the prior unit before selectAndApplyModel
+      // restores it, causing false transport-preflight failures (#477 follow-up).
+      const activeTools = getToolBaselineSnapshot(pi);
       // Mirrors runDispatch: deep-planning keeps approval gates in plain chat
       // because structured questions can be cancelled outside the chat turn on
       // some transports.
