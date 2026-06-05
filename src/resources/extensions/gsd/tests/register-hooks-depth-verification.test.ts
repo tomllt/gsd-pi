@@ -1,10 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { registerHooks } from "../bootstrap/register-hooks.ts";
+import {
+  clearPendingAutoStart,
+  setPendingAutoStart,
+} from "../guided-flow.ts";
+import { closeDatabase, getMilestone } from "../gsd-db.ts";
+import { deriveState, invalidateStateCache } from "../state.ts";
 import {
   getPendingGate,
   resetWriteGateState,
@@ -184,6 +190,100 @@ test("register-hooks unlocks milestone depth verification from question id witho
     false,
     "question-id milestone inference should unlock the matching milestone context write",
   );
+});
+
+test("register-hooks persists first structured question round for new milestone re-entry", async (t) => {
+  const dir = makeTempDir("question-draft");
+  mkdirSync(join(dir, ".gsd", "milestones"), { recursive: true });
+  const originalCwd = process.cwd();
+  process.chdir(dir);
+  resetWriteGateState(dir);
+  clearPendingAutoStart(dir);
+
+  t.after(() => {
+    try {
+      resetWriteGateState(dir);
+      clearPendingAutoStart(dir);
+      closeDatabase();
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  const handlers = new Map<string, Array<(event: any, ctx?: any) => Promise<void> | void>>();
+  const pi = {
+    on(event: string, handler: (event: any, ctx?: any) => Promise<void> | void) {
+      const existing = handlers.get(event) ?? [];
+      existing.push(handler);
+      handlers.set(event, existing);
+    },
+  } as any;
+  const ctx = { cwd: dir, ui: { notify: () => undefined } } as any;
+
+  registerHooks(pi, []);
+  setPendingAutoStart(dir, {
+    basePath: dir,
+    milestoneId: "M004",
+    ctx,
+    pi: { sendMessage: () => undefined } as any,
+  });
+
+  const questions = [
+    {
+      id: "m004_shape",
+      header: "M004 Shape",
+      question: "What are you picturing for M004?",
+      options: [
+        { label: "Planning metadata (Recommended)", description: "Plan the next metadata layer." },
+        { label: "Find and organize", description: "Improve searching and organizing." },
+      ],
+    },
+    {
+      id: "boundary",
+      header: "Boundary",
+      question: "Which boundary should I plan around?",
+      options: [
+        { label: "No new dependencies (Recommended)", description: "Keep implementation vanilla." },
+        { label: "Browser APIs OK", description: "Use browser-native capabilities." },
+      ],
+    },
+  ];
+
+  for (const handler of handlers.get("tool_result") ?? []) {
+    await handler({
+      toolName: "ask_user_questions",
+      input: { questions },
+      details: {
+        response: {
+          answers: {
+            m004_shape: { selected: "Planning metadata (Recommended)" },
+            boundary: { selected: "No new dependencies (Recommended)" },
+          },
+        },
+      },
+    }, ctx);
+  }
+
+  const milestoneDir = join(dir, ".gsd", "milestones", "M004");
+  const draftPath = join(milestoneDir, "M004-CONTEXT-DRAFT.md");
+  const discussionPath = join(milestoneDir, "M004-DISCUSSION.md");
+
+  assert.equal(existsSync(draftPath), true, "first answer round should create a resumable context draft");
+  assert.equal(existsSync(discussionPath), true, "first answer round should create a discussion log");
+
+  const draft = readFileSync(draftPath, "utf-8");
+  assert.match(draft, /What are you picturing for M004\?/);
+  assert.match(draft, /Planning metadata \(Recommended\)/);
+  assert.match(draft, /No new dependencies \(Recommended\)/);
+
+  const row = getMilestone("M004");
+  assert.equal(row?.status, "queued", "new milestone shell should be registered in the DB");
+
+  invalidateStateCache();
+  const state = await deriveState(dir);
+  assert.equal(state.activeMilestone?.id, "M004");
+  assert.equal(state.phase, "needs-discussion");
 });
 
 test("register-hooks clears depth gate when remote (Telegram/Slack/Discord) answer is normalized (#4406)", async (t) => {

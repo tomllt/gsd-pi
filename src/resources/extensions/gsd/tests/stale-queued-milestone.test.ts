@@ -100,6 +100,7 @@ describe("stale queued milestone selection (#3470)", () => {
     const state = await deriveStateFromDb(base);
 
     assert.equal(state.activeMilestone?.id, "M068", "Queued milestone with draft should become active");
+    assert.equal(state.phase, "needs-discussion", "Queued milestone with draft should resume discussion");
   });
 
   test("queued milestone WITH slices can still be selected as active", async () => {

@@ -505,6 +505,8 @@ async function buildRegistryAndFindActive(
     const allSlicesDone = slices.length > 0 && slices.every(s => isStatusDone(s.status));
 
     const title = stripMilestonePrefix(m.title) || m.id;
+    const hasContext = !!resolveMilestoneFile(basePath, m.id, "CONTEXT");
+    const hasDraftContext = !hasContext && !!resolveMilestoneFile(basePath, m.id, "CONTEXT-DRAFT");
 
     if (!activeMilestoneFound) {
       const deps = m.depends_on;
@@ -515,7 +517,7 @@ async function buildRegistryAndFindActive(
         continue;
       }
 
-      if (m.status === 'queued' && slices.length === 0) {
+      if (m.status === 'queued' && slices.length === 0 && !hasContext && !hasDraftContext) {
         if (!firstDeferredQueuedShell) {
           firstDeferredQueuedShell = { id: m.id, title, deps };
         }
@@ -531,7 +533,7 @@ async function buildRegistryAndFindActive(
         continue;
       }
 
-      if (m.status === 'needs-discussion') activeMilestoneHasDraft = true;
+      if ((m.status === 'needs-discussion' && !hasContext) || hasDraftContext) activeMilestoneHasDraft = true;
 
       activeMilestone = { id: m.id, title };
       activeMilestoneSlices = slices;
