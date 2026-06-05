@@ -5,10 +5,9 @@
  * (e.g. `passed` → `pass`) are applied consistently across the codebase.
  */
 
-import { extractUatType } from "./files.js";
-import type { UatType } from "./files.js";
 import { splitFrontmatter, parseFrontmatterMap } from "../shared/frontmatter.js";
 import { parse as parseYaml } from "yaml";
+import { getDeclaredUatType, isPartialEligibleUatType, type UatType } from "./uat-policy.js";
 
 function normalizeVerdict(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -103,12 +102,6 @@ export const UAT_ACCEPTABLE_VERDICTS: readonly string[] = ["pass", "passed"];
  * UAT types whose results may legitimately produce a `partial` verdict
  * when all automatable checks pass but human-only checks remain.
  */
-const PARTIAL_ELIGIBLE_UAT_TYPES: readonly UatType[] = [
-  "mixed",
-  "human-experience",
-  "live-runtime",
-];
-
 /**
  * Check whether a verdict is acceptable for a given UAT type.
  *
@@ -117,7 +110,7 @@ const PARTIAL_ELIGIBLE_UAT_TYPES: readonly UatType[] = [
  */
 export function isAcceptableUatVerdict(verdict: string, uatType: UatType | undefined): boolean {
   if (UAT_ACCEPTABLE_VERDICTS.includes(verdict)) return true;
-  if (verdict === "partial" && uatType && (PARTIAL_ELIGIBLE_UAT_TYPES as readonly string[]).includes(uatType)) {
+  if (verdict === "partial" && isPartialEligibleUatType(uatType)) {
     return true;
   }
   return false;
@@ -147,5 +140,5 @@ export function isValidMilestoneVerdict(verdict: string): verdict is ValidationV
  * the codebase when a UAT file lacks an explicit `## UAT Type` section.
  */
 export function getUatType(content: string): UatType {
-  return extractUatType(content) ?? "artifact-driven";
+  return getDeclaredUatType(content);
 }

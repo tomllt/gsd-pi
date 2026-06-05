@@ -14,9 +14,9 @@
 
 import type { GSDState } from "./types.js";
 import type { GSDPreferences } from "./preferences.js";
-import type { UatType } from "./files.js";
 import type { MinimalModelRegistry } from "./context-budget.js";
 import { loadFile, extractUatType, loadActiveOverrides } from "./files.js";
+import { getUatBrowserToolSupportError, type UatType } from "./uat-policy.js";
 import {
   isDbAvailable,
   getMilestoneSlices,
@@ -688,6 +688,15 @@ export const DISPATCH_RULES: DispatchRule[] = [
       );
       if (transportError) {
         return { action: "stop" as const, reason: transportError, level: "warning" as const };
+      }
+      const browserToolError = getUatBrowserToolSupportError({
+        uatType,
+        activeTools,
+        milestoneId: mid,
+        sliceId,
+      });
+      if (browserToolError) {
+        return { action: "stop" as const, reason: browserToolError, level: "warning" as const };
       }
 
       // Cap run-uat dispatch attempts to prevent infinite replay (#3624).

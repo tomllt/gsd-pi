@@ -34,8 +34,8 @@ import { getGatesForTurn } from "../gate-registry.js";
 import { gsdProjectionRoot, clearPathCache, resolveMilestoneFile } from "../paths.js";
 import { resolveCanonicalMilestoneRoot } from "../worktree-manager.js";
 import { checkOwnership, sliceUnitKey } from "../unit-ownership.js";
-import { saveFile, clearParseCache, extractUatType } from "../files.js";
-import { hasBrowserRequiredText } from "../browser-evidence.js";
+import { saveFile, clearParseCache } from "../files.js";
+import { getDeclaredUatType, shouldEscalateArtifactUatToBrowser } from "../uat-policy.js";
 import { invalidateStateCache } from "../state.js";
 import { renderRoadmapFromDb } from "../markdown-renderer.js";
 import { parseRoadmap } from "../parsers-legacy.js";
@@ -350,7 +350,7 @@ export async function handleCompleteSlice(
   // Otherwise the browser checks get silently deferred to a human and the slice
   // passes on static checks alone (M001/S03 regression). `browser-executable`,
   // `live-runtime`, and `mixed` all receive browser tools (see
-  // BROWSER_INCLUSIVE_UAT_TYPES); only the non-browser modes are rejected here.
+  // UAT_MODE_POLICIES); only the non-browser modes are rejected here.
   //
   // Reuse the canonical hasBrowserRequiredText detector (also used by dispatch
   // and milestone validation): it skips Not-Proven/Out-of-Scope disclaimer
@@ -362,9 +362,10 @@ export async function handleCompleteSlice(
   // genuinely defers verification to a human. Every other mode has a real
   // verification path: `runtime-executable` runs browser test commands like
   // `npx playwright test` via gsd_uat_exec, and live-runtime/mixed/
-  // browser-executable receive browser tools (BROWSER_INCLUSIVE_UAT_TYPES).
-  const declaredUatMode = extractUatType(params.uatContent || "") ?? "artifact-driven";
-  if (declaredUatMode === "artifact-driven" && hasBrowserRequiredText(params.uatContent || "")) {
+  // browser-executable receive browser tools (UAT_MODE_POLICIES).
+  const uatContent = params.uatContent || "";
+  const declaredUatMode = getDeclaredUatType(uatContent);
+  if (shouldEscalateArtifactUatToBrowser(uatContent)) {
     return {
       error: `UAT requires browser verification (opening a page in a browser, navigating to a page or localhost, screenshots) but declares "UAT mode: artifact-driven", which only runs static/file checks and would defer the browser work to a human. Use a mode that actually verifies the UI: "browser-executable" (interactive browser tools), "runtime-executable" (a browser test command such as playwright), or a browser-inclusive "mixed"/"live-runtime". Re-author the UAT Type section and complete the slice again.`,
     };

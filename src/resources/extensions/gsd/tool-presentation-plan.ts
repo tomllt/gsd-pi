@@ -7,6 +7,7 @@ import {
   RUN_UAT_TOOL_PRESENTATION_PLAN_ID,
   RUN_UAT_WORKFLOW_TOOL_NAMES,
 } from "./unit-tool-contracts.js";
+import { uatTypeIncludesBrowser } from "./uat-policy.js";
 
 export {
   RUN_UAT_BROWSER_TOOL_NAMES,
@@ -131,17 +132,6 @@ export function buildRunUatCanonicalToolNames(options: { includeBrowserTools?: r
 // `human-experience` is told to capture screenshots. Without this, a webpage
 // UAT classified as anything but `browser-executable` had no browser tools and
 // downgraded its live checks to NEEDS-HUMAN (M001/S03 regression).
-export const BROWSER_INCLUSIVE_UAT_TYPES: readonly string[] = [
-  "browser-executable",
-  "live-runtime",
-  "mixed",
-  "human-experience",
-];
-
-function uatTypeIncludesBrowser(uatType: string | undefined): boolean {
-  return uatType !== undefined && BROWSER_INCLUSIVE_UAT_TYPES.includes(uatType);
-}
-
 export function runUatBrowserToolsForType(uatType: string | undefined): readonly string[] {
   return uatTypeIncludesBrowser(uatType) ? RUN_UAT_BROWSER_TOOL_NAMES : [];
 }

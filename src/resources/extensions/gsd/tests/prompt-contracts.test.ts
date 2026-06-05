@@ -17,6 +17,7 @@ import {
 } from "../bootstrap/register-hooks.ts";
 import { shouldBlockAutoUnitToolCall } from "../auto-unit-tool-scope.ts";
 import { UNIT_TOOL_CONTRACTS } from "../unit-tool-contracts.ts";
+import { uatTypeIncludesBrowser } from "../uat-policy.ts";
 
 const promptsDir = join(process.cwd(), "src/resources/extensions/gsd/prompts");
 const templatesDir = join(process.cwd(), "src/resources/extensions/gsd/templates");
@@ -183,6 +184,7 @@ test("live-runtime and mixed UAT presentations also surface browser tools", () =
   // drive a browser, so the runner must actually receive the browser tools and
   // a hybrid surface — otherwise live checks silently downgrade to NEEDS-HUMAN.
   for (const uatType of ["live-runtime", "mixed", "human-experience"] as const) {
+    assert.equal(uatTypeIncludesBrowser(uatType), true, `${uatType} policy should include browser tools`);
     const presentation = buildRunUatPresentationForType(uatType);
     assert.equal(presentation.surface, "hybrid", `${uatType} should use the hybrid surface`);
     for (const toolName of RUN_UAT_BROWSER_TOOL_NAMES) {
@@ -196,6 +198,7 @@ test("live-runtime and mixed UAT presentations also surface browser tools", () =
 
 test("artifact-driven and runtime-executable UAT presentations stay browser-free", () => {
   for (const uatType of ["artifact-driven", "runtime-executable"] as const) {
+    assert.equal(uatTypeIncludesBrowser(uatType), false, `${uatType} policy should stay browser-free`);
     const presentation = buildRunUatPresentationForType(uatType);
     assert.equal(presentation.surface, "mcp", `${uatType} should use the mcp surface`);
     assert.ok(

@@ -631,14 +631,32 @@ test("executeUatResultSave accepts gsd_uat_exec evidence written in a milestone 
     assert.equal(result.isError, undefined);
     assert.equal(result.details.operation, "save_uat_result");
     assert.equal(result.details.verdict, "PASS");
+    assert.equal(result.details.runId, "uat:M001:S02:attempt-1");
+    assert.equal(result.details.worktreeRoot, worktree);
+    assert.equal(result.details.browserToolsPresented, false);
     assert.ok(
       existsSync(join(base, ".gsd", "uat", "M001", "S02", "attempt-1.json")),
       "attempt JSON should be persisted under the authoritative project .gsd",
     );
+    const attempt = JSON.parse(readFileSync(
+      join(base, ".gsd", "uat", "M001", "S02", "attempt-1.json"),
+      "utf-8",
+    )) as {
+      runId?: string;
+      worktreeRoot?: string;
+      browserToolsPresented?: boolean;
+      modePolicy?: { requiredAnyModes?: string[] };
+    };
+    assert.equal(attempt.runId, "uat:M001:S02:attempt-1");
+    assert.equal(attempt.worktreeRoot, worktree);
+    assert.equal(attempt.browserToolsPresented, false);
+    assert.deepEqual(attempt.modePolicy?.requiredAnyModes, ["runtime"]);
     const assessment = readFileSync(
       join(base, ".gsd", "milestones", "M001", "slices", "S02", "S02-ASSESSMENT.md"),
       "utf-8",
     );
+    assert.match(assessment, /runId: uat:M001:S02:attempt-1/);
+    assert.ok(assessment.includes(`worktreeRoot: ${worktree}`));
     assert.match(assessment, /Runtime path C:\\\\tmp\\\|uat evidence/);
     assert.match(assessment, /backslash \\\\ and pipe \\\|/);
   } finally {
@@ -749,8 +767,10 @@ test("executeUatResultSave supplies direct browser tools for browser-executable 
     const attempt = JSON.parse(readFileSync(
       join(base, ".gsd", "uat", "M001", "S06", "attempt-1.json"),
       "utf-8",
-    )) as { presentation?: { presentedTools?: string[] } };
+    )) as { browserToolsPresented?: boolean; presentation?: { presentedTools?: string[] } };
 
+    assert.equal(result.details.browserToolsPresented, true);
+    assert.equal(attempt.browserToolsPresented, true);
     assert.ok(attempt.presentation?.presentedTools?.includes("browser_navigate"));
     assert.ok(attempt.presentation?.presentedTools?.includes("browser_assert"));
     assert.equal(

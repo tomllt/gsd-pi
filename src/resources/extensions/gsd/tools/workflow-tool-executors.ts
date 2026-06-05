@@ -17,11 +17,10 @@ import {
 } from "../gsd-db.js";
 import { GATE_REGISTRY } from "../gate-registry.js";
 import { generateRequirementsMd, saveArtifactToDb } from "../db-writer.js";
-import { clearPathCache, relSliceFile, resolveGsdPathContract, resolveMilestoneFile, resolveSliceFile } from "../paths.js";
+import { clearPathCache, resolveGsdPathContract, resolveMilestoneFile, resolveSliceFile } from "../paths.js";
 import { saveFile, clearParseCache } from "../files.js";
-import { buildManualValidationGuidance, resolveCanonicalMilestoneRoot } from "../worktree-manager.js";
-import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { unlinkSync } from "node:fs";
+import { join } from "node:path";
 import type { CompleteMilestoneParams } from "./complete-milestone.js";
 import { handleCompleteMilestone } from "./complete-milestone.js";
 import { handleCompleteTask } from "./complete-task.js";
@@ -50,13 +49,15 @@ import { parseProject } from "../schemas/parsers.js";
 import { getAutoRuntimeSnapshot } from "../auto-runtime-state.js";
 import { renderPlanFromDb } from "../markdown-renderer.js";
 import {
-  buildRunUatPresentationForType,
-  canonicalWorkflowToolName,
-  parseMcpToolName,
-  RUN_UAT_FORBIDDEN_TOOL_NAMES,
-  RUN_UAT_TOOL_PRESENTATION_PLAN_ID,
-  RUN_UAT_WORKFLOW_TOOL_NAMES,
-} from "../tool-presentation-plan.js";
+  prepareUatRun,
+  saveUatAttemptArtifact,
+  type UatResultSaveParams,
+} from "../uat-run.js";
+export type {
+  UatCheckResultInput,
+  UatEvidenceRef,
+  UatPresentationInput,
+} from "../uat-run.js";
 
 export const SUPPORTED_SUMMARY_ARTIFACT_TYPES = [
   "SUMMARY",
@@ -438,58 +439,7 @@ export interface SaveGateResultParams {
   findings?: string;
 }
 
-export type UatType =
-  | "artifact-driven"
-  | "browser-executable"
-  | "runtime-executable"
-  | "live-runtime"
-  | "mixed"
-  | "human-experience";
-
-export type UatVerdict = "PASS" | "FAIL" | "PARTIAL";
-export type UatCheckResult = "PASS" | "FAIL" | "NEEDS-HUMAN";
-
-export interface UatEvidenceRef {
-  kind: "gsd_uat_exec" | "gsd_exec" | "screenshot" | "log" | "url" | "browser";
-  ref: string;
-  note?: string;
-  unitType?: string;
-  tool?: string;
-  executionId?: string;
-}
-
-export interface UatCheckResultInput {
-  id: string;
-  description: string;
-  mode: "artifact" | "runtime" | "browser" | "human-follow-up";
-  result: UatCheckResult;
-  evidence?: UatEvidenceRef[];
-  notes?: string;
-  nonAutomatable?: boolean;
-}
-
-export interface UatPresentationInput {
-  surface: "provider-tools" | "claude-code-sdk" | "mcp" | "hybrid";
-  model?: { provider?: string; api?: string; id?: string };
-  presentedTools: string[];
-  blockedTools: Array<{ name: string; reason: string }>;
-  aliases?: Array<{ requested: string; canonical: string }>;
-  fallbackToolsUsed?: string[];
-  toolPresentationPlanId?: string;
-  notes?: string;
-}
-
-export interface UatResultSaveParams {
-  milestoneId: string;
-  sliceId: string;
-  uatType: UatType;
-  verdict: UatVerdict;
-  checks: UatCheckResultInput[];
-  presentation: UatPresentationInput;
-  notes?: string;
-  attempt?: number | string | "auto";
-  previousAttemptId?: string;
-}
+export type { UatResultSaveParams };
 
 export async function executeTaskComplete(
   params: TaskCompleteParams,
@@ -1020,397 +970,6 @@ function errorResult(operation: string, message: string, error: string): ToolExe
   };
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function mergeBlockedTools(
-  current: UatPresentationInput["blockedTools"] | undefined,
-  canonical: UatPresentationInput["blockedTools"],
-): UatPresentationInput["blockedTools"] {
-  const merged = new Map<string, { name: string; reason: string }>();
-  for (const entry of [...(current ?? []), ...canonical]) {
-    merged.set(canonicalWorkflowToolName(parseMcpToolName(entry.name)?.tool ?? entry.name), entry);
-  }
-  return [...merged.values()];
-}
-
-function mergePresentedTools(current: readonly string[] | undefined, canonical: readonly string[]): string[] {
-  return [...new Set([...(current ?? []), ...canonical])];
-}
-
-function normalizeUatVerdict(params: UatResultSaveParams): UatResultSaveParams {
-  const raw = params as Partial<UatResultSaveParams> & Record<string, unknown>;
-  if (typeof raw.verdict === "string") {
-    return { ...params, verdict: raw.verdict.toUpperCase() as UatVerdict };
-  }
-  return params;
-}
-
-function supplyDefaultPresentation(params: UatResultSaveParams): UatResultSaveParams {
-  const raw = params as Partial<UatResultSaveParams> & Record<string, unknown>;
-  if (!raw.presentation) {
-    return { ...params, presentation: buildRunUatPresentationForType(params.uatType) };
-  }
-  return params;
-}
-
-function mergeCanonicalPresentation(params: UatResultSaveParams): UatResultSaveParams {
-  const canonicalPresentation = buildRunUatPresentationForType(params.uatType);
-  const providedPresentation = params.presentation as Partial<UatPresentationInput>;
-  return {
-    ...params,
-    presentation: {
-      ...providedPresentation,
-      surface: providedPresentation.surface ?? canonicalPresentation.surface,
-      presentedTools: mergePresentedTools(providedPresentation.presentedTools, canonicalPresentation.presentedTools),
-      blockedTools: mergeBlockedTools(providedPresentation.blockedTools, canonicalPresentation.blockedTools),
-      toolPresentationPlanId: RUN_UAT_TOOL_PRESENTATION_PLAN_ID,
-    } as UatPresentationInput,
-  };
-}
-
-const VALID_UAT_TYPES: readonly UatType[] = [
-  "artifact-driven",
-  "browser-executable",
-  "runtime-executable",
-  "live-runtime",
-  "mixed",
-  "human-experience",
-];
-
-function ensureUatRequiredFields(params: UatResultSaveParams): string | null {
-  if (!isNonEmptyString(params.milestoneId)) return "milestoneId is required";
-  if (!isNonEmptyString(params.sliceId)) return "sliceId is required";
-  if (!isNonEmptyString(params.uatType)) return "uatType is required";
-  if (!(VALID_UAT_TYPES as readonly string[]).includes(params.uatType)) {
-    return `uatType must be one of: ${VALID_UAT_TYPES.join(", ")}`;
-  }
-  if (!["PASS", "FAIL", "PARTIAL"].includes(params.verdict)) return "verdict must be PASS, FAIL, or PARTIAL";
-  if (!Array.isArray(params.checks) || params.checks.length === 0) return "checks must contain at least one UAT check";
-  if (!params.presentation || !Array.isArray(params.presentation.presentedTools)) return "presentation.presentedTools is required";
-  if (!Array.isArray(params.presentation.blockedTools)) return "presentation.blockedTools is required";
-  return null;
-}
-
-function approvedEvidenceRoots(basePath: string): string[] {
-  const contract = resolveGsdPathContract(basePath);
-  return [contract.worktreeGsd, contract.projectGsd].filter((root): root is string => typeof root === "string");
-}
-
-function approvedBrowserArtifactRoots(basePath: string): string[] {
-  const contract = resolveGsdPathContract(basePath);
-  const roots = [contract.workRoot, contract.projectRoot].map((root) => join(root, ".artifacts", "browser"));
-  return [...new Set(roots)];
-}
-
-function pathStartsWithin(parent: string, target: string): boolean {
-  const normalizedParent = parent.replace(/\\/g, "/").replace(/\/+$/, "");
-  const normalizedTarget = target.replace(/\\/g, "/").replace(/\/+$/, "");
-  return normalizedTarget === normalizedParent || normalizedTarget.startsWith(`${normalizedParent}/`);
-}
-
-function pushUnique(paths: string[], candidate: string): void {
-  if (!paths.includes(candidate)) paths.push(candidate);
-}
-
-function execMetaPathCandidates(basePath: string, ref: string): string[] {
-  const trimmed = ref.trim();
-  const candidates: string[] = [];
-  const execDirs = approvedEvidenceRoots(basePath).map((root) => join(root, "exec"));
-  const normalizedRef = trimmed.replace(/\\/g, "/");
-  const pathLike = normalizedRef.endsWith(".meta.json") || normalizedRef.includes("/.gsd/exec/");
-
-  if (pathLike) {
-    const rawPath = isAbsolute(trimmed) ? resolve(trimmed) : resolve(basePath, trimmed);
-    pushUnique(candidates, rawPath);
-
-    const relativeExecMarker = ".gsd/exec/";
-    const markerIndex = normalizedRef.indexOf(relativeExecMarker);
-    if (markerIndex >= 0) {
-      const execRelative = normalizedRef.slice(markerIndex + relativeExecMarker.length);
-      for (const execDir of execDirs) {
-        pushUnique(candidates, join(execDir, execRelative));
-      }
-    }
-
-    return candidates.filter((candidate) =>
-      execDirs.some((execDir) => pathStartsWithin(execDir, candidate))
-    );
-  }
-
-  for (const execDir of execDirs) {
-    pushUnique(candidates, join(execDir, `${trimmed}.meta.json`));
-  }
-  return candidates;
-}
-
-function resolveExecMetaPath(basePath: string, ref: string): string | null {
-  for (const candidate of execMetaPathCandidates(basePath, ref)) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-function evidencePathIsApproved(basePath: string, ref: string): boolean {
-  const normalizedRef = ref.replace(/\\/g, "/");
-  if (normalizedRef.startsWith(".gsd/exec/") || normalizedRef.startsWith(".gsd/uat/")) return true;
-  if (normalizedRef.startsWith(".artifacts/browser/")) {
-    const resolvedRef = resolve(basePath, ref);
-    return approvedBrowserArtifactRoots(basePath).some((root) => pathStartsWithin(root, resolvedRef));
-  }
-  const gsdEvidenceApproved = approvedEvidenceRoots(basePath).some((root) => {
-    return pathStartsWithin(join(root, "exec"), ref) || pathStartsWithin(join(root, "uat"), ref);
-  });
-  if (gsdEvidenceApproved) return true;
-  return approvedBrowserArtifactRoots(basePath).some((root) => pathStartsWithin(root, ref));
-}
-
-function validateEvidenceRef(basePath: string, evidence: UatEvidenceRef): string | null {
-  if (!isNonEmptyString(evidence.ref)) return "evidence.ref is required";
-  if (evidence.kind === "gsd_uat_exec" || evidence.kind === "gsd_exec") {
-    const path = resolveExecMetaPath(basePath, evidence.ref.trim());
-    if (!path) return `missing gsd_exec metadata for evidence id "${evidence.ref}"`;
-    if (evidence.kind === "gsd_uat_exec") {
-      try {
-        const meta = JSON.parse(readFileSync(path, "utf-8")) as { metadata?: { kind?: unknown } };
-        if (meta.metadata?.kind !== "uat_exec") return `evidence id "${evidence.ref}" is not typed as uat_exec`;
-      } catch {
-        return `invalid gsd_exec metadata JSON for evidence id "${evidence.ref}"`;
-      }
-    }
-    return null;
-  }
-  if (evidence.kind === "url") {
-    try {
-      const parsed = new URL(evidence.ref);
-      return parsed.protocol === "http:" || parsed.protocol === "https:"
-        ? null
-        : `invalid URL evidence ref "${evidence.ref}"`;
-    } catch {
-      return `invalid URL evidence ref "${evidence.ref}"`;
-    }
-  }
-  return evidencePathIsApproved(basePath, evidence.ref)
-    ? null
-    : `evidence ref "${evidence.ref}" is outside approved evidence locations`;
-}
-
-function validateUatChecks(basePath: string, params: UatResultSaveParams): string | null {
-  for (const check of params.checks) {
-    if (!isNonEmptyString(check.id)) return "every check must have a non-empty id";
-    if (!isNonEmptyString(check.description)) return `check ${check.id} must have a description`;
-    if (!["artifact", "runtime", "browser", "human-follow-up"].includes(check.mode)) {
-      return `check ${check.id} has invalid mode "${check.mode}"`;
-    }
-    if (!["PASS", "FAIL", "NEEDS-HUMAN"].includes(check.result)) {
-      return `check ${check.id} has invalid result "${check.result}"`;
-    }
-    if (check.result === "PASS" || check.result === "FAIL") {
-      if (!Array.isArray(check.evidence) || check.evidence.length === 0) {
-        return `check ${check.id} is ${check.result} but has no objective evidence`;
-      }
-      for (const evidence of check.evidence) {
-        const error = validateEvidenceRef(basePath, evidence);
-        if (error) return `check ${check.id}: ${error}`;
-      }
-    } else if (!isNonEmptyString(check.notes)) {
-      return `check ${check.id} is NEEDS-HUMAN but has no manual instruction or reason`;
-    }
-  }
-  return null;
-}
-
-function validateFreshUatOwnedEvidence(params: UatResultSaveParams): string | null {
-  const hasFreshUatEvidence = params.checks.some((check) =>
-    (check.evidence ?? []).some((evidence) => evidence.kind === "gsd_uat_exec")
-  );
-  return hasFreshUatEvidence
-    ? null
-    : "UAT Assessment requires at least one fresh gsd_uat_exec evidence reference from run-uat";
-}
-
-function validateUatMode(params: UatResultSaveParams): string | null {
-  const modes = new Set(params.checks.map((check) => check.mode));
-  const hasHuman = params.checks.some((check) => check.result === "NEEDS-HUMAN");
-  if (params.uatType === "artifact-driven" && hasHuman && params.verdict === "PASS") {
-    return "artifact-driven UAT cannot PASS with human-only checks";
-  }
-  if (
-    hasHuman &&
-    params.verdict === "PASS" &&
-    !["human-experience", "mixed", "live-runtime"].includes(params.uatType) &&
-    !params.checks.every((check) => check.result !== "NEEDS-HUMAN" || check.nonAutomatable === true)
-  ) {
-    return "NEEDS-HUMAN checks can only coexist with PASS for human-experience, mixed, live-runtime, or explicitly non-automatable checks";
-  }
-  if (params.uatType === "runtime-executable" && !modes.has("runtime")) {
-    return "runtime-executable UAT requires at least one runtime check";
-  }
-  if (params.uatType === "browser-executable" && !modes.has("browser")) {
-    return "browser-executable UAT requires at least one browser check";
-  }
-  if (params.uatType === "live-runtime" && !modes.has("runtime") && !modes.has("browser")) {
-    return "live-runtime UAT requires runtime or browser evidence";
-  }
-  return null;
-}
-
-function quoteToolNames(toolNames: readonly string[]): string {
-  return toolNames.map((toolName) => `"${toolName}"`).join(", ");
-}
-
-function validateCanonicalPresentation(params: UatResultSaveParams): string | null {
-  const aliasHints: Record<string, string> = {
-    gsd_save_summary: "gsd_summary_save",
-    gsd_complete_task: "gsd_task_complete",
-    gsd_complete_slice: "gsd_slice_complete",
-    gsd_milestone_complete: "gsd_complete_milestone",
-  };
-  const errors: string[] = [];
-  for (const toolName of params.presentation.presentedTools) {
-    const baseName = parseMcpToolName(toolName)?.tool ?? toolName;
-    const canonical = aliasHints[baseName];
-    if (canonical) errors.push(`presentation tool "${toolName}" uses an alias; use canonical "${canonical}"`);
-  }
-
-  const presentedCanonical = new Set(
-    params.presentation.presentedTools.map((toolName) =>
-      canonicalWorkflowToolName(parseMcpToolName(toolName)?.tool ?? toolName)
-    ),
-  );
-  const missingRequiredTools = RUN_UAT_WORKFLOW_TOOL_NAMES.filter(
-    (requiredTool) => !presentedCanonical.has(requiredTool),
-  );
-  if (missingRequiredTools.length === 1) {
-    errors.push(`presentation is missing required UAT tool "${missingRequiredTools[0]}"`);
-  } else if (missingRequiredTools.length > 1) {
-    errors.push(`presentation is missing required UAT tools ${quoteToolNames(missingRequiredTools)}`);
-  }
-
-  const forbiddenCanonical = new Set(
-    RUN_UAT_FORBIDDEN_TOOL_NAMES
-      .filter((toolName) => !toolName.includes("*"))
-      .map((toolName) => canonicalWorkflowToolName(parseMcpToolName(toolName)?.tool ?? toolName)),
-  );
-  const forbiddenPresentedTools: string[] = [];
-  for (const toolName of params.presentation.presentedTools) {
-    const canonical = canonicalWorkflowToolName(parseMcpToolName(toolName)?.tool ?? toolName);
-    if (toolName === "mcp__gsd-workflow__*" || forbiddenCanonical.has(canonical)) {
-      forbiddenPresentedTools.push(toolName);
-    }
-  }
-  if (forbiddenPresentedTools.length === 1) {
-    errors.push(`presentation includes forbidden run-uat tool "${forbiddenPresentedTools[0]}"`);
-  } else if (forbiddenPresentedTools.length > 1) {
-    errors.push(`presentation includes forbidden run-uat tools ${quoteToolNames(forbiddenPresentedTools)}`);
-  }
-
-  const blockedCanonical = new Set(
-    params.presentation.blockedTools.map((entry) =>
-      canonicalWorkflowToolName(parseMcpToolName(entry.name)?.tool ?? entry.name)
-    ),
-  );
-  const missingBlockedTools = ["gsd_exec", "gsd_summary_save", "gsd_save_gate_result"].filter(
-    (blockedTool) => !blockedCanonical.has(blockedTool),
-  );
-  if (missingBlockedTools.length === 1) {
-    errors.push(`presentation must record "${missingBlockedTools[0]}" as blocked during run-uat`);
-  } else if (missingBlockedTools.length > 1) {
-    errors.push(`presentation must record ${quoteToolNames(missingBlockedTools)} as blocked during run-uat`);
-  }
-  return errors.length > 0 ? errors.join("; ") : null;
-}
-
-function nextUatAttempt(basePath: string, milestoneId: string, sliceId: string): number {
-  const contract = resolveGsdPathContract(basePath);
-  const dir = join(contract.projectGsd, "uat", milestoneId, sliceId);
-  if (!existsSync(dir)) return 1;
-  let max = 0;
-  for (const entry of readdirSync(dir)) {
-    const match = /^attempt-(\d+)\.json$/.exec(entry);
-    if (match) max = Math.max(max, Number(match[1]));
-  }
-  return max + 1;
-}
-
-function escapeMarkdownTableCell(value: unknown): string {
-  return String(value ?? "")
-    .replace(/[\\|]/g, (char) => `\\${char}`)
-    .replace(/\r?\n/g, "<br>");
-}
-
-function renderUatAssessment(
-  params: UatResultSaveParams,
-  attempt: number,
-  gateVerdict: "pass" | "flag",
-  basePath: string,
-): string {
-  const lines = [
-    "---",
-    `sliceId: ${params.sliceId}`,
-    `uatType: ${params.uatType}`,
-    `verdict: ${params.verdict}`,
-    `attempt: ${attempt}`,
-    `date: ${new Date().toISOString()}`,
-    "---",
-    "",
-    `# UAT Result - ${params.sliceId}`,
-    "",
-    "## Checks",
-    "",
-    "| Check | Mode | Result | Evidence | Notes |",
-    "|-------|------|--------|----------|-------|",
-    ...params.checks.map((check) => {
-      const evidence = (check.evidence ?? []).map((entry) => `${entry.kind}:${entry.ref}`).join("<br>") || "-";
-      return `| ${escapeMarkdownTableCell(check.description)} | ${escapeMarkdownTableCell(check.mode)} | ${escapeMarkdownTableCell(check.result)} | ${escapeMarkdownTableCell(evidence)} | ${escapeMarkdownTableCell(check.notes)} |`;
-    }),
-    "",
-    "## Overall Verdict",
-    "",
-    `${params.verdict} - ${params.notes ?? "UAT result saved."}`,
-    "",
-    "## Tool Presentation",
-    "",
-    "```json",
-    JSON.stringify(params.presentation, null, 2),
-    "```",
-    "",
-    "## Gate",
-    "",
-    `Aggregate UAT gate saved as ${gateVerdict}.`,
-  ];
-
-  // When any check still needs a human, point them at the exact checkout to
-  // validate — critical for worktree milestones whose code sits under a hidden
-  // `.gsd/worktrees/` path the reviewer would otherwise have to hunt for.
-  const hasHuman = params.checks.some((check) => check.result === "NEEDS-HUMAN");
-  if (hasHuman) {
-    const guidance = buildManualValidationGuidance(basePath, params.milestoneId, {
-      uatPath: relSliceFile(basePath, params.milestoneId, params.sliceId, "UAT"),
-    });
-    if (guidance) {
-      lines.push(
-        "",
-        "## Manual Validation",
-        "",
-        "One or more checks are marked `NEEDS-HUMAN` and require a person to validate:",
-        "",
-        ...guidance.split("\n").map((line) => `- ${line}`),
-      );
-    }
-  }
-
-  return `${lines.join("\n")}\n`;
-}
-
-async function saveUatAttemptArtifact(basePath: string, params: UatResultSaveParams, attempt: number): Promise<string> {
-  const contract = resolveGsdPathContract(basePath);
-  const relativePath = `uat/${params.milestoneId}/${params.sliceId}/attempt-${attempt}.json`;
-  await saveFile(join(contract.projectGsd, relativePath), `${JSON.stringify({ ...params, attempt }, null, 2)}\n`);
-  return relativePath;
-}
-
 export async function executeUatResultSave(
   params: UatResultSaveParams,
   basePath: string = process.cwd(),
@@ -1418,110 +977,78 @@ export async function executeUatResultSave(
   const unitGuard = blockIfWrongAutoUnit("run-uat", "save_uat_result");
   if (unitGuard) return unitGuard;
 
-  // Phase 1: normalize verdict and supply the canonical presentation when none was provided.
-  params = normalizeUatVerdict(params);
-  params = supplyDefaultPresentation(params);
-
   const dbAvailable = await ensureDbOpen(basePath);
   if (!dbAvailable) return errorResult("save_uat_result", "GSD database is not available.", "db_unavailable");
 
-  // Phase 2: validate the submitted presentation before the canonical merge so that
-  // presentations missing required workflow tools are rejected rather than silently patched.
-  const requiredError = ensureUatRequiredFields(params);
-  if (requiredError) return errorResult("save_uat_result", requiredError, "invalid_params");
-  const presentationError = validateCanonicalPresentation(params);
-  if (presentationError) return errorResult("save_uat_result", presentationError, "alias_tool_name");
-
-  // Phase 3: merge in the canonical plan ID and read-only audit tools so the persisted
-  // artifact always carries the full audit surface even when the provider omitted them.
-  params = mergeCanonicalPresentation(params);
-  const checkError = validateUatChecks(basePath, params);
-  if (checkError) return errorResult("save_uat_result", checkError, "invalid_evidence");
-  const freshEvidenceError = validateFreshUatOwnedEvidence(params);
-  if (freshEvidenceError) return errorResult("save_uat_result", freshEvidenceError, "missing_fresh_uat_evidence");
-  const modeError = validateUatMode(params);
-  if (modeError) return errorResult("save_uat_result", modeError, "uat_mode_mismatch");
+  const prepared = prepareUatRun(basePath, params);
+  if (!prepared.ok) {
+    return errorResult("save_uat_result", prepared.error.message, prepared.error.code);
+  }
+  const { run } = prepared;
 
   try {
-    const attempt = params.attempt === "auto" || params.attempt === undefined
-      ? nextUatAttempt(basePath, params.milestoneId, params.sliceId)
-      : typeof params.attempt === "string"
-        ? Number.parseInt(params.attempt, 10)
-        : params.attempt;
-    if (!Number.isInteger(attempt) || attempt < 1) {
-      return errorResult("save_uat_result", "attempt must be a positive integer or auto", "invalid_attempt");
-    }
-    const gateVerdict = params.verdict === "PASS" ? "pass" : "flag";
-    const rationale = params.notes ?? `UAT ${params.verdict} for ${params.sliceId}.`;
-    const assessment = renderUatAssessment(params, attempt, gateVerdict, basePath);
     const summary = await executeSummarySave(
       {
-        milestone_id: params.milestoneId,
-        slice_id: params.sliceId,
+        milestone_id: run.params.milestoneId,
+        slice_id: run.params.sliceId,
         artifact_type: "ASSESSMENT",
-        content: assessment,
+        content: run.assessment,
       },
       basePath,
     );
     if (summary.isError) return summary;
-    const attemptPath = await saveUatAttemptArtifact(basePath, params, attempt);
-    const evaluatedAt = new Date().toISOString();
+    const attemptPath = await saveUatAttemptArtifact(basePath, run);
     upsertQualityGate({
-      milestoneId: params.milestoneId,
-      sliceId: params.sliceId,
+      milestoneId: run.params.milestoneId,
+      sliceId: run.params.sliceId,
       gateId: "UAT",
       scope: "slice",
       taskId: "",
       status: "complete",
-      verdict: gateVerdict,
-      rationale,
-      findings: assessment,
-      evaluatedAt,
+      verdict: run.gateVerdict,
+      rationale: run.rationale,
+      findings: run.assessment,
+      evaluatedAt: run.evaluatedAt,
     });
     insertGateRun({
-      traceId: `uat:${params.milestoneId}:${params.sliceId}`,
-      turnId: `uat:${params.sliceId}:attempt-${attempt}`,
+      traceId: `uat:${run.params.milestoneId}:${run.params.sliceId}`,
+      turnId: run.runId,
       gateId: "UAT",
       gateType: "uat",
       unitType: "run-uat",
-      unitId: `run-uat:${params.milestoneId}/${params.sliceId}`,
-      milestoneId: params.milestoneId,
-      sliceId: params.sliceId,
-      outcome: params.verdict === "PASS" ? "pass" : "fail",
-      failureClass: params.verdict === "PASS" ? "none" : "verification",
-      rationale,
-      findings: assessment,
-      attempt,
-      maxAttempts: attempt,
-      retryable: params.verdict !== "PASS",
-      evaluatedAt,
+      unitId: `run-uat:${run.params.milestoneId}/${run.params.sliceId}`,
+      milestoneId: run.params.milestoneId,
+      sliceId: run.params.sliceId,
+      outcome: run.gateOutcome,
+      failureClass: run.params.verdict === "PASS" ? "none" : "verification",
+      rationale: run.rationale,
+      findings: run.assessment,
+      attempt: run.attempt,
+      maxAttempts: run.attempt,
+      retryable: run.params.verdict !== "PASS",
+      evaluatedAt: run.evaluatedAt,
     });
     invalidateStateCache();
-    // Surface where to validate when checks are left for a human, so the path
-    // (often a buried worktree checkout) reaches the reviewer, not just the file.
-    const hasHuman = params.checks.some((check) => check.result === "NEEDS-HUMAN");
-    const manualGuidance = hasHuman
-      ? buildManualValidationGuidance(basePath, params.milestoneId, {
-          uatPath: relSliceFile(basePath, params.milestoneId, params.sliceId, "UAT"),
-        })
-      : null;
-    const savedText = `UAT result saved for ${params.milestoneId}/${params.sliceId}: ${params.verdict}`;
+    const savedText = `UAT result saved for ${run.params.milestoneId}/${run.params.sliceId}: ${run.params.verdict}`;
     return {
       content: [{
         type: "text",
-        text: manualGuidance ? `${savedText}\n\nManual validation needed:\n${manualGuidance}` : savedText,
+        text: run.manualGuidance ? `${savedText}\n\nManual validation needed:\n${run.manualGuidance}` : savedText,
       }],
       details: {
         operation: "save_uat_result",
-        milestoneId: params.milestoneId,
-        sliceId: params.sliceId,
-        verdict: params.verdict,
-        gateVerdict,
-        attempt,
+        milestoneId: run.params.milestoneId,
+        sliceId: run.params.sliceId,
+        verdict: run.params.verdict,
+        gateVerdict: run.gateVerdict,
+        attempt: run.attempt,
         attemptPath,
-        recommendedNextUnit: params.verdict === "PASS" ? null : "reactive-execute",
-        ...(hasHuman
-          ? { manualValidationPath: resolveCanonicalMilestoneRoot(basePath, params.milestoneId) }
+        runId: run.runId,
+        worktreeRoot: run.worktreeRoot,
+        browserToolsPresented: run.browserToolsPresented,
+        recommendedNextUnit: run.params.verdict === "PASS" ? null : "reactive-execute",
+        ...(run.hasHuman
+          ? { manualValidationPath: run.worktreeRoot }
           : {}),
       },
     };

@@ -10,8 +10,8 @@
  */
 
 import { loadFile, parseContinue, parseSummary, loadActiveOverrides, formatOverridesSection, parseTaskPlanFile } from "./files.js";
-import type { Override, UatType } from "./files.js";
-import { hasVerdict, getUatType, extractVerdict } from "./verdict-parser.js";
+import type { Override } from "./files.js";
+import { hasVerdict, extractVerdict } from "./verdict-parser.js";
 import { loadPrompt, inlineTemplate } from "./prompt-loader.js";
 import {
   resolveMilestoneFile, resolveSliceFile, resolveSlicePath,
@@ -42,11 +42,11 @@ import { logWarning } from "./workflow-logger.js";
 import { inlineGraphSubgraph } from "./graph-context.js";
 import { buildExtractionStepsBlock } from "./commands-extract-learnings.js";
 import { classifyProject, type ProjectClassification } from "./detection.js";
-import { hasBrowserRequiredText } from "./browser-evidence.js";
 import { debugLog } from "./debug-logger.js";
 import { buildSkillActivationBlock, buildSkillDiscoveryVars } from "./skill-activation.js";
 import { findMilestoneIds } from "./milestone-ids.js";
 import { buildRunUatPresentationForType, RUN_UAT_TOOL_PRESENTATION_PLAN_ID } from "./tool-presentation-plan.js";
+import { resolveEffectiveUatType, shouldDispatchUatForContent, type UatType } from "./uat-policy.js";
 
 export { buildSkillActivationBlock, buildSkillDiscoveryVars };
 
@@ -284,19 +284,6 @@ function prependContextModeToBlock(
   if (!contextMode) return block;
   if (!block.trim()) return contextMode;
   return `${contextMode}\n\n${block}`;
-}
-
-function resolveEffectiveUatType(content: string): UatType {
-  const uatType = getUatType(content);
-  if (uatType === "artifact-driven" && hasBrowserRequiredText(content)) {
-    return "browser-executable";
-  }
-  return uatType;
-}
-
-function shouldDispatchUatForContent(content: string, prefs: GSDPreferences | undefined): boolean {
-  const uatType = resolveEffectiveUatType(content);
-  return !!prefs?.uat_dispatch || uatType !== "artifact-driven" || hasBrowserRequiredText(content);
 }
 
 // ─── Executor Constraints ─────────────────────────────────────────────────────

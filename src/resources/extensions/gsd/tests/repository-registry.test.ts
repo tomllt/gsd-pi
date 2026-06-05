@@ -2,7 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -117,7 +117,7 @@ test("repository registry keeps project root anchored to .gsd project in monorep
 });
 
 test("repository registry uses external-state worktree checkout as project root", (t) => {
-  const base = mkdtempSync(join(tmpdir(), "gsd-repo-registry-external-"));
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "gsd-repo-registry-external-")));
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const worktree = join(base, ".gsd", "projects", "abc123", "worktrees", "M001");
   mkdirSync(worktree, { recursive: true });
