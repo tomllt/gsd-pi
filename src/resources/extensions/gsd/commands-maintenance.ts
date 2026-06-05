@@ -542,9 +542,26 @@ async function confirmRecover(
       "Import markdown into the DB?",
       `${warningText}\n\nContinue only if the DB is lost or corrupt and markdown is the source you intend to import.`,
     );
-    if (confirmed) return true;
-    ctx.ui.notify("gsd recover cancelled. No database changes made.", "info");
-    return false;
+    if (!confirmed) {
+      ctx.ui.notify("gsd recover cancelled. No database changes made.", "info");
+      return false;
+    }
+    // Data loss requires a second, explicit acknowledgement — the interactive
+    // equivalent of the --allow-data-loss opt-in the non-interactive paths
+    // demand. A single generic "yes" must not silently delete DB rows.
+    if (dataLoss) {
+      const acknowledged = await ctx.ui.confirm(
+        "Permanently delete DB rows the markdown lacks?",
+        "This recover will DELETE authoritative DB rows the markdown does not contain. " +
+          "A snapshot is saved to .gsd/backups/ first, but /gsd rebuild markdown is usually " +
+          "what you want. Proceed with the deletion?",
+      );
+      if (!acknowledged) {
+        ctx.ui.notify("gsd recover cancelled. No database changes made.", "info");
+        return false;
+      }
+    }
+    return true;
   }
 
   ctx.ui.notify(

@@ -534,4 +534,43 @@ describe('gsd-recover', async () => {
       cleanup(base);
     }
   });
+
+  test('handleRecover interactive data-loss requires a second explicit acknowledgement', async () => {
+    const base = createFixtureBase();
+    try {
+      writeFile(base, 'milestones/M001/M001-ROADMAP.md', ROADMAP_M001);
+      openDatabase(':memory:');
+      insertMilestone({ id: 'M999', title: 'Existing DB State', status: 'active' });
+
+      // First confirm (proceed?) = yes; second confirm (delete rows?) = no.
+      let call = 0;
+      const { ctx, notes } = makeCtx(async () => { call += 1; return call === 1; });
+      await handleRecover(ctx, base, '');
+
+      assert.ok(getMilestone('M999'), 'declining the data-loss ack preserves DB rows');
+      assert.equal(getMilestone('M001'), null, 'markdown not imported when data-loss ack declined');
+      assert.match(notes.at(-1)?.message ?? '', /cancelled/);
+    } finally {
+      closeDatabase();
+      cleanup(base);
+    }
+  });
+
+  test('handleRecover interactive proceeds when the data-loss deletion is acknowledged', async () => {
+    const base = createFixtureBase();
+    try {
+      writeFile(base, 'milestones/M001/M001-ROADMAP.md', ROADMAP_M001);
+      openDatabase(':memory:');
+      insertMilestone({ id: 'M999', title: 'Existing DB State', status: 'active' });
+
+      const { ctx } = makeCtx(async () => true); // both confirms accepted
+      await handleRecover(ctx, base, '');
+
+      assert.equal(getMilestone('M999'), null, 'acknowledged data-loss recover clears old rows');
+      assert.ok(getMilestone('M001'), 'acknowledged data-loss recover imports markdown');
+    } finally {
+      closeDatabase();
+      cleanup(base);
+    }
+  });
 });
