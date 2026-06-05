@@ -417,7 +417,12 @@ export function validatePreferences(preferences: GSDPreferences): {
               `(off, minimal, low, medium, high, xhigh) — ignored`,
             );
             const { thinking: _ignored, ...rest } = entry as Record<string, unknown>;
-            sanitizedModels[phase] = rest;
+            // If stripping the bad thinking leaves no usable model, drop the
+            // phase entirely rather than storing a hollow `{}` / `{ provider }`
+            // entry that resolveWinningPhase would otherwise treat as configured.
+            if (rest.model) {
+              sanitizedModels[phase] = rest;
+            }
             continue;
           }
         }

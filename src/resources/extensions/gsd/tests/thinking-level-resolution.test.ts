@@ -150,6 +150,29 @@ test("an empty-string model falls through the sibling chain", () => {
   });
 });
 
+test("a model-less object entry is unconfigured and falls through to a sibling", () => {
+  withPreferences(
+    ["models:", "  discuss:", "    provider: anthropic", "  planning: planning-model"],
+    () => {
+      // discuss has no `model` → skipped → planning wins.
+      assert.equal(resolveModelWithFallbacksForUnit("discuss-milestone")?.primary, "planning-model");
+    },
+  );
+});
+
+test("a sole model-less object entry yields undefined (no {primary: undefined})", () => {
+  withPreferences(["models:", "  planning:", "    provider: anthropic"], () => {
+    assert.equal(resolveModelWithFallbacksForUnit("plan-milestone"), undefined);
+  });
+});
+
+test("validation drops a phase left hollow after stripping invalid thinking", () => {
+  const result = validatePreferences({ models: { planning: { thinking: "bad" } } } as never);
+  assert.ok(result.warnings.some((w) => w.includes("models.planning.thinking")));
+  // No model remained after stripping → phase dropped entirely, not stored as {}.
+  assert.equal((result.preferences.models as Record<string, unknown>).planning, undefined);
+});
+
 test("validation accepts a valid thinking block", () => {
   const result = validatePreferences({ thinking: { planning: "xhigh", execution: "low" } } as never);
   assert.deepEqual(result.preferences.thinking, { planning: "xhigh", execution: "low" });

@@ -112,7 +112,12 @@ function resolveWinningPhase(
     // Falsy check (not `!= null`) so an empty-string model is treated as
     // unconfigured and the chain falls through — matches the pre-refactor
     // switch, which bailed via `if (!phaseConfig)`.
-    if (config) return { phase: key, config };
+    if (!config) continue;
+    // An object entry only "wins" if it provides a usable model. A model-less
+    // object (e.g. `{ provider: x }`, or `{}` left after stripping an invalid
+    // `thinking`) must not shadow sibling fallback or yield `{ primary: undefined }`.
+    if (typeof config === "object" && !config.model) continue;
+    return { phase: key, config };
   }
   return undefined;
 }
