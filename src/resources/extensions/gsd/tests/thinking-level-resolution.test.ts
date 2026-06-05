@@ -47,6 +47,16 @@ test("separate thinking block resolves without a model pin", () => {
   });
 });
 
+test("inline thinking on a model-less models entry resolves", () => {
+  // `models.planning: { thinking: high }` with no model — inline thinking must
+  // be honored even though the entry pins no model (resolveWinningPhase skips it).
+  withPreferences(["models:", "  planning:", "    thinking: high"], () => {
+    assert.equal(resolveThinkingLevelForUnit("plan-milestone"), "high");
+    // Model resolution still yields nothing for that phase.
+    assert.equal(resolveModelWithFallbacksForUnit("plan-milestone"), undefined);
+  });
+});
+
 test("inline thinking wins over the block for the same phase", () => {
   withPreferences(
     [

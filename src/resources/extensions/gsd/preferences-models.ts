@@ -158,14 +158,19 @@ export function resolveModelWithFallbacksForUnit(unitType: string): ResolvedMode
 /**
  * Resolve the explicitly configured reasoning effort for a unit type (ADR-026).
  *
- * Thinking travels with the model. When a `models` bucket wins the chain, the
- * level is resolved as: (1) inline `models.<phase>.thinking` first; (2) the
- * thinking block walked from the unit's own chain head up to and including the
- * winning phase. This lets `thinking.execution_simple` surface even when the
- * model fell through to `execution`, while ensuring a unit that claimed its own
- * model bucket never borrows a later sibling's thinking block entry. When no
- * model is configured for the unit at all, the `thinking` block resolves on its
- * own full sibling chain.
+ * Thinking travels with the model. The chain is walked most-specific-first up to
+ * and including the phase whose model won; at each level inline
+ * `models.<phase>.thinking` is preferred, then the same phase's `thinking` block
+ * entry. This means:
+ * - a more-specific block key (`thinking.execution_simple`) surfaces even when
+ *   the model only resolves on a less-specific sibling (`models.execution`);
+ * - inline thinking is honored even on a model-less `models.<phase>` entry
+ *   (e.g. `{ thinking: "high" }` with no `model`);
+ * - a unit that claimed its own model bucket never borrows a *less*-specific
+ *   sibling's thinking (the walk stops at the winning phase).
+ * When no model is configured anywhere in the chain, the walk spans the full
+ * chain so inline thinking and the `thinking` block both resolve on their own
+ * sibling chain.
  *
  * Returns undefined when nothing explicit is configured — the dispatch path
  * then falls back to the session/default level and applies the code-writing
@@ -181,35 +186,16 @@ export function resolveThinkingLevelForUnit(unitType: string): GSDThinkingLevel 
   const models = prefs.models as GSDModelConfigV2 | undefined;
   const block = prefs.thinking as GSDThinkingConfig | undefined;
 
+  // Walk most-specific-first, up to and including the winning model phase (or
+  // the full chain when no model is configured), checking inline then block.
   const winner = resolveWinningPhase(models, chain);
-  if (winner) {
-    // Pair thinking to the phase the model resolved from.
-    if (typeof winner.config === "object" && winner.config.thinking) {
-      return winner.config.thinking;
-    }
-    // Walk the unit's own chain in the thinking block, stopping at (and
-    // including) the winning model phase. Walking from the head finds the
-    // most-specific key first (e.g. thinking.execution_simple surfaces even
-    // when the model fell through to execution), while the stop ensures a
-    // unit that claimed its own model bucket never borrows a later sibling's
-    // thinking.
-    if (block) {
-      for (const key of chain) {
-        const level = block[key];
-        if (level) return level;
-        if (key === winner.phase) break;
-      }
-    }
-    return undefined;
-  }
-
-  // No model configured anywhere in the chain — let the thinking block drive
-  // on its own sibling chain (e.g. `thinking.discuss ?? thinking.planning`).
-  if (block) {
-    for (const key of chain) {
-      const level = block[key];
-      if (level) return level;
-    }
+  const limit = winner ? chain.indexOf(winner.phase) + 1 : chain.length;
+  for (let i = 0; i < limit; i++) {
+    const key = chain[i];
+    const entry = models?.[key];
+    if (typeof entry === "object" && entry?.thinking) return entry.thinking; // inline (incl. model-less)
+    const blockLevel = block?.[key];
+    if (blockLevel) return blockLevel;                                       // block
   }
   return undefined;
 }
