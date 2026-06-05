@@ -212,12 +212,12 @@ export async function handleAutoCommand(trimmed: string, ctx: ExtensionCommandCo
     // Cold start after /quit lands at the project root, not the worktree. If the
     // active milestone has a live worktree, chdir back into it now so the agent
     // doesn't have to search for it. Best-effort; resolves to a no-op otherwise.
-    {
+    try {
       const { reenterActiveWorktreeIfNeeded } = await import("../../worktree-reentry.js");
       await reenterActiveWorktreeIfNeeded(basePath, {
         notify: (message) => ctx.ui.notify(message, "info"),
       });
-    }
+    } catch { /* non-fatal */ }
     const { hasGsdBootstrapArtifacts } = await import("../../detection.js");
     const { gsdRoot } = await import("../../paths.js");
     if (!hasGsdBootstrapArtifacts(gsdRoot(basePath))) {
