@@ -1269,11 +1269,14 @@ export async function cleanupAfterLoopExit(ctx: ExtensionContext): Promise<void>
   // A transient provider-error pause intentionally leaves the paused badge
   // visible so the user still has a resumable auto-mode signal on screen.
   if (!s.paused) {
-    if (preserveStepSurface) {
-      s.preserveStepSurfaceAfterLoopExit = false;
-    } else if (preserveCompletionSurface) {
+    if (preserveCompletionSurface) {
       ctx.ui.setStatus("gsd-auto", undefined);
       s.completionStopInProgress = false;
+      if (preserveStepSurface) {
+        s.preserveStepSurfaceAfterLoopExit = false;
+      }
+    } else if (preserveStepSurface) {
+      s.preserveStepSurfaceAfterLoopExit = false;
     } else {
       ctx.ui.setStatus("gsd-auto", undefined);
       ctx.ui.setWidget("gsd-progress", undefined);

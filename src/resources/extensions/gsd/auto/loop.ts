@@ -1353,7 +1353,9 @@ export async function autoLoop(
       stuckStatePersistedThisIteration = true;
       finishTurn("completed");
       if (finalizeDecision.action === "complete-and-break") {
-        s.preserveStepSurfaceAfterLoopExit = true;
+        if (!s.completionStopInProgress) {
+          s.preserveStepSurfaceAfterLoopExit = true;
+        }
         break;
       }
     } catch (loopErr) {

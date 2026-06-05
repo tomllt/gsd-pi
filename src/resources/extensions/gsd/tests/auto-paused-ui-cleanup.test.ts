@@ -173,6 +173,38 @@ test("cleanupAfterLoopExit preserves completion closeout surface after stopAuto 
   }
 });
 
+test("cleanupAfterLoopExit clears completionStopInProgress even when preserveStepSurfaceAfterLoopExit is also set", async () => {
+  const statusCalls: unknown[] = [];
+  const widgetCalls: unknown[] = [];
+
+  autoSession.reset();
+  autoSession.active = true;
+  autoSession.paused = false;
+  autoSession.completionStopInProgress = true;
+  autoSession.preserveStepSurfaceAfterLoopExit = true;
+
+  try {
+    await cleanupAfterLoopExit({
+      hasUI: true,
+      ui: {
+        setStatus: (...args: unknown[]) => statusCalls.push(args),
+        setWidget: (...args: unknown[]) => widgetCalls.push(args),
+        setHeader: () => {},
+        notify: () => {},
+      },
+    } as any);
+
+    assert.equal(
+      autoSession.completionStopInProgress,
+      false,
+      "completionStopInProgress must be cleared even when preserveStepSurfaceAfterLoopExit was also set",
+    );
+    assert.equal(autoSession.preserveStepSurfaceAfterLoopExit, false);
+  } finally {
+    autoSession.reset();
+  }
+});
+
 test("pauseAuto preserves artifact retry counts across pause/resume", async () => {
   const base = mkdtempSync(join(tmpdir(), "gsd-pause-retry-count-"));
   const previousCwd = process.cwd();
