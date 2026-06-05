@@ -998,15 +998,17 @@ export async function bootstrapAutoSession(
   //
   // Exception (#4122): when the session provider is a custom provider declared
   // in ~/.gsd/agent/models.json (Ollama, vLLM, OpenAI-compatible proxy, etc.),
-  // PREFERENCES.md is skipped entirely. PREFERENCES.md cannot reference custom
-  // providers, so honoring it would silently reroute auto-mode to a built-in
-  // provider the user is not logged into and surface as "Not logged in · Please
-  // run /login" before pausing and resetting to claude-code/claude-sonnet-4-6.
+  // ignore PREFERENCES.md only if it points at a built-in provider. This keeps
+  // custom-provider sessions from being silently rerouted to an unconfigured
+  // built-in provider, while still allowing PREFERENCES.md entries that also
+  // target a custom provider to participate in auto-start snapshot selection.
   const manualSessionOverride = getSessionModelOverride(ctx.sessionManager.getSessionId());
   const sessionProviderIsCustom = isCustomProvider(ctx.model?.provider);
-  const preferredModel = sessionProviderIsCustom
-    ? null
-    : resolveDefaultSessionModel(ctx.model?.provider);
+  const rawPreferredModel = resolveDefaultSessionModel(ctx.model?.provider);
+  const preferredModel =
+    sessionProviderIsCustom && rawPreferredModel && !isCustomProvider(rawPreferredModel.provider)
+      ? null
+      : rawPreferredModel;
   // Validate the preferred model against the live registry + provider auth so
   // an unconfigured PREFERENCES.md entry (no API key / OAuth) can't become the
   // start-model snapshot. Without this, every subsequent unit would try to
