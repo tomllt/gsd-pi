@@ -123,36 +123,29 @@ function forceOverwriteAssessmentsWithVerdict(
   }
 }
 
-function syncTopLevelMilestoneArtifacts(
+function syncOtherMilestoneArtifacts(
   srcMilestonesDir: string,
   dstMilestonesDir: string,
+  currentMilestoneId: string,
 ): void {
   if (!existsSync(srcMilestonesDir)) return;
 
   try {
     for (const milestoneEntry of readdirSync(srcMilestonesDir, { withFileTypes: true })) {
       if (!milestoneEntry.isDirectory()) continue;
+      // The current milestone is already fully projected by the caller's
+      // additive safeCopyRecursive; skip it here to avoid redundant work.
+      if (milestoneEntry.name === currentMilestoneId) continue;
       const srcMilestoneDir = join(srcMilestonesDir, milestoneEntry.name);
       const dstMilestoneDir = join(dstMilestonesDir, milestoneEntry.name);
 
-      try {
-        mkdirSync(dstMilestoneDir, { recursive: true });
-        for (const fileEntry of readdirSync(srcMilestoneDir, { withFileTypes: true })) {
-          if (!fileEntry.isFile()) continue;
-          if (!fileEntry.name.endsWith(".md") && !fileEntry.name.endsWith(".json")) continue;
-
-          safeCopy(
-            join(srcMilestoneDir, fileEntry.name),
-            join(dstMilestoneDir, fileEntry.name),
-            { force: false },
-          );
-        }
-      } catch (err) {
-        logWarning(
-          "worktree",
-          `milestone top-level artifact sync failed (${milestoneEntry.name}): ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+      // Additively project the entire milestone subtree (force:false), not just
+      // top-level files. Prior completed milestones keep their per-slice and
+      // per-task SUMMARY.md / UAT.md on disk so the worktree's stale-render
+      // detector doesn't flag them as missing (DB has summary, disk doesn't).
+      // force:false preserves any worktree-local files (#1886 invariant) and
+      // only fills in files absent from the worktree projection.
+      safeCopyRecursive(srcMilestoneDir, dstMilestoneDir, { force: false });
     }
   } catch (err) {
     logWarning(
@@ -248,9 +241,16 @@ export function _projectRootToWorktreeImpl(
     { force: false },
   );
 
-  // Additively project missing top-level milestone files for all milestones
-  // so worktree-bound units can verify future-milestone context artifacts.
-  syncTopLevelMilestoneArtifacts(join(prGsd, "milestones"), join(wtGsd, "milestones"));
+  // Additively project the full subtree of every OTHER milestone so
+  // worktree-bound units can read prior-milestone context artifacts and so
+  // completed milestones retain their per-slice/per-task SUMMARY.md and
+  // UAT.md on the worktree filesystem (otherwise the stale-render detector
+  // flags them as "complete in DB but missing on disk").
+  syncOtherMilestoneArtifacts(
+    join(prGsd, "milestones"),
+    join(wtGsd, "milestones"),
+    milestoneId,
+  );
 
   // Force-sync ASSESSMENT files that have a verdict from project root (#2821).
   // The additive-only copy above preserves worktree-local files, but

@@ -97,6 +97,50 @@ test("projectRootToWorktree forwards root PROJECT.md into isolated worktrees", (
   }
 });
 
+test("projectRootToWorktree projects prior-milestone slice/task SUMMARY.md, not just top-level files", () => {
+  // Regression: a worktree opened for the CURRENT milestone (M002) must also
+  // receive the full subtree of OTHER, already-completed milestones (M001) so
+  // their per-slice/per-task SUMMARY.md exist on the worktree filesystem.
+  // Previously only top-level *.md/*.json were projected for other milestones,
+  // leaving the stale-render detector to flag M001's summaries as "complete in
+  // DB but missing on disk".
+  const { dir, cleanup } = makeProjectRoot();
+  try {
+    const worktree = join(dir, ".gsd", "worktrees", "M002");
+    mkdirSync(join(worktree, ".gsd"), { recursive: true });
+
+    // Current milestone (M002) — what the worktree is working on.
+    mkdirSync(join(dir, ".gsd", "milestones", "M002"), { recursive: true });
+    writeFileSync(join(dir, ".gsd", "milestones", "M002", "M002-ROADMAP.md"), "# M002\n");
+
+    // Prior, completed milestone (M001) with nested slice + task summaries.
+    const m001TaskDir = join(dir, ".gsd", "milestones", "M001", "slices", "S01", "tasks");
+    mkdirSync(m001TaskDir, { recursive: true });
+    writeFileSync(join(dir, ".gsd", "milestones", "M001", "M001-ROADMAP.md"), "# M001\n");
+    writeFileSync(
+      join(dir, ".gsd", "milestones", "M001", "slices", "S01", "S01-SUMMARY.md"),
+      "# S01 Summary\n",
+    );
+    writeFileSync(join(m001TaskDir, "T01-SUMMARY.md"), "# T01 Summary\n");
+
+    const workspace = createWorkspace(worktree);
+    const scope = scopeMilestone(workspace, "M002");
+    new WorktreeStateProjection().projectRootToWorktree(scope);
+
+    const wtGsd = join(worktree, ".gsd");
+    assert.ok(
+      existsSync(join(wtGsd, "milestones", "M001", "slices", "S01", "S01-SUMMARY.md")),
+      "prior-milestone slice SUMMARY.md is projected into the worktree",
+    );
+    assert.ok(
+      existsSync(join(wtGsd, "milestones", "M001", "slices", "S01", "tasks", "T01-SUMMARY.md")),
+      "prior-milestone task SUMMARY.md is projected into the worktree",
+    );
+  } finally {
+    cleanup();
+  }
+});
+
 // ─── projectWorktreeToRoot — Module contract ────────────────────────────────
 
 test("projectWorktreeToRoot exists and accepts a MilestoneScope", () => {
