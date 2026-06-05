@@ -3,6 +3,7 @@ import { importExtensionModule, type ExtensionAPI, type ExtensionContext } from 
 
 import { closeManagedGsdBrowser, registerManagedGsdBrowserTools, warmUpManagedGsdBrowser } from "./engine/managed-gsd-browser.js";
 import { resolveBrowserEngineMode, type BrowserEngineMode } from "./engine/selection.js";
+import { setArtifactRootForCwd } from "./state.js";
 import { detectWebApp } from "./web-app-detect.js";
 
 let legacyRegistrationPromise: Promise<void> | null = null;
@@ -119,28 +120,29 @@ async function registerLegacyBrowserTools(pi: ExtensionAPI): Promise<void> {
         formatArtifactTimestamp: utils.formatArtifactTimestamp,
       };
 
-      navigation.registerNavigationTools(pi, deps);
-      screenshot.registerScreenshotTools(pi, deps);
-      interaction.registerInteractionTools(pi, deps);
-      inspection.registerInspectionTools(pi, deps);
-      session.registerSessionTools(pi, deps);
-      assertions.registerAssertionTools(pi, deps);
-      refTools.registerRefTools(pi, deps);
-      wait.registerWaitTools(pi, deps);
-      pages.registerPageTools(pi, deps);
-      forms.registerFormTools(pi, deps);
-      intent.registerIntentTools(pi, deps);
-      pdf.registerPdfTools(pi, deps);
-      statePersistence.registerStatePersistenceTools(pi, deps);
-      networkMock.registerNetworkMockTools(pi, deps);
-      device.registerDeviceTools(pi, deps);
-      extract.registerExtractTools(pi, deps);
-      visualDiff.registerVisualDiffTools(pi, deps);
-      zoom.registerZoomTools(pi, deps);
-      codegen.registerCodegenTools(pi, deps);
-      actionCache.registerActionCacheTools(pi, deps);
-      injectionDetection.registerInjectionDetectionTools(pi, deps);
-      verify.registerVerifyTools(pi, deps);
+      const cwdScopedPi = withBrowserArtifactCwdScope(pi);
+      navigation.registerNavigationTools(cwdScopedPi, deps);
+      screenshot.registerScreenshotTools(cwdScopedPi, deps);
+      interaction.registerInteractionTools(cwdScopedPi, deps);
+      inspection.registerInspectionTools(cwdScopedPi, deps);
+      session.registerSessionTools(cwdScopedPi, deps);
+      assertions.registerAssertionTools(cwdScopedPi, deps);
+      refTools.registerRefTools(cwdScopedPi, deps);
+      wait.registerWaitTools(cwdScopedPi, deps);
+      pages.registerPageTools(cwdScopedPi, deps);
+      forms.registerFormTools(cwdScopedPi, deps);
+      intent.registerIntentTools(cwdScopedPi, deps);
+      pdf.registerPdfTools(cwdScopedPi, deps);
+      statePersistence.registerStatePersistenceTools(cwdScopedPi, deps);
+      networkMock.registerNetworkMockTools(cwdScopedPi, deps);
+      device.registerDeviceTools(cwdScopedPi, deps);
+      extract.registerExtractTools(cwdScopedPi, deps);
+      visualDiff.registerVisualDiffTools(cwdScopedPi, deps);
+      zoom.registerZoomTools(cwdScopedPi, deps);
+      codegen.registerCodegenTools(cwdScopedPi, deps);
+      actionCache.registerActionCacheTools(cwdScopedPi, deps);
+      injectionDetection.registerInjectionDetectionTools(cwdScopedPi, deps);
+      verify.registerVerifyTools(cwdScopedPi, deps);
     })().catch((error) => {
       legacyRegistrationPromise = null;
       throw error;
@@ -148,6 +150,21 @@ async function registerLegacyBrowserTools(pi: ExtensionAPI): Promise<void> {
   }
 
   return legacyRegistrationPromise;
+}
+
+function withBrowserArtifactCwdScope(pi: ExtensionAPI): ExtensionAPI {
+  return {
+    ...pi,
+    registerTool(definition) {
+      pi.registerTool({
+        ...definition,
+        async execute(toolCallId, params, signal, onUpdate, ctx) {
+          if (ctx?.cwd) setArtifactRootForCwd(ctx.cwd);
+          return definition.execute(toolCallId, params, signal, onUpdate, ctx);
+        },
+      });
+    },
+  };
 }
 
 async function registerBrowserTools(pi: ExtensionAPI): Promise<void> {

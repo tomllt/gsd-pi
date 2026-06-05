@@ -166,11 +166,11 @@
     "discord.js": "^14.26.4",
     "extract-zip": "^2.0.1",
     "file-type": "^21.1.1",
+    "get-east-asian-width": "^1.6.0",
     "glob": "^13.0.1",
     "graceful-fs": "^4.2.4",
-    "get-east-asian-width": "^1.6.0",
-    "hosted-git-info": "^9.0.2",
     "highlight.js": "^10.7.3",
+    "hosted-git-info": "^9.0.2",
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.5",
@@ -200,7 +200,7 @@
     "c8": "^11.0.0",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.12",
-    "jiti": "^2.6.1",
+    "jiti": "^2.7.0",
     "typescript": "^5.9.3"
   },
   "optionalDependencies": {
