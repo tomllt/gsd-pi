@@ -1063,6 +1063,58 @@ describe("ModelRegistry", () => {
 			expect(() => streamSimple(scopedModel, emptyContext)).not.toThrow("custom streamSimple override");
 		});
 
+		test("anthropic-compatible provider override does not hijack other providers sharing anthropic-messages", async () => {
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+
+			registry.registerProvider("custom-anthropic-wrapper", {
+				api: "anthropic-messages",
+				baseUrl: "https://wrapper.test/anthropic",
+				apiKey: "TEST_KEY",
+				models: [
+					{
+						id: "wrapper-model",
+						name: "Wrapper Model",
+						reasoning: true,
+						input: ["text"],
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+						contextWindow: 128000,
+						maxTokens: 4096,
+					},
+				],
+				streamSimple: () => {
+					throw new Error("wrapper streamSimple override");
+				},
+			});
+
+			const wrapperModel = registry.find("custom-anthropic-wrapper", "wrapper-model");
+			if (!wrapperModel) {
+				throw new Error("Expected wrapper model to be registered");
+			}
+			const anthropicModel: Model<Api> = {
+				id: "test-anthropic-model",
+				name: "Test Anthropic Model",
+				api: "anthropic-messages",
+				provider: "anthropic",
+				baseUrl: "https://api.anthropic.com/v1",
+				reasoning: true,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 200000,
+				maxTokens: 4096,
+			};
+
+			await expect(streamSimple(wrapperModel, emptyContext).result()).resolves.toMatchObject({
+				provider: "custom-anthropic-wrapper",
+				model: "wrapper-model",
+				errorMessage: "No API key for provider: custom-anthropic-wrapper",
+			});
+			await expect(
+				getApiProvider("anthropic-messages")?.streamSimple(anthropicModel, emptyContext).result(),
+			).resolves.not.toMatchObject({
+				provider: "custom-anthropic-wrapper",
+			});
+		});
+
 		describe("dynamic provider override persistence", () => {
 			test("baseUrl-only override keeps built-in provider models after refresh", () => {
 				const registry = ModelRegistry.create(authStorage, modelsJsonPath);
