@@ -1725,9 +1725,9 @@ export function buildSdkOptions(
 	const sdkMcpServers = inlinePhaseMcpServers ?? filteredMcpServers;
 	const strictMcpConfig = !!inlinePhaseMcpServers;
 	// Strict phase configs inline the exact MCP servers GSD needs. Loading
-	// project/local settings at the same time can duplicate those servers and
+	// Claude Code settings at the same time can duplicate those servers and
 	// leave allowed mcp__... tools with no registered backing tool.
-	const settingSources = strictMcpConfig ? [] : ["project", "local"];
+	const settingSources = strictMcpConfig ? [] : ["user", "project", "local"];
 	const exactWorkflowMcpTools = resolveExactWorkflowMcpToolsForPhase(
 		gsdPhase,
 		workflowServerName,
