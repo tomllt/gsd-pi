@@ -38,7 +38,7 @@ If slice research is inlined, trust its architectural findings, but verify every
 
 1. If requirements are preloaded, identify owned and supporting Active requirements.
 2. Call `memory_query` with keywords from the slice title and source files.
-3. Read `{{planTemplatePath}}` and `{{taskPlanTemplatePath}}`.
+3. Use the inlined Output Template sections already present in this prompt. Do not read template files from disk.
 4. {{skillActivation}} Record expected executor skills in each task plan's `skills_used` frontmatter.
 5. Define slice verification before tasks. Non-trivial slices need real tests or executable assertions; boundary contracts need contract-exercising checks. Tests must not read .gitignore/gitignored paths such as `.gsd/`, `.planning/`, or `.audits/`.
 6. Include Threat Surface (Q3), Requirement Impact (Q4), proof level, observability, integration closure, Failure Modes (Q5), Load Profile (Q6), and Negative Tests (Q7) only where applicable.

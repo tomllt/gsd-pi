@@ -150,6 +150,30 @@ describe("Worktree Safety module", () => {
     assert.equal(result.kind, "safe");
   });
 
+  test("accepts project root for source-writing Unit when isolation mode is branch", () => {
+    const safety = createWorktreeSafetyModule({
+      existsSync: () => true,
+      lstatSync: () => ({ isFile: () => false }),
+      listRegisteredWorktrees: () => [{ path: projectRoot, branch: "milestone/M001" }],
+      getCurrentBranch: () => "milestone/M001",
+    });
+
+    const result = safety.validateUnitRoot({
+      unitType: "execute-task",
+      unitId: "M001/S01/T01",
+      writeScope: "source-writing",
+      projectRoot,
+      unitRoot: projectRoot,
+      milestoneId: "M001",
+      isolationMode: "branch",
+      expectedBranch: "milestone/M001",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.kind, "safe");
+    assert.equal(result.branch, "milestone/M001");
+  });
+
   test("rejects non-project root for source-writing Unit when isolation mode is none", () => {
     const safety = createWorktreeSafetyModule({
       existsSync: () => true,

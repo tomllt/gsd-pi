@@ -639,6 +639,26 @@ export function shouldUseWorktreeIsolation(basePath?: string): boolean {
   return getIsolationMode(basePath) === "worktree";
 }
 
+type AutoIsolationMode = ReturnType<typeof getIsolationMode>;
+
+function resolveEffectiveUnitIsolationMode(
+  configuredMode: AutoIsolationMode,
+  isolationDegraded: boolean,
+): AutoIsolationMode {
+  return configuredMode === "worktree" && isolationDegraded ? "branch" : configuredMode;
+}
+
+export function _resolveEffectiveUnitIsolationModeForTest(
+  configuredMode: AutoIsolationMode,
+  isolationDegraded: boolean,
+): AutoIsolationMode {
+  return resolveEffectiveUnitIsolationMode(configuredMode, isolationDegraded);
+}
+
+function getEffectiveUnitIsolationMode(basePath: string): AutoIsolationMode {
+  return resolveEffectiveUnitIsolationMode(getIsolationMode(basePath), s.isolationDegraded);
+}
+
 /** Crash recovery prompt — set by startAuto, consumed by the main loop */
 
 /** Pending verification retry — set when gate fails with retries remaining, consumed by autoLoop */
@@ -2382,6 +2402,7 @@ export function createWiredAutoOrchestrationModule(
     },
     worktree: {
       async prepareForUnit(unitType, unitId) {
+        const isolationMode = getEffectiveUnitIsolationMode(runtimeBasePath);
         const manifest = resolveManifest(unitType);
         if (!manifest) {
           return {
@@ -2389,16 +2410,13 @@ export function createWiredAutoOrchestrationModule(
             reason: `No Unit manifest is registered for ${unitType}`,
           };
         }
-        if (getIsolationMode(runtimeBasePath) !== "worktree") {
+        if (isolationMode !== "worktree") {
           return { ok: true, reason: "not-required" };
         }
         const writeScope =
           manifest.tools.mode === "all" || manifest.tools.mode === "docs"
             ? "source-writing"
             : "planning-only";
-        if (getIsolationMode(runtimeBasePath) !== "worktree") {
-          return { ok: true, reason: "isolation-not-worktree" };
-        }
         const safety = createWorktreeSafetyModule();
         const activeBasePath = getLiveDispatchBasePath();
         const snapshot = await deriveState(activeBasePath);
@@ -2411,7 +2429,7 @@ export function createWiredAutoOrchestrationModule(
           projectRoot: runtimeBasePath,
           unitRoot: activeBasePath,
           milestoneId,
-          isolationMode: getIsolationMode(runtimeBasePath),
+          isolationMode,
           expectedBranch,
         });
         if (!result.ok) {
@@ -2436,7 +2454,7 @@ export function createWiredAutoOrchestrationModule(
               projectRoot: runtimeBasePath,
               unitRoot: getLiveDispatchBasePath(),
               milestoneId,
-              isolationMode: getIsolationMode(runtimeBasePath),
+              isolationMode: getEffectiveUnitIsolationMode(runtimeBasePath),
               expectedBranch,
             }),
           });

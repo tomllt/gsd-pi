@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { _withDetachedAutoKeepaliveForTest } from "../auto.ts";
+import {
+  _resolveEffectiveUnitIsolationModeForTest,
+  _withDetachedAutoKeepaliveForTest,
+} from "../auto.ts";
 import {
   _scheduleAutoStartAfterIdleForTest,
   resolveGuidedExecuteLaunchMode,
@@ -343,9 +346,20 @@ test("prepareForUnit skips worktree safety when isolation is not worktree (#6154
 
   assert.ok(prepareForUnitIdx > -1, "prepareForUnit should exist");
   assert.ok(
-    prepareForUnitBody.includes('if (getIsolationMode(runtimeBasePath) !== "worktree")'),
+    prepareForUnitBody.includes("const isolationMode = getEffectiveUnitIsolationMode(runtimeBasePath);"),
+    "prepareForUnit should resolve the effective isolation mode once",
+  );
+  assert.ok(
+    prepareForUnitBody.includes('if (isolationMode !== "worktree")'),
     "prepareForUnit should bypass worktree safety validation outside worktree isolation mode",
   );
+});
+
+test("effective unit isolation follows degraded branch fallback", () => {
+  assert.equal(_resolveEffectiveUnitIsolationModeForTest("worktree", true), "branch");
+  assert.equal(_resolveEffectiveUnitIsolationModeForTest("worktree", false), "worktree");
+  assert.equal(_resolveEffectiveUnitIsolationModeForTest("branch", true), "branch");
+  assert.equal(_resolveEffectiveUnitIsolationModeForTest("none", true), "none");
 });
 
 test("discuss-to-auto handoff defaults to step mode unless explicitly disabled", () => {
