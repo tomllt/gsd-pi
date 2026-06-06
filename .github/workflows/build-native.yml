@@ -334,12 +334,25 @@ jobs:
               if [ "$DELAY" -gt 30 ]; then DELAY=30; fi
             done
           }
-          for workspace in @opengsd/contracts @opengsd/rpc-client @opengsd/mcp-server; do
+          # Publish each package from its own directory. `npm publish --workspace`
+          # does NOT work here: this repo defines its workspace via pnpm-workspace.yaml,
+          # and root package.json has no npm "workspaces" field, so npm reports
+          # "No workspaces found" and the packages never get published. Publish order
+          # matters — rpc-client depends on contracts, and mcp-server depends on both —
+          # so keep contracts → rpc-client → mcp-server. prepack-resolve-workspace.cjs
+          # (run above) has already rewritten their internal workspace:* ranges to ^VERSION.
+          ROOT="$(pwd)"
+          for entry in \
+            "@opengsd/contracts:packages/contracts" \
+            "@opengsd/rpc-client:packages/rpc-client" \
+            "@opengsd/mcp-server:packages/mcp-server"; do
+            workspace="${entry%%:*}"
+            dir="${entry#*:}"
             if npm view "${workspace}@${VERSION}" version >/dev/null 2>&1; then
               echo "${workspace}@${VERSION} already published, skipping"
               continue
             fi
-            npm publish --workspace "${workspace}" --ignore-scripts ${TAG_FLAG}
+            ( cd "${ROOT}/${dir}" && npm publish --ignore-scripts ${TAG_FLAG} )
             wait_for_workspace_package "${workspace}"
           done
 
