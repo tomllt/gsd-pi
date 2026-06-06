@@ -67,7 +67,12 @@ export interface ParsedRoadmap {
 const TEMPLATE_TOKEN_RE = /\{\{[^}]+\}\}/;
 const H2_RE = /^##\s+(.+)$/gm;
 const H3_RE = /^###\s+(.+)$/gm;
-const MILESTONE_LINE_RE = /^-\s+\[([ x])\]\s+(M\d{3}):\s+(.+?)\s+(?:—|--|-)\s+(.+)$/gm;
+// A milestone line is single-line by construction. Every inter-token gap uses
+// horizontal-whitespace classes (`[^\S\n]`) rather than `\s`, because `\s`
+// matches newlines: a line missing a valid separator would otherwise let the
+// `\s+(?:—|--|-)\s+` clause "bridge" onto the NEXT bullet's `- `, consuming it
+// as the separator and silently swallowing the following well-formed milestone.
+const MILESTONE_LINE_RE = /^-[^\S\n]+\[([ x])\][^\S\n]+(M\d{3}):[^\S\n]+(.+?)[^\S\n]+(?:—|--|-)[^\S\n]+(.+)$/gm;
 const SLICE_HEADER_RE = /^###\s+(S\d{2})\s*(?:—|--|-)\s+(.+)$/m;
 const REQUIREMENT_HEADER_RE = /^###\s+(R\d{3})\s*(?:—|--|-)\s+(.+)$/m;
 
