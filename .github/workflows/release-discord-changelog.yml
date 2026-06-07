@@ -20,7 +20,7 @@ jobs:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Post release changelog to Discord
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
           RELEASE_TAG: ${{ inputs.release_tag }}

@@ -72,7 +72,7 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           version: 10.12.1
 
@@ -215,7 +215,7 @@ jobs:
           ref: ${{ github.event.inputs.ref != '' && github.event.inputs.ref || (github.event.inputs.channel == 'next' && 'next' || 'main') }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           version: 10.12.1
 
@@ -289,7 +289,7 @@ jobs:
           echo "$OUTPUT" | jq -r '.releaseNotes' > release-metadata/release-notes.md
 
       - name: Upload release metadata
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: prod-release-metadata
           path: release-metadata/
@@ -372,7 +372,7 @@ jobs:
           copy native\target\${{ matrix.target }}\release\gsd_engine.dll artifacts\gsd_engine.node
 
       - name: Upload native artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: native-${{ matrix.platform }}
           path: artifacts/gsd_engine.node
@@ -408,7 +408,7 @@ jobs:
           fi
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           version: 10.12.1
 
@@ -437,7 +437,7 @@ jobs:
           GSD_LIVE_TESTS: "1"
 
       - name: Download release metadata
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: prod-release-metadata
           path: release-metadata
@@ -492,7 +492,7 @@ jobs:
           pnpm run test:live-regression
 
       - name: Download native artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: native-*
           path: artifacts
@@ -719,7 +719,7 @@ jobs:
             -d "$(jq -n --arg c "**GSD v${RELEASE_VERSION} Released**\n\n${NOTES}\n\n\`npm i @opengsd/gsd-pi@${RELEASE_VERSION}\`" '{content:$c, allowed_mentions:{parse:[]}}')"
 
       - name: Log in to GHCR
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
