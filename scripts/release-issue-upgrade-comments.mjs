@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 
 export const RELEASE_UPGRADE_MARKER_PREFIX = "<!-- gsd-release-upgrade-check:";
+export const RELEASE_UPGRADE_LABEL = "needs-upgrade";
 
 export function releaseMarker(releaseTag) {
   return `${RELEASE_UPGRADE_MARKER_PREFIX}${encodeURIComponent(releaseTag)} -->`;
@@ -13,6 +14,15 @@ export function releaseMarker(releaseTag) {
 export function hasReleaseComment(comments, releaseTag) {
   const marker = releaseMarker(releaseTag);
   return comments.some((comment) => String(comment.body || "").includes(marker));
+}
+
+export function issueHasLabel(issue, label) {
+  const labels = Array.isArray(issue.labels) ? issue.labels : [];
+
+  return labels.some((entry) => {
+    const name = typeof entry === "string" ? entry : entry?.name;
+    return name === label;
+  });
 }
 
 export function displayReleaseTag(releaseTag) {
@@ -104,27 +114,40 @@ export async function postReleaseUpgradeComments({
   const issues = await listOpenIssues(githubJsonFn, owner, repo);
   let posted = 0;
   let skipped = 0;
+  let labeled = 0;
 
   for (const issue of issues) {
     const comments = await listIssueComments(githubJsonFn, owner, repo, issue.number);
     if (hasReleaseComment(comments, releaseTag)) {
       skipped += 1;
+    } else {
+      await githubJsonFn(`/repos/${owner}/${repo}/issues/${issue.number}/comments`, {
+        method: "POST",
+        body: JSON.stringify({
+          body: buildReleaseUpgradeComment(releaseTag, releaseUrl),
+        }),
+      });
+      posted += 1;
+    }
+
+    if (issueHasLabel(issue, RELEASE_UPGRADE_LABEL)) {
       continue;
     }
 
-    await githubJsonFn(`/repos/${owner}/${repo}/issues/${issue.number}/comments`, {
+    await githubJsonFn(`/repos/${owner}/${repo}/issues/${issue.number}/labels`, {
       method: "POST",
       body: JSON.stringify({
-        body: buildReleaseUpgradeComment(releaseTag, releaseUrl),
+        labels: [RELEASE_UPGRADE_LABEL],
       }),
     });
-    posted += 1;
+    labeled += 1;
   }
 
   return {
     totalIssues: issues.length,
     posted,
     skipped,
+    labeled,
   };
 }
 
@@ -186,7 +209,7 @@ async function main() {
   });
 
   console.log(
-    `Posted ${result.posted} release upgrade comments for ${releaseTag}; skipped ${result.skipped} already-commented issues across ${result.totalIssues} open issues.`,
+    `Posted ${result.posted} release upgrade comments for ${releaseTag}; tagged ${result.labeled} issues with ${RELEASE_UPGRADE_LABEL}; skipped ${result.skipped} already-commented issues across ${result.totalIssues} open issues.`,
   );
 }
 

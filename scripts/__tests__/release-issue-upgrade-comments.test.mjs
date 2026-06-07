@@ -7,8 +7,10 @@ import test from "node:test";
 import YAML from "yaml";
 
 import {
+  RELEASE_UPGRADE_LABEL,
   buildReleaseUpgradeComment,
   hasReleaseComment,
+  issueHasLabel,
   listIssueComments,
   listOpenIssues,
   postReleaseUpgradeComments,
@@ -34,6 +36,15 @@ test("hasReleaseComment detects the per-release marker", () => {
     true,
   );
   assert.equal(hasReleaseComment([{ body: "ordinary comment" }], "v1.2.3"), false);
+});
+
+test("issueHasLabel detects string and object labels", () => {
+  assert.equal(issueHasLabel({ labels: [RELEASE_UPGRADE_LABEL] }, RELEASE_UPGRADE_LABEL), true);
+  assert.equal(
+    issueHasLabel({ labels: [{ name: RELEASE_UPGRADE_LABEL }] }, RELEASE_UPGRADE_LABEL),
+    true,
+  );
+  assert.equal(issueHasLabel({ labels: [{ name: "needs-info" }] }, RELEASE_UPGRADE_LABEL), false);
 });
 
 test("listOpenIssues paginates by raw page size and filters pull requests", async () => {
@@ -70,11 +81,17 @@ test("listIssueComments paginates so duplicate markers are found on later pages"
   assert.equal(calls.length, 2);
 });
 
-test("postReleaseUpgradeComments skips issues already commented for the release", async () => {
-  const posts = [];
+test("postReleaseUpgradeComments tags issues and skips duplicate comments", async () => {
+  const comments = [];
+  const labels = [];
   const githubJson = async (path, options = {}) => {
     if (path === "/repos/open-gsd/gsd-pi/issues?state=open&per_page=100&page=1") {
-      return [{ number: 1 }, { number: 2 }, { number: 3, pull_request: {} }];
+      return [
+        { number: 1, labels: [] },
+        { number: 2, labels: [] },
+        { number: 3, pull_request: {} },
+        { number: 4, labels: [{ name: RELEASE_UPGRADE_LABEL }] },
+      ];
     }
     if (path === "/repos/open-gsd/gsd-pi/issues/1/comments?per_page=100&page=1") {
       return [{ body: releaseMarker("v1.2.3") }];
@@ -82,9 +99,20 @@ test("postReleaseUpgradeComments skips issues already commented for the release"
     if (path === "/repos/open-gsd/gsd-pi/issues/2/comments?per_page=100&page=1") {
       return [];
     }
+    if (path === "/repos/open-gsd/gsd-pi/issues/4/comments?per_page=100&page=1") {
+      return [];
+    }
     if (path === "/repos/open-gsd/gsd-pi/issues/2/comments" && options.method === "POST") {
-      posts.push(JSON.parse(options.body));
+      comments.push(JSON.parse(options.body));
       return { id: 123 };
+    }
+    if (path === "/repos/open-gsd/gsd-pi/issues/4/comments" && options.method === "POST") {
+      comments.push(JSON.parse(options.body));
+      return { id: 124 };
+    }
+    if (path.endsWith("/labels") && options.method === "POST") {
+      labels.push({ path, body: JSON.parse(options.body) });
+      return [{ name: RELEASE_UPGRADE_LABEL }];
     }
     throw new Error(`Unexpected request: ${path}`);
   };
@@ -96,9 +124,14 @@ test("postReleaseUpgradeComments skips issues already commented for the release"
     releaseTag: "v1.2.3",
   });
 
-  assert.deepEqual(result, { totalIssues: 2, posted: 1, skipped: 1 });
-  assert.equal(posts.length, 1);
-  assert.match(posts[0].body, /A new GSD release is available/);
+  assert.deepEqual(result, { totalIssues: 3, posted: 2, skipped: 1, labeled: 2 });
+  assert.equal(comments.length, 2);
+  assert.equal(labels.length, 2);
+  assert.deepEqual(
+    labels.map((request) => request.body.labels),
+    [[RELEASE_UPGRADE_LABEL], [RELEASE_UPGRADE_LABEL]],
+  );
+  assert.match(comments[0].body, /A new GSD release is available/);
 });
 
 test("resolveRelease prefers the release event payload when it matches", async () => {
