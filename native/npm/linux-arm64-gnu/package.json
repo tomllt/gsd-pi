@@ -16,5 +16,8 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/open-gsd/gsd-pi.git"
+  },
+  "publishConfig": {
+    "provenance": true
   }
 }

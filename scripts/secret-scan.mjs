@@ -45,6 +45,12 @@ function parseArgs(argv) {
   if (argv[0] === '--file') {
     return { mode: 'file', file: argv[1] || '' };
   }
+  // Full-tree scan over every tracked file. The diff/staged modes only see the
+  // current change, so a secret committed before the gate existed slips through;
+  // run this on a schedule as a safety net.
+  if (argv[0] === '--all') {
+    return { mode: 'all' };
+  }
   return { mode: 'staged' };
 }
 
@@ -54,6 +60,9 @@ function getFiles(options) {
   }
   if (options.mode === 'file') {
     return options.file;
+  }
+  if (options.mode === 'all') {
+    return runGit(['ls-files']);
   }
   return runGit(['diff', '--cached', '--name-only', '--diff-filter=ACMR']);
 }

@@ -23,7 +23,10 @@ test('package hooks declare a concrete staged web host', () => {
   assert.equal(rootPackage.scripts['gsd'], 'node scripts/dev-cli.js')
   assert.equal(rootPackage.scripts['gsd:web'], 'pnpm run build:contracts && pnpm run build:pi && pnpm run copy-resources && node scripts/build-web-if-stale.cjs && node scripts/dev-cli.js --web')
   assert.equal(rootPackage.scripts['gsd:web:stop'], 'node scripts/dev-cli.js web stop')
-  assert.ok(rootPackage.files.includes('dist/web'))
+  assert.ok(
+    rootPackage.files.includes('dist/web') || rootPackage.files.includes('dist'),
+    'dist/web must be covered by the files field (via explicit entry or parent dist/)',
+  )
 
   const webPackage = JSON.parse(readFileSync(join(projectRoot, 'web', 'package.json'), 'utf-8'))
   assert.equal(webPackage.scripts['start:standalone'], 'node .next/standalone/web/server.js')

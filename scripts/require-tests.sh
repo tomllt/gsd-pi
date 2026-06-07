@@ -19,7 +19,16 @@ fi
 FILES=$(git diff --name-only "$BASE" HEAD 2>/dev/null || git diff --name-only HEAD~1)
 
 # --- exempt branch types that don't need tests ---
-BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+# In CI the checkout is a detached HEAD, so `rev-parse --abbrev-ref HEAD`
+# returns "HEAD" and the exemption never fires. Prefer the PR head ref / the
+# pushed branch ref that GitHub Actions exposes, and fall back to git locally.
+if [ -n "${GITHUB_HEAD_REF:-}" ]; then
+  BRANCH="$GITHUB_HEAD_REF"
+elif [ -n "${GITHUB_REF_NAME:-}" ]; then
+  BRANCH="$GITHUB_REF_NAME"
+else
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+fi
 if [[ "$BRANCH" =~ ^(docs|chore|ci)/ ]]; then
   echo "✓ Branch type '${BRANCH%%/*}/' is exempt from test requirements"
   exit 0

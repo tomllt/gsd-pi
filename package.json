@@ -19,7 +19,6 @@
   },
   "files": [
     "dist",
-    "dist/web",
     "packages/*/dist/**",
     "packages/*/bin/**",
     "packages/*/package.json",
@@ -30,12 +29,15 @@
     "scripts/install.js",
     "scripts/install",
     "scripts/link-workspace-packages.cjs",
-    "scripts/ensure-workspace-builds.cjs",
     "scripts/lib/workspace-manifest.cjs",
     "scripts/lib/logo.cjs",
     "package.json",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "piConfig": {
     "name": "gsd",
     "configDir": ".gsd"
@@ -88,11 +90,9 @@
     "test:integration": "node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --test --test-timeout=180000 \"src/tests/integration/*.test.ts\" \"src/resources/extensions/gsd/tests/integration/*.test.ts\" \"src/resources/extensions/async-jobs/*.test.ts\" \"src/resources/extensions/ollama/**/*.test.ts\" \"src/resources/extensions/ollama/*.test.ts\" \"src/resources/extensions/search-the-web/tests/*.test.ts\" \"src/resources/extensions/bg-shell/tests/*.test.ts\" \"src/resources/extensions/slash-commands/tests/*.test.ts\" \"src/resources/extensions/browser-tools/tests/*.test.mjs\"",
     "pretest": "pnpm run typecheck:extensions",
     "test": "pnpm run test:unit && pnpm run test:integration && pnpm run test:packages",
-    "prototype:tui-design": "pnpm run build:pi-tui && pnpm run build:pi-coding-agent && node packages/pi-coding-agent/scripts/run-design-prototype.mjs",
-    "prototype:tui-density": "pnpm run build:pi-tui && pnpm run build:pi-coding-agent && node packages/pi-coding-agent/scripts/run-density-prototype.mjs",
-    "prototype:tui-widget": "pnpm run build:pi-tui && pnpm run build:pi-coding-agent && node --experimental-strip-types packages/gsd-agent-modes/scripts/run-widget-prototype.mjs",
     "test:smoke": "node --experimental-strip-types tests/smoke/run.ts",
     "test:live": "node scripts/with-env.mjs GSD_LIVE_TESTS=1 -- node --experimental-strip-types tests/live/run.ts",
+    "test:live-workflow": "node --experimental-strip-types tests/live-workflow/run.ts",
     "test:browser-tools": "node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --test src/resources/extensions/browser-tools/tests/browser-tools-unit.test.cjs src/resources/extensions/browser-tools/tests/browser-engine-selection.test.mjs src/resources/extensions/browser-tools/tests/managed-gsd-browser-tools.test.mjs src/resources/extensions/browser-tools/tests/browser-tools-integration.test.mjs",
     "test:native": "pnpm --filter @gsd/native run test",
     "test:secret-scan": "node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --test src/tests/secret-scan.test.ts",
@@ -112,6 +112,7 @@
     "sync-pkg-version": "node scripts/sync-pkg-version.cjs",
     "sync-platform-versions": "node native/scripts/sync-platform-versions.cjs",
     "verify:native-platform-packages": "node scripts/verify-native-platform-packages.mjs",
+    "verify:npm-release": "node scripts/verify-npm-release.mjs",
     "verify:version-sync": "node scripts/verify-version-sync.cjs",
     "validate-pack": "node scripts/validate-pack.js",
     "prepack": "node scripts/prepack-resolve-workspace.cjs",
@@ -216,6 +217,8 @@
     "koffi": "^2.9.0"
   },
   "overrides": {
+    "uuid": "^11.1.1",
+    "postcss": "^8.5.10",
     "@mistralai/mistralai": "2.2.1",
     "gaxios": "7.1.4",
     "c8": {

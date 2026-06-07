@@ -3,7 +3,10 @@ name: Coverage report
 on:
   pull_request:
     branches: [main, dev, test]
-    types: [labeled, reopened, synchronize]
+    # No `synchronize`: this is a 90-minute job gated on the `coverage` label.
+    # Re-running it on every push to a labeled PR is pure cost — it runs when the
+    # label is applied (or the PR reopens), plus the weekly cron below.
+    types: [labeled, reopened]
   schedule:
     - cron: "0 7 * * 1"
   workflow_dispatch:
@@ -41,7 +44,7 @@ jobs:
           git checkout --force --detach "$GITHUB_SHA"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 

@@ -175,6 +175,30 @@ test("main package publish validates tarball before publishing", () => {
   assert.ok(prodSteps.indexOf(prodValidate) < prodPublishIndex);
 });
 
+test("production release publishes workspace packages and verifies ALL packages before cutting the GitHub release", () => {
+  const steps = workflow.jobs["prod-release"].steps;
+  const idx = (name) => steps.findIndex((s) => s.name === name);
+
+  const workspacePublish = idx("Publish workspace packages to npm");
+  const mainPublish = idx("Publish release to npm @latest");
+  const verifyAll = idx("Verify all required packages are published on npm");
+  const pushTag = idx("Push release commit and tag");
+  const ghRelease = idx("Create GitHub Release");
+
+  // Workspace packages publish before the main package.
+  assert.ok(workspacePublish > -1, "prod-release must publish workspace packages");
+  assert.ok(workspacePublish < mainPublish, "workspace packages must publish before the main package");
+  assert.match(steps[workspacePublish].run, /publish-workspace-packages\.sh/);
+  assert.match(steps[workspacePublish].run, /prepack-resolve-workspace\.cjs/);
+
+  // The full verification gate runs AFTER all publishing and BEFORE the release is cut.
+  assert.ok(verifyAll > -1, "prod-release must verify all required packages on npm");
+  assert.match(steps[verifyAll].run, /verify-npm-release\.mjs/);
+  assert.ok(verifyAll > mainPublish, "verify must run after the main package is published");
+  assert.ok(verifyAll < pushTag, "verify must run before the release tag is pushed");
+  assert.ok(verifyAll < ghRelease, "verify must run before the GitHub release is created");
+});
+
 test("main package publish uses explicit prepack and disables npm lifecycle reruns", () => {
   const prereleasePublish = workflow.jobs["prerelease-publish"].steps.find(
     (step) => step.name === "Publish @${{ github.event.inputs.channel }}",

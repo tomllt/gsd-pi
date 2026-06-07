@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@cargo-audit
+        uses: taiki-e/install-action@59bdb325aeb39aca0cb80c297ec5b4c295d6a35f # cargo-audit branch
 
       - name: cargo audit
         working-directory: native
@@ -162,3 +162,19 @@ jobs:
           path: |
             native/cargo-audit.json
             native/cargo-audit-summary.md
+
+  secret-scan-full:
+    # Full-tree secret scan. The per-PR scan in ci-fast-gates.sh is diff-only, so
+    # it cannot catch a secret that landed before the gate existed. This runs the
+    # scanner over every tracked file as a scheduled safety net (and on demand).
+    name: full-tree secret scan
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Scan all tracked files for secrets
+        run: node scripts/secret-scan.mjs --all

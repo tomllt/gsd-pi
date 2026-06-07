@@ -44,11 +44,16 @@ const INTERNAL_PACKAGE_NAMES = new Set([
 
 const NATIVE_CRATE_NAMES = new Set(["gsd-ast", "gsd-engine", "gsd-grep"]);
 
-/** Dev publishes reuse stable @opengsd/engine-* packages already on npm. */
+/**
+ * Prerelease publishes (dev AND next channels) reuse the stable
+ * @opengsd/engine-* packages already on npm — the prerelease workflow does not
+ * build or publish per-platform engines. Strip any prerelease suffix back to
+ * the base X.Y.Z so optionalDependencies pin to a version that actually exists.
+ */
 function resolveEngineOptionalDependencyVersion(rootVersion) {
-  const devMatch = rootVersion.match(/^(\d+\.\d+\.\d+)-dev\.[0-9a-f]+$/i);
-  if (devMatch) {
-    return devMatch[1];
+  const prereleaseMatch = rootVersion.match(/^(\d+\.\d+\.\d+)-(?:dev|next)\.[0-9a-f]+$/i);
+  if (prereleaseMatch) {
+    return prereleaseMatch[1];
   }
   return rootVersion;
 }
@@ -211,7 +216,9 @@ function verifyVersionSync(root) {
     const platform = platformDir.replace("native/npm/", "");
     const depName = `@opengsd/engine-${platform}`;
     const pinned = rootPkg.optionalDependencies?.[depName];
-    if (pinned !== undefined && pinned !== expectedOptionalDepVersion) {
+    if (pinned === undefined) {
+      issues.push(`package.json optionalDependencies.${depName} is missing, expected ${expectedOptionalDepVersion}`);
+    } else if (pinned !== expectedOptionalDepVersion) {
       issues.push(`package.json optionalDependencies.${depName} is ${pinned}, expected ${expectedOptionalDepVersion}`);
     }
   }

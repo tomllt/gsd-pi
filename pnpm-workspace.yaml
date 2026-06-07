@@ -7,6 +7,21 @@ autoInstallPeers: true
 strictPeerDependencies: false
 engineStrict: true
 
+# Transitive-dependency security overrides (Dependabot). pnpm 10 reads overrides
+# from here, not from package.json's top-level npm "overrides" field.
+#   uuid               GHSA-w5hq-g745-h8pq — bounds check in v3/v5/v6; fix only in
+#                      the 11.1.1 line, so pin ^11.1.1 to avoid 12.0.0/13.0.0.
+#   postcss            GHSA-qx2v-qp2m-jg93 — XSS via unescaped </style> in stringify.
+#   @mistralai/mistralai  pin to last known-good release (was in npm overrides).
+#   gaxios             pin to last audited release (was in npm overrides).
+#   c8>yargs           c8@11 pulls in yargs<18 which has a prototype-pollution vuln.
+overrides:
+  uuid: ^11.1.1
+  postcss: ^8.5.10
+  "@mistralai/mistralai": 2.2.1
+  gaxios: 7.1.4
+  "c8>yargs": "^18.0.0"
+
 # npm registry rejects tarballs containing hard-linked files (E415). pnpm hard-links
 # by default; copy mode breaks those links so bundledDependencies pack cleanly.
 packageImportMethod: copy

@@ -16,45 +16,16 @@
  * (even NTFS junctions) can fail with EPERM. In that case we fall back to
  * cpSync (directory copy) which works universally.
  */
-const { existsSync, mkdirSync, symlinkSync, cpSync, lstatSync, readlinkSync, unlinkSync, rmSync } = require('fs')
+const { existsSync, mkdirSync, symlinkSync, cpSync, lstatSync, readlinkSync, unlinkSync } = require('fs')
 const { resolve, join } = require('path')
 const { getLinkablePackages, REPO_ROOT } = require('./lib/workspace-manifest.cjs')
 
-/**
- * Global installs (or npm install -g --ignore-scripts) can leave empty
- * node_modules/* placeholders while the bundled @gsd/pi-coding-agent copy
- * (without nested deps) still imports undici. install/deps.js may run
- * `npm install --ignore-scripts` in packageRoot to materialize hoisted deps
- * (openai, partial-json, …). This helper seeds root undici from the shipped
- * packages/pi-coding-agent copy when that repair has not run yet.
- */
-function ensureRootUndici() {
-  const rootUndiciDir = join(REPO_ROOT, 'node_modules', 'undici')
-  const rootUndiciPkg = join(rootUndiciDir, 'package.json')
-  if (existsSync(rootUndiciPkg)) return false
-
-  const shippedUndiciDir = join(REPO_ROOT, 'packages', 'pi-coding-agent', 'node_modules', 'undici')
-  const shippedUndiciPkg = join(shippedUndiciDir, 'package.json')
-  if (!existsSync(shippedUndiciPkg)) return false
-
-  if (existsSync(rootUndiciDir)) {
-    rmSync(rootUndiciDir, { recursive: true, force: true })
-  }
-
-  mkdirSync(join(REPO_ROOT, 'node_modules'), { recursive: true })
-
-  try {
-    symlinkSync(shippedUndiciDir, rootUndiciDir, 'junction')
-    return true
-  } catch {
-    try {
-      cpSync(shippedUndiciDir, rootUndiciDir, { recursive: true })
-      return true
-    } catch {
-      return false
-    }
-  }
-}
+// NOTE: undici is a real root dependency (package.json "dependencies") and is
+// materialized at install time by repairPackageDependencies() in
+// scripts/install/deps.js. A previous helper here tried to seed root undici from
+// packages/pi-coding-agent/node_modules/undici, but node_modules is never shipped
+// in the tarball (the "files" glob excludes it, and validate-pack forbids it), so
+// that path was always inert and has been removed.
 
 const scopeDirs = {
   '@gsd': join(REPO_ROOT, 'node_modules', '@gsd'),
@@ -134,10 +105,6 @@ for (const name of ['pi-agent-core', 'pi-ai', 'pi-tui', 'pi-coding-agent']) {
       // non-fatal
     }
   }
-}
-
-if (ensureRootUndici()) {
-  process.stderr.write('  Linked undici from shipped pi-coding-agent bundle\n')
 }
 
 if (linked > 0) process.stderr.write(`  Linked ${linked} workspace package${linked !== 1 ? 's' : ''}\n`)

@@ -72,7 +72,7 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 
@@ -120,6 +120,16 @@ jobs:
           pnpm run sync-platform-versions
           echo "version=$(node -e 'process.stdout.write(require("./package.json").version)')" >> "$GITHUB_OUTPUT"
 
+      # `npm publish --ignore-scripts` skips the prepublishOnly hook, so the
+      # gates it would normally run must be invoked explicitly here. The prod
+      # path runs verify:version-sync at "Validate package files after version
+      # bump"; the prerelease path needs both checks after stamping.
+      - name: Typecheck extensions (prepublishOnly parity)
+        run: pnpm run typecheck:extensions
+
+      - name: Verify version sync (prepublishOnly parity)
+        run: pnpm run verify:version-sync
+
       - name: Smoke test
         run: |
           chmod +x dist/loader.js
@@ -151,7 +161,27 @@ jobs:
           fi
           trap 'node scripts/postpack-restore-workspace.cjs' EXIT
           node scripts/prepack-resolve-workspace.cjs
-          npm publish --ignore-scripts --tag "${CHANNEL}"
+          # The pre-check above is a TOCTOU window — a concurrent/manual publish
+          # of the same version between the check and here would otherwise surface
+          # a raw npm error. Mirror the prod path: tolerate "cannot publish over"
+          # as an idempotent skip, fail loudly on anything else.
+          if OUTPUT=$(npm publish --ignore-scripts --tag "${CHANNEL}" 2>&1); then
+            echo "$OUTPUT"
+          else
+            if echo "$OUTPUT" | grep -q "cannot publish over the previously published\|You cannot publish over"; then
+              echo "Version ${VERSION} was published concurrently — verifying @${CHANNEL} tag."
+              TAGGED=$(npm view "@opengsd/gsd-pi" "dist-tags.${CHANNEL}" 2>/dev/null || true)
+              if [ "${TAGGED}" != "${VERSION}" ]; then
+                echo "::error::@${CHANNEL} points to '${TAGGED:-<unset>}' not ${VERSION} after concurrent publish."
+                echo "::error::Move the tag manually if intended: npm dist-tag add @opengsd/gsd-pi@${VERSION} ${CHANNEL}"
+                exit 1
+              fi
+              echo "Confirmed: @${CHANNEL} → ${VERSION} (from concurrent publish)."
+            else
+              echo "$OUTPUT"
+              exit 1
+            fi
+          fi
           echo "Verifying @opengsd/gsd-pi@${VERSION} can be installed from npm..."
           DELAY=10
           for attempt in $(seq 1 12); do
@@ -185,7 +215,7 @@ jobs:
           ref: ${{ github.event.inputs.ref != '' && github.event.inputs.ref || (github.event.inputs.channel == 'next' && 'next' || 'main') }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 
@@ -298,13 +328,13 @@ jobs:
           ref: ${{ needs.prod-release-plan.outputs.source_sha }}
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Add Rust compilation target
         run: rustup target add ${{ matrix.target }}
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           shared-key: native-${{ matrix.platform }}
           workspaces: |
@@ -378,7 +408,7 @@ jobs:
           fi
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 
@@ -424,6 +454,9 @@ jobs:
           node -e "require('./pkg/package.json')" && \
           pnpm run verify:version-sync && \
           echo "All package.json files are valid"
+
+      - name: Typecheck extensions (prepublishOnly parity)
+        run: pnpm run typecheck:extensions
 
       - name: Update CHANGELOG.md
         run: node scripts/update-changelog.mjs release-metadata/changelog-entry.md
@@ -585,6 +618,21 @@ jobs:
       - name: Validate package is installable
         run: pnpm run validate-pack
 
+      # Publish the @opengsd workspace packages (contracts, rpc-client, mcp-server,
+      # cloud-mcp-gateway, daemon) BEFORE the main package and BEFORE cutting the
+      # release. The set is derived from each package's publishConfig, so it can't
+      # drift out of sync the way the old hardcoded list did (which left
+      # cloud-mcp-gateway + daemon unpublished for two releases).
+      - name: Publish workspace packages to npm
+        env:
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
+          NODE_AUTH_TOKEN: ${{ github.event.inputs.publish_auth == 'token' && secrets.NPM_TOKEN || '' }}
+          TAG_FLAG: --tag latest
+        run: |
+          trap 'node scripts/postpack-restore-workspace.cjs' EXIT
+          node scripts/prepack-resolve-workspace.cjs
+          bash scripts/publish-workspace-packages.sh
+
       - name: Publish release to npm @latest
         env:
           RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
@@ -595,9 +643,15 @@ jobs:
             echo "$OUTPUT"
           else
             if echo "$OUTPUT" | grep -q "cannot publish over the previously published\|You cannot publish over"; then
-              echo "::error::Version ${RELEASE_VERSION} already exists. Trusted publishing only authenticates npm publish, not dist-tag mutation."
-              echo "::error::Promote manually if intended: npm dist-tag add @opengsd/gsd-pi@${RELEASE_VERSION} latest"
-              exit 1
+              echo "::warning::${RELEASE_VERSION} concurrent publish detected — verifying @latest dist-tag."
+              ACTUAL=$(npm view "@opengsd/gsd-pi" dist-tags.latest 2>/dev/null || true)
+              if [ "${ACTUAL}" = "${RELEASE_VERSION}" ]; then
+                echo "Confirmed: @latest already points to ${RELEASE_VERSION}; treating as success."
+              else
+                echo "::error::@latest dist-tag is '${ACTUAL}', not '${RELEASE_VERSION}'. Trusted publishing only authenticates npm publish, not dist-tag mutation."
+                echo "::error::Promote manually if intended: npm dist-tag add @opengsd/gsd-pi@${RELEASE_VERSION} latest"
+                exit 1
+              fi
             else
               echo "$OUTPUT"
               exit 1
@@ -625,6 +679,15 @@ jobs:
           echo "::error::Publish step succeeded but @opengsd/gsd-pi@${RELEASE_VERSION} was not installable from npm after retries. Check registry tarball propagation before continuing."
           exit 1
 
+      # Final gate: confirm EVERY required package (main + engines + workspace) is
+      # actually on npm at the release version before we tag and create the GitHub
+      # release. This is the stop that would have caught the two half-published
+      # releases.
+      - name: Verify all required packages are published on npm
+        env:
+          RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
+        run: node scripts/verify-npm-release.mjs "${RELEASE_VERSION}"
+
       - name: Push release commit and tag
         env:
           RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
@@ -649,12 +712,14 @@ jobs:
           RELEASE_VERSION: ${{ needs.prod-release-plan.outputs.version }}
         run: |
           NOTES=$(cat release-metadata/release-notes.md)
+          # allowed_mentions disables @everyone/@here/role pings — release notes
+          # are derived from commit subjects and must not be able to mass-ping.
           curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n --arg c "**GSD v${RELEASE_VERSION} Released**\n\n${NOTES}\n\n\`npm i @opengsd/gsd-pi@${RELEASE_VERSION}\`" '{content:$c}')"
+            -d "$(jq -n --arg c "**GSD v${RELEASE_VERSION} Released**\n\n${NOTES}\n\n\`npm i @opengsd/gsd-pi@${RELEASE_VERSION}\`" '{content:$c, allowed_mentions:{parse:[]}}')"
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

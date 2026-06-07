@@ -188,6 +188,16 @@ export async function repairPackageDependencies(packageRoot, { ui, quiet = false
       .slice(-3)
       .join('; ')
     ui?.warn?.('Dependencies', meaningful || 'npm install failed')
+    // On the postinstall path `ui` is null, so the line above is a no-op and the
+    // failure would be completely silent — the package then crashes on first run
+    // with ERR_MODULE_NOT_FOUND. Always emit an unconditional warning to stderr
+    // so an offline/proxy/cert failure is visible at install time.
+    if (!ui) {
+      console.warn(
+        `[gsd] WARNING: failed to materialize runtime dependencies (${meaningful || 'npm install failed'}).\n` +
+        `[gsd] The CLI may fail to start. Re-run with network access, or run \`npm install --ignore-scripts\` inside the gsd-pi package directory.`,
+      )
+    }
     return
   }
 

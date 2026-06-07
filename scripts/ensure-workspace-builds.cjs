@@ -6,13 +6,15 @@
  * index.js) and that the build is not stale (no src/ file newer than dist/).
  * If any are missing or stale, runs the build for those packages.
  *
- * Designed for the postinstall hook so that `pnpm install` in a fresh clone
- * produces a working runtime without a manual `pnpm run build` step. Also
- * catches the common case where `git pull` updates package sources but the
- * old dist/ remains, causing TypeScript type errors.
+ * Invoked by the dev-CLI preflight (scripts/dev-cli-helpers.mjs) so that running
+ * the local CLI in a fresh clone produces a working runtime without a manual
+ * `pnpm run build` step. Also catches the common case where `git pull` updates
+ * package sources but the old dist/ remains, causing TypeScript type errors.
  *
- * Skipped in CI (where the full build pipeline handles this) and when
- * installing as an end-user dependency (no packages/ directory).
+ * NOTE: this is a development-only helper — it is NOT run by the npm postinstall
+ * hook. It self-skips in CI (the full build pipeline handles builds) and when
+ * installed as an end-user dependency (no packages/ directory), so it is not
+ * shipped in the published tarball's "files" list.
  */
 const { existsSync, statSync, readdirSync } = require('fs')
 const { resolve, join } = require('path')
@@ -90,8 +92,13 @@ if (require.main === module) {
   if (process.env.CI === 'true' || process.env.CI === '1') process.exit(0)
 
   // Workspace packages that need dist/index.js at runtime.
-  // Order matters: dependencies must build before dependents.
+  // Order matters: dependencies must build before dependents — `contracts` is the
+  // lowest-level package and must be first, or dependents compile against a stale
+  // dist/. This list is topologically ordered, so it can't be auto-derived from
+  // the alphabetically-sorted getLinkablePackages(); the drift guard below keeps
+  // it complete instead.
   const WORKSPACE_PACKAGES = [
+    'contracts',
     'native',
     'pi-tui',
     'pi-ai',
@@ -102,6 +109,23 @@ if (require.main === module) {
     'rpc-client',
     'mcp-server',
   ]
+
+  // Drift guard: every linkable package must appear above, or a fresh clone
+  // would silently run against a stale/missing dist for the omitted package.
+  try {
+    const { getLinkablePackages } = require('./lib/workspace-manifest.cjs')
+    const missing = getLinkablePackages()
+      .map((p) => p.dir)
+      .filter((dir) => !WORKSPACE_PACKAGES.includes(dir))
+    if (missing.length > 0) {
+      process.stderr.write(
+        `  WARNING: linkable package(s) missing from ensure-workspace-builds order: ${missing.join(', ')}\n` +
+        `  Add them in topological (dependency-first) order to WORKSPACE_PACKAGES.\n`,
+      )
+    }
+  } catch {
+    // workspace-manifest is dev-only; ignore if unavailable.
+  }
 
   const stale = detectStalePackages(root, WORKSPACE_PACKAGES)
 
