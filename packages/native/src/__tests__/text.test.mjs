@@ -203,6 +203,36 @@ describe("truncateToWidth", () => {
     assert.ok(result.includes("\x1b[31m"));
     assert.ok(result.includes("\x1b[0m"));
   });
+
+  // Byte-exact reset-bracketing contract (must match the pi-tui JS
+  // finalizeTruncatedResult() behavior so truncate can be routed through native
+  // without changing rendered output). See pi-tui truncate-to-width.test.ts.
+  test("brackets the ellipsis with resets even for plain text", () => {
+    // Unicode ellipsis, plain ASCII prefix: leading + trailing reset.
+    assert.equal(native.truncateToWidth("plain ascii line", 10, 0, false), "plain asc\x1b[0m\u2026\x1b[0m");
+    // ASCII ellipsis behaves the same.
+    assert.equal(native.truncateToWidth("plain ascii line", 10, 1, false), "plain a\x1b[0m...\x1b[0m");
+  });
+
+  test("brackets the ellipsis when it is wider than the width", () => {
+    // width 1, unicode ellipsis (width 1): target_w == 0 branch.
+    assert.equal(native.truncateToWidth("abcdef", 1, 0, false), "\x1b[0m\u2026\x1b[0m");
+    // width 0: nothing fits, empty output.
+    assert.equal(native.truncateToWidth("abcdef", 0, 0, false), "");
+  });
+
+  test("drops a trailing dangling SGR opener at the truncation boundary", () => {
+    // The kept visible prefix ('-- ') has no SGR before it; the following
+    // '\x1b[2m' opener has no visible content after it within the budget, so
+    // it must be dropped with no spurious reset.
+    assert.equal(native.truncateToWidth("\u2500\u2500 \x1b[2mdim text", 3, 2, false), "\u2500\u2500 ");
+  });
+
+  test("does not leak a NUL terminator into padded output", () => {
+    const result = native.truncateToWidth("plain ascii line for truncation", 40, 2, true);
+    assert.ok(!result.includes("\u0000"), "padded output must not contain a NUL");
+    assert.equal(native.visibleWidth(result), 40);
+  });
 });
 
 // ── sliceWithWidth ─────────────────────────────────────────────────────

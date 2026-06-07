@@ -564,6 +564,33 @@ test("validate-milestone prompt dispatches parallel reviewers", () => {
   assert.match(prompt, /assessment evidence/i);
 });
 
+// ─── ADR-029: forward preloaded evidence to validate reviewers ────────
+test("validate-milestone forwards preloaded evidence to reviewers and keeps full reads on-demand", () => {
+  const prompt = readPrompt("validate-milestone");
+  // Orchestrator is told to embed the preloaded evidence into reviewer tasks.
+  assert.match(prompt, /[Ee]mbed the relevant preloaded evidence/);
+  // Each reviewer is told to use the preloaded evidence, not re-read from disk.
+  const useCount = (prompt.match(/do not re-read them from disk/g) ?? []).length;
+  assert.ok(useCount >= 3, `expected all three reviewers to use preloaded evidence, found ${useCount}`);
+  // Full reads are explicitly the on-demand exception, not the routine path.
+  assert.match(prompt, /only if (its|the) preloaded (excerpt|evidence) is missing, truncated, or inconsistent/i);
+});
+
+// ─── ADR-029: research-milestone grounds instead of surveying ─────────
+test("research-milestone prompt grounds in preloaded context instead of open-ended survey", () => {
+  const prompt = readPrompt("research-milestone");
+  // Grounded-research invariant present.
+  assert.match(prompt, /do not re-survey/i);
+  assert.match(prompt, /Codebase Snapshot and Project Classification/);
+  // The old open-ended survey license is gone (no "use `scout` to build a broad map").
+  assert.doesNotMatch(prompt, /use `scout` to build a broad map/);
+  // resolve_library/docs lookups remain permitted (bounded, external).
+  assert.match(prompt, /resolve_library/);
+  // Incremental save enables resume after interruption.
+  assert.match(prompt, /Save \*\*incrementally\*\*/);
+  assert.match(prompt, /Resume — Prior Partial Research/);
+});
+
 // ─── Prompt migration: replan-slice → gsd_replan_slice ────────────────
 
 test("replan-slice prompt names gsd_replan_slice as the tool to use", () => {
@@ -700,8 +727,8 @@ test("guided-discuss prompts require 3-or-4 options plus Other-let-me-discuss in
     );
     assert.match(
       prompt,
-      /grounded in (the |your |)investigation/i,
-      `${name} must require options grounded in prior investigation`,
+      /grounded in (the |your |)(investigation|preloaded context)/i,
+      `${name} must require options grounded in the preloaded context / prior investigation`,
     );
   }
 });

@@ -913,7 +913,15 @@ pub fn truncate_to_width(
 	let tab_width = clamp_tab_width(tab_width);
 
 	let text_u16 = text.into_utf16()?;
-	let text = text_u16.as_slice();
+	// JsStringUtf16::as_slice() includes a trailing NUL terminator; strip it so
+	// it cannot leak into padded output or width math.
+	let text = {
+		let mut slice = text_u16.as_slice();
+		while slice.last() == Some(&0) {
+			slice = &slice[..slice.len() - 1];
+		}
+		slice
+	};
 
 	// Fast path: early-exit width check
 	let (text_w, exceeded) = visible_width_u16_up_to(text, max_width, tab_width);
@@ -942,16 +950,26 @@ pub fn truncate_to_width(
 	let target_w = max_width.saturating_sub(ellipsis_w);
 
 	if target_w == 0 {
-		let mut out = Vec::with_capacity(ellipsis.len().min(max_width * 2));
+		let mut out = Vec::with_capacity(ellipsis.len().min(max_width * 2) + 8);
+		let mut clipped = Vec::with_capacity(ellipsis.len());
 		let mut w = 0usize;
 		let _ = for_each_grapheme_u16_slow(ellipsis, tab_width, |gu16, gw| {
 			if w + gw > max_width {
 				return false;
 			}
-			out.extend_from_slice(gu16);
+			clipped.extend_from_slice(gu16);
 			w += gw;
 			true
 		});
+
+		// Bracket the (possibly clipped) ellipsis with resets, matching the JS
+		// finalizeTruncatedResult() path. Only when something was kept.
+		const RESET: &[u16] = &[ESC, b'[' as u16, b'0' as u16, b'm' as u16];
+		if !clipped.is_empty() {
+			out.extend_from_slice(RESET);
+			out.extend_from_slice(&clipped);
+			out.extend_from_slice(RESET);
+		}
 
 		if pad && w < max_width {
 			out.resize(out.len() + (max_width - w), b' ' as u16);
@@ -964,7 +982,14 @@ pub fn truncate_to_width(
 	let mut i = 0usize;
 	let text_len = text.len();
 
-	let mut saw_sgr = false;
+	// Track whether the kept visible prefix has an SGR opener emitted *before*
+	// it (so it needs a closing reset), and the out.len() immediately after the
+	// last visible character. Trailing escape sequences appended after the last
+	// visible char carry no rendered content; JS's finalizeTruncatedResult()
+	// does not emit them, and they must not flip the reset decision either.
+	let mut saw_sgr_before_visible = false;
+	let mut pending_sgr = false;
+	let mut visible_out_len = 0usize;
 
 	while i < text_len {
 		if text[i] == ESC {
@@ -972,7 +997,7 @@ pub fn truncate_to_width(
 				let seq = &text[i..i + seq_len];
 				out.extend_from_slice(seq);
 				if is_sgr_u16(seq) {
-					saw_sgr = true;
+					pending_sgr = true;
 				}
 				i += seq_len;
 				continue;
@@ -1000,6 +1025,11 @@ pub fn truncate_to_width(
 				}
 				out.push(u);
 				w += gw;
+				visible_out_len = out.len();
+				if pending_sgr {
+					saw_sgr_before_visible = true;
+					pending_sgr = false;
+				}
 			}
 			if w >= target_w {
 				break;
@@ -1011,6 +1041,11 @@ pub fn truncate_to_width(
 				}
 				out.extend_from_slice(gu16);
 				w += gw;
+				visible_out_len = out.len();
+				if pending_sgr {
+					saw_sgr_before_visible = true;
+					pending_sgr = false;
+				}
 				true
 			});
 			if !keep_going {
@@ -1019,10 +1054,25 @@ pub fn truncate_to_width(
 		}
 	}
 
-	if saw_sgr {
-		out.extend_from_slice(&[ESC, b'[' as u16, b'0' as u16, b'm' as u16]);
+	// Drop trailing escape sequences emitted after the last visible character;
+	// they carry no rendered content and JS does not emit them.
+	out.truncate(visible_out_len);
+	let saw_sgr = saw_sgr_before_visible;
+
+	// Always bracket the ellipsis with SGR resets when an ellipsis is present so
+	// it can neither inherit the kept prefix's styling nor leak styling into the
+	// following cells. Matches the JS finalizeTruncatedResult() behavior
+	// (prefix + \x1b[0m + ellipsis + \x1b[0m). The resets are zero-width.
+	// When the ellipsis is omitted, only emit a trailing reset if the kept
+	// prefix opened a style (saw_sgr).
+	const RESET: &[u16] = &[ESC, b'[' as u16, b'0' as u16, b'm' as u16];
+	if !ellipsis.is_empty() {
+		out.extend_from_slice(RESET);
+		out.extend_from_slice(ellipsis);
+		out.extend_from_slice(RESET);
+	} else if saw_sgr {
+		out.extend_from_slice(RESET);
 	}
-	out.extend_from_slice(ellipsis);
 
 	if pad {
 		let out_w = w + ellipsis_w;

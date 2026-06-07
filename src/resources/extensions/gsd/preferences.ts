@@ -86,6 +86,8 @@ export function resolveSkillStalenessDays(basePath?: string): number {
 export {
   resolveModelForUnit,
   resolveModelWithFallbacksForUnit,
+  resolveThinkingLevelForUnit,
+  phaseChainForUnit,
   getNextFallbackModel,
   isTransientNetworkError,
   validateModelId,
@@ -437,6 +439,9 @@ function mergePreferences(base: GSDPreferences, override: GSDPreferences): GSDPr
     skill_rules: [...(base.skill_rules ?? []), ...(override.skill_rules ?? [])],
     custom_instructions: mergeStringLists(base.custom_instructions, override.custom_instructions),
     models: { ...(base.models ?? {}), ...(override.models ?? {}) },
+    thinking: (base.thinking || override.thinking)
+      ? { ...(base.thinking ?? {}), ...(override.thinking ?? {}) }
+      : undefined,
     skill_discovery: override.skill_discovery ?? base.skill_discovery,
     skill_staleness_days: override.skill_staleness_days ?? base.skill_staleness_days,
     auto_supervisor: { ...(base.auto_supervisor ?? {}), ...(override.auto_supervisor ?? {}) },

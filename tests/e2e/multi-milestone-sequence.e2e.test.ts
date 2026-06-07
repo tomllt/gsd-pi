@@ -1,5 +1,5 @@
 // Project/App: gsd-pi
-// File Purpose: E2E gate for headless multi-milestone sequencing through auto-mode.
+// File Purpose: E2E gate for headless multi-milestone closeout boundaries through auto-mode.
 
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -56,14 +56,14 @@ function pushText(turns: TranscriptTurn[], text: string, expect?: TranscriptTurn
 	});
 }
 
-function slicePlanInput(milestoneId: "M001" | "M002", file: string, verify: string, expected: string): Record<string, unknown> {
+function slicePlanInput(file: string, verify: string, expected: string): Record<string, unknown> {
 	return {
-		milestoneId,
+		milestoneId: "M001",
 		sliceId: "S01",
 		goal: `Update ${file} and verify the behavior.`,
 		successCriteria: expected,
 		proofLevel: `Run ${verify}.`,
-		integrationClosure: milestoneId === "M002" ? "Full fixture command passes after both milestones." : "Focused source behavior only.",
+		integrationClosure: "Focused source behavior only.",
 		observabilityImpact: "None.",
 		tasks: [{
 			taskId: "T01",
@@ -80,7 +80,6 @@ function slicePlanInput(milestoneId: "M001" | "M002", file: string, verify: stri
 }
 
 function completeTaskInput(
-	milestoneId: "M001" | "M002",
 	file: string,
 	verify: string,
 	oneLiner: string,
@@ -88,7 +87,7 @@ function completeTaskInput(
 	return {
 		taskId: "T01",
 		sliceId: "S01",
-		milestoneId,
+		milestoneId: "M001",
 		oneLiner,
 		narrative: `Changed ${file} and verified it with ${verify}.`,
 		verification: `${verify} exited 0.`,
@@ -107,7 +106,6 @@ function completeTaskInput(
 }
 
 function completeSliceInput(
-	milestoneId: "M001" | "M002",
 	title: string,
 	file: string,
 	verify: string,
@@ -115,7 +113,7 @@ function completeSliceInput(
 ): Record<string, unknown> {
 	return {
 		sliceId: "S01",
-		milestoneId,
+		milestoneId: "M001",
 		sliceTitle: title,
 		oneLiner,
 		narrative: `The planned task changed ${file} and verified it with ${verify}.`,
@@ -131,13 +129,12 @@ function completeSliceInput(
 }
 
 function validationInput(
-	milestoneId: "M001" | "M002",
 	success: string,
 	integration: string,
 	requirements: string,
 ): Record<string, unknown> {
 	return {
-		milestoneId,
+		milestoneId: "M001",
 		verdict: "pass",
 		remediationRound: 0,
 		successCriteriaChecklist: success,
@@ -150,21 +147,20 @@ function validationInput(
 }
 
 function completionInput(
-	milestoneId: "M001" | "M002",
 	title: string,
 	oneLiner: string,
 	narrative: string,
 	keyFile: string,
 ): Record<string, unknown> {
 	return {
-		milestoneId,
+		milestoneId: "M001",
 		title,
 		oneLiner,
 		narrative,
 		verificationPassed: true,
 		successCriteriaResults: "- PASS: planned source behavior is present.\n- PASS: validation passed before completion.",
 		definitionOfDoneResults: "- PASS: source module changed.\n- PASS: slice and task completed.\n- PASS: milestone validation passed.",
-		requirementOutcomes: `${milestoneId === "M001" ? "R001" : "R002"} satisfied by ${milestoneId}/S01/T01.`,
+		requirementOutcomes: "R001 satisfied by M001/S01/T01.",
 		keyDecisions: ["Let the dispatcher activate the next milestone only after the prior milestone is complete."],
 		keyFiles: [keyFile],
 		lessonsLearned: ["Milestone sequencing should be validated through real auto-mode dispatch boundaries."],
@@ -206,7 +202,7 @@ function buildTranscript(): string {
 	pushTool(turns, "gsd_requirement_save", {
 		class: "core-capability",
 		description: "The status module returns the requested done value after M001 completes.",
-		why: "M002 proves the workflow activates downstream milestones after closeout.",
+		why: "M002 proves downstream work remains queued after M001 closeout.",
 		source: "spec",
 		status: "active",
 		primary_owner: "M002/S01",
@@ -247,7 +243,7 @@ function buildTranscript(): string {
 			"## Done",
 			"- `src/answer.js` returns `ready`.",
 			"- `node --test test/answer.test.js` exits 0.",
-			"- M001 validates and completes before M002 activates.",
+			"- M001 validates and completes before M002 planning.",
 			"",
 		].join("\n"),
 	}, "m001-context", { hasToolResultFor: "ask_user_questions" });
@@ -268,7 +264,7 @@ function buildTranscript(): string {
 			integrationClosure: "Focused module behavior only.",
 			observabilityImpact: "None.",
 		}],
-		successCriteria: ["answer() returns ready.", "M001 completes before M002 activates."],
+		successCriteria: ["answer() returns ready.", "M001 stops at closeout before M002 planning."],
 		keyRisks: [{
 			risk: "M002 could activate before M001 is durably complete.",
 			whyItMatters: "Milestone sequencing depends on closeout state agreement.",
@@ -279,7 +275,7 @@ function buildTranscript(): string {
 			whatWillBeProven: "M001 completes after verification and validation.",
 		}],
 		verificationContract: "Focused node:test command exits 0.",
-		verificationIntegration: "M002 verifies the full fixture after M001.",
+		verificationIntegration: "M002 remains queued for the next command after M001.",
 		verificationOperational: "Headless process exits 0 without blocked or error notifications.",
 		verificationUat: "Slice UAT summary records pass verdict.",
 		definitionOfDone: ["`src/answer.js` is changed.", "M001 validation passes.", "M001 completion is durable."],
@@ -344,7 +340,7 @@ function buildTranscript(): string {
 		content: "# S01 - Research\n\nUse `src/answer.js` and verify with `node --test test/answer.test.js`.\n",
 	}, "m001-s01-research");
 	pushText(turns, "M001/S01 researched.", { hasToolResultFor: "gsd_summary_save" });
-	pushTool(turns, "gsd_plan_slice", slicePlanInput("M001", "src/answer.js", "node --test test/answer.test.js", "answer() returns ready."), "m001-s01-plan");
+	pushTool(turns, "gsd_plan_slice", slicePlanInput("src/answer.js", "node --test test/answer.test.js", "answer() returns ready."), "m001-s01-plan");
 	pushText(turns, "M001/S01 planned.", { hasToolResultFor: "gsd_plan_slice" });
 	pushTool(turns, "write", {
 		path: "src/answer.js",
@@ -354,98 +350,23 @@ function buildTranscript(): string {
 		command: "node --test test/answer.test.js",
 		timeout: 30,
 	}, "verify-answer", { hasToolResultFor: "write" });
-	pushTool(turns, "gsd_task_complete", completeTaskInput("M001", "src/answer.js", "node --test test/answer.test.js", "Updated answer() to return ready."), "m001-task", { hasToolResultFor: "bash" });
+	pushTool(turns, "gsd_task_complete", completeTaskInput("src/answer.js", "node --test test/answer.test.js", "Updated answer() to return ready."), "m001-task", { hasToolResultFor: "bash" });
 	pushText(turns, "M001/S01/T01 complete.", { hasToolResultFor: "gsd_task_complete" });
-	pushTool(turns, "gsd_slice_complete", completeSliceInput("M001", "Update answer module", "src/answer.js", "node --test test/answer.test.js", "answer() now returns ready."), "m001-slice");
+	pushTool(turns, "gsd_slice_complete", completeSliceInput("Update answer module", "src/answer.js", "node --test test/answer.test.js", "answer() now returns ready."), "m001-slice");
 	pushText(turns, "M001/S01 complete.", { hasToolResultFor: "gsd_slice_complete" });
 	pushTool(turns, "gsd_validate_milestone", validationInput(
-		"M001",
-		"- PASS: answer() returns ready.\n- PASS: M001 completes before M002 activates.",
-		"M001 is a focused source change; M002 performs the downstream full fixture verification.",
+		"- PASS: answer() returns ready.\n- PASS: M001 stops before M002 planning.",
+		"M001 is a focused source change; M002 remains queued for a later command.",
 		"R001 is covered by M001/S01/T01.",
 	), "m001-validation");
 	pushText(turns, "Milestone M001 validation complete - verdict: pass.", { hasToolResultFor: "gsd_validate_milestone" });
 	pushTool(turns, "gsd_complete_milestone", completionInput(
-		"M001",
 		"Answer Ready",
 		"Updated answer() to return ready and validated M001.",
 		"M001 completed its source change, focused verification, slice closeout, milestone validation, and milestone completion before M002 work began.",
 		"src/answer.js",
 	), "m001-complete");
 	pushText(turns, "Milestone M001 complete.", { hasToolResultFor: "gsd_complete_milestone" });
-
-	pushTool(turns, "gsd_summary_save", {
-		milestone_id: "M002",
-		artifact_type: "RESEARCH",
-		content: "# M002 - Research\n\nM001 is complete. Use `src/status.js` and verify both modules with `npm test`.\n",
-	}, "m002-research");
-	pushText(turns, "Milestone M002 researched.", { hasToolResultFor: "gsd_summary_save" });
-	pushTool(turns, "gsd_plan_milestone", {
-		milestoneId: "M002",
-		title: "Status Done",
-		vision: "Second source behavior change that verifies both milestones together.",
-		status: "active",
-		dependsOn: ["M001"],
-		slices: [{
-			sliceId: "S01",
-			title: "Update status module",
-			risk: "low",
-			depends: [],
-			demo: "Calling status() returns done and the full fixture test suite passes.",
-			goal: "Change the status module and verify the full fixture.",
-			successCriteria: "status() returns done and answer() still returns ready.",
-			proofLevel: "Full command exits 0.",
-			integrationClosure: "Both milestone source changes are verified by one command.",
-			observabilityImpact: "None.",
-		}],
-		successCriteria: ["status() returns done.", "answer() still returns ready.", "Both milestones complete."],
-		keyRisks: [{
-			risk: "The workflow may stop after M001 instead of activating M002.",
-			whyItMatters: "Multi-milestone specs need sequential closeout without manual recovery.",
-		}],
-		proofStrategy: [{
-			riskOrUnknown: "M002 activation after M001 completion",
-			retireIn: "S01",
-			whatWillBeProven: "M002 plans, executes, validates, and completes after M001.",
-		}],
-		verificationContract: "Full node:test command exits 0.",
-		verificationIntegration: "The full fixture command verifies both source modules together.",
-		verificationOperational: "Headless process exits 0 without blocked or error notifications.",
-		verificationUat: "Slice UAT summary records pass verdict.",
-		definitionOfDone: ["`src/status.js` is changed.", "`npm test` passes.", "M002 validation and completion are durable."],
-		requirementCoverage: "R002 is owned by M002/S01. R001 remains covered by M001/S01.",
-		boundaryMapMarkdown: "| Boundary | Decision |\n| --- | --- |\n| M001 -> M002 | `npm test` proves M001 behavior still holds while M002 changes status. |\n",
-	}, "m002-roadmap");
-	pushText(turns, "Milestone M002 planned.", { hasToolResultFor: "gsd_plan_milestone" });
-	pushTool(turns, "gsd_plan_slice", slicePlanInput("M002", "src/status.js", "npm test", "status() returns done."), "m002-s01-plan");
-	pushText(turns, "M002/S01 planned.", { hasToolResultFor: "gsd_plan_slice" });
-	pushTool(turns, "write", {
-		path: "src/status.js",
-		content: "export function status() {\n\treturn \"done\";\n}\n",
-	}, "write-status");
-	pushTool(turns, "bash", {
-		command: "npm test",
-		timeout: 30,
-	}, "verify-status", { hasToolResultFor: "write" });
-	pushTool(turns, "gsd_task_complete", completeTaskInput("M002", "src/status.js", "npm test", "Updated status() to return done."), "m002-task", { hasToolResultFor: "bash" });
-	pushText(turns, "M002/S01/T01 complete.", { hasToolResultFor: "gsd_task_complete" });
-	pushTool(turns, "gsd_slice_complete", completeSliceInput("M002", "Update status module", "src/status.js", "npm test", "status() now returns done."), "m002-slice");
-	pushText(turns, "M002/S01 complete.", { hasToolResultFor: "gsd_slice_complete" });
-	pushTool(turns, "gsd_validate_milestone", validationInput(
-		"M002",
-		"- PASS: status() returns done.\n- PASS: answer() still returns ready.\n- PASS: both milestones complete.",
-		"The M002 `npm test` command verifies both milestone source modules together.",
-		"R002 is covered by M002/S01/T01; R001 remained covered by M001/S01/T01.",
-	), "m002-validation");
-	pushText(turns, "Milestone M002 validation complete - verdict: pass.", { hasToolResultFor: "gsd_validate_milestone" });
-	pushTool(turns, "gsd_complete_milestone", completionInput(
-		"M002",
-		"Status Done",
-		"Updated status() to return done and verified both milestones together.",
-		"M002 activated after M001 completed, planned the status source change, verified the full fixture, validated the milestone, and completed the sequence.",
-		"src/status.js",
-	), "m002-complete");
-	pushText(turns, "Milestone M002 complete.", { hasToolResultFor: "gsd_complete_milestone" });
 
 	return writeTranscript(turns);
 }
@@ -454,7 +375,7 @@ describe("multi-milestone sequence e2e (fake LLM)", () => {
 	const avail = binaryAvailable();
 	const skipReason = avail.ok ? null : avail.reason;
 
-	test("headless new-milestone --auto completes M001 then M002", { skip: skipReason ?? false, timeout: 300_000 }, (t) => {
+	test("headless new-milestone --auto stops at M001 closeout before M002", { skip: skipReason ?? false, timeout: 300_000 }, (t) => {
 		const project = createTmpProject({
 			git: true,
 			files: {
@@ -559,20 +480,20 @@ describe("multi-milestone sequence e2e (fake LLM)", () => {
 		assert.deepEqual(badOperatorSignals, [], `unexpected blocked/error operator signals: ${badOperatorSignals.join("\n")}`);
 		assert.deepEqual(toolErrors, [], `unexpected tool errors:\n${toolErrors.join("\n")}`);
 		assert.equal(toolNames.filter((toolName) => toolName === "gsd_milestone_generate_id").length, 2, "multi-milestone planning must generate two IDs");
-		assert.equal(toolNames.filter((toolName) => toolName === "gsd_plan_milestone").length, 2, "both milestones must be planned through the workflow tool");
-		assert.equal(toolNames.filter((toolName) => toolName === "gsd_validate_milestone").length, 2, "both milestones must validate before completion");
-		assert.equal(toolNames.filter((toolName) => toolName === "gsd_complete_milestone").length, 2, "both milestones must complete");
+		assert.equal(toolNames.filter((toolName) => toolName === "gsd_plan_milestone").length, 1, "auto stops at M001 closeout before planning M002");
+		assert.equal(toolNames.filter((toolName) => toolName === "gsd_validate_milestone").length, 1, "auto validates only M001 before stopping");
+		assert.equal(toolNames.filter((toolName) => toolName === "gsd_complete_milestone").length, 1, "auto completes only M001 before stopping");
 		assert.equal(discussionManifestWrites.length, 1, "multi-milestone discussion manifest must be written before auto execution");
 		assert.ok(
-			notifyMessages.some((message) => /auto-mode stopped/i.test(message) && /all milestones complete|milestone m002 complete/i.test(message)),
-			`expected terminal all-milestones completion notification, got:\n${notifyMessages.join("\n")}`,
+			notifyMessages.some((message) => /auto-mode stopped/i.test(message) && /milestone m001 complete/i.test(message)),
+			`expected M001 closeout stop notification, got:\n${notifyMessages.join("\n")}`,
 		);
 		assert.doesNotThrow(
-			() => execFileSync("npm", ["test"], { cwd: project.dir, stdio: "pipe" }),
-			"full fixture verification command must pass after both milestones complete",
+			() => execFileSync("node", ["--test", "test/answer.test.js"], { cwd: project.dir, stdio: "pipe" }),
+			"M001 focused verification command must pass after closeout",
 		);
 
-		for (const milestoneId of ["M001", "M002"]) {
+		for (const milestoneId of ["M001"]) {
 			assert.ok(existsSync(join(project.dir, ".gsd", "milestones", milestoneId, `${milestoneId}-CONTEXT.md`)), `${milestoneId} context artifact is present`);
 			assert.ok(existsSync(join(project.dir, ".gsd", "milestones", milestoneId, `${milestoneId}-ROADMAP.md`)), `${milestoneId} roadmap artifact is present`);
 			assert.ok(existsSync(join(project.dir, ".gsd", "milestones", milestoneId, `${milestoneId}-VALIDATION.md`)), `${milestoneId} validation artifact is present`);
@@ -580,22 +501,23 @@ describe("multi-milestone sequence e2e (fake LLM)", () => {
 			assert.ok(existsSync(join(project.dir, ".gsd", "milestones", milestoneId, "slices", "S01", "S01-SUMMARY.md")), `${milestoneId}/S01 summary artifact is present`);
 			assert.ok(existsSync(join(project.dir, ".gsd", "milestones", milestoneId, "slices", "S01", "tasks", "T01-SUMMARY.md")), `${milestoneId}/S01/T01 summary artifact is present`);
 		}
+		assert.ok(existsSync(join(project.dir, ".gsd", "milestones", "M002", "M002-CONTEXT.md")), "M002 context artifact is queued");
+		assert.equal(existsSync(join(project.dir, ".gsd", "milestones", "M002", "M002-ROADMAP.md")), false, "M002 roadmap is not planned before the next command");
 
 		const db = new DatabaseSync(join(project.dir, ".gsd", "gsd.db"));
 		t.after(() => db.close());
-		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM milestones WHERE status = 'complete'"), "2");
+		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM milestones WHERE status = 'complete'"), "1");
 		assert.equal(scalar(db, "SELECT status AS value FROM milestones WHERE id = :id", { id: "M001" }), "complete");
-		assert.equal(scalar(db, "SELECT status AS value FROM milestones WHERE id = :id", { id: "M002" }), "complete");
-		assert.match(scalar(db, "SELECT depends_on AS value FROM milestones WHERE id = :id", { id: "M002" }) ?? "", /M001/);
-		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM slices WHERE status = 'complete'"), "2");
-		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM tasks WHERE status = 'complete'"), "2");
-		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM assessments WHERE scope = 'milestone-validation' AND status = 'pass'"), "2");
+		assert.notEqual(scalar(db, "SELECT status AS value FROM milestones WHERE id = :id", { id: "M002" }), "complete");
+		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM slices WHERE status = 'complete'"), "1");
+		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM tasks WHERE status = 'complete'"), "1");
+		assert.equal(scalar(db, "SELECT COUNT(*) AS value FROM assessments WHERE scope = 'milestone-validation' AND status = 'pass'"), "1");
 		assert.equal(
 			scalar(
 				db,
 				"SELECT COUNT(*) AS value FROM quality_gates WHERE scope = 'milestone' AND task_id = '' AND status = 'complete' AND verdict = 'pass'",
 			),
-			"8",
+			"4",
 		);
 	});
 });

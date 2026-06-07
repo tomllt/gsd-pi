@@ -18,6 +18,13 @@ function isInsideAnyBase(bases: string[], candidate: string): boolean {
   return bases.some((base) => isInsideBase(base, candidate));
 }
 
+function resolvesInsideRoot(root: string, candidate: string): boolean {
+  const resolvedCandidate = isAbsolute(candidate)
+    ? resolve(candidate)
+    : resolve(root, candidate);
+  return isInsideBase(root, resolvedCandidate);
+}
+
 /**
  * Planning IO fields are execution contracts. Absolute paths are only safe when
  * they stay inside the active working directory; in worktree mode, an absolute
@@ -37,13 +44,24 @@ export function validatePlanningPathScope(
       if (!shouldValidatePlanningPathReference(trimmed)) continue;
 
       const candidate = normalizePlannedFileReference(raw);
-      const resolvedCandidate = isAbsolute(candidate)
-        ? resolve(candidate)
-        : resolve(basePath, candidate);
-      if (isInsideAnyBase(absoluteRoots, resolvedCandidate)) continue;
+      if (isAbsolute(candidate)) {
+        if (isInsideAnyBase(absoluteRoots, resolve(candidate))) continue;
+      } else if (absoluteRoots.some((root) => resolvesInsideRoot(root, candidate))) {
+        continue;
+      }
       return `${field} contains path outside allowed repository roots: ${candidate}. Use a path within one of: ${absoluteRoots.join(", ")}.`;
     }
   }
 
+  return null;
+}
+
+export function validatePathOnlyPlanningFields(fields: PlanningPathScopeField[]): string | null {
+  for (const { field, values } of fields) {
+    for (const raw of values) {
+      if (shouldValidatePlanningPathReference(raw)) continue;
+      return `${field} must contain only file paths; invalid entry: ${raw}`;
+    }
+  }
   return null;
 }

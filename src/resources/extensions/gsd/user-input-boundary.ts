@@ -23,7 +23,7 @@ const APPROVAL_CHANGE_QUESTION_RE =
 const RESEARCH_DECISION_QUESTION_RE =
   /\b(?:research|skip)\b/i;
 
-function extractTextFromMessage(msg: unknown): string {
+function extractVisibleTextFromMessage(msg: unknown): string {
   if (!msg || typeof msg !== "object") return "";
   const content = (msg as { content?: unknown }).content;
   if (typeof content === "string") return content;
@@ -34,6 +34,26 @@ function extractTextFromMessage(msg: unknown): string {
     const typed = block as { type?: unknown; text?: unknown };
     if (typed.type === "text" && typeof typed.text === "string") {
       parts.push(typed.text);
+    }
+    // thinking blocks intentionally excluded — they are internal reasoning, not user-visible
+  }
+  return parts.join("\n");
+}
+
+function extractTextFromMessage(msg: unknown): string {
+  if (!msg || typeof msg !== "object") return "";
+  const content = (msg as { content?: unknown }).content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const typed = block as { type?: unknown; text?: unknown; thinking?: unknown };
+    if (typed.type === "text" && typeof typed.text === "string") {
+      parts.push(typed.text);
+    }
+    if (typed.type === "thinking" && typeof typed.thinking === "string") {
+      parts.push(typed.thinking);
     }
   }
   return parts.join("\n");
@@ -51,12 +71,24 @@ export function lastAssistantText(messages: unknown[] | null | undefined): strin
   return "";
 }
 
+function lastAssistantVisibleText(messages: unknown[] | null | undefined): string {
+  if (!Array.isArray(messages)) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== "object") continue;
+    if ((msg as { role?: unknown }).role !== "assistant") continue;
+    const text = extractVisibleTextFromMessage(msg).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 function anyMessageMatches(messages: unknown[] | undefined, pattern: RegExp): boolean {
   if (!Array.isArray(messages)) return false;
   return messages.some((msg) => {
     if (!msg || typeof msg !== "object") return false;
     if ((msg as { role?: unknown }).role === "user") return false;
-    return pattern.test(extractTextFromMessage(msg));
+    return pattern.test(extractVisibleTextFromMessage(msg));
   });
 }
 
@@ -134,7 +166,7 @@ export function isExplicitApprovalResponse(
 export function isAwaitingUserInput(messages: unknown[] | undefined): boolean {
   if (anyMessageMatches(messages, /ask_user_questions was cancelled before receiving a response/i)) return true;
   if (anyMessageMatches(messages, REMOTE_QUESTION_FAILURE_RE)) return true;
-  const text = lastAssistantText(messages);
+  const text = lastAssistantVisibleText(messages);
   if (!text) return false;
   if (APPROVAL_WAIT_RE.test(text)) return true;
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -145,7 +177,7 @@ export function isAwaitingUserInput(messages: unknown[] | undefined): boolean {
 export function isAwaitingApprovalBoundary(messages: unknown[] | undefined): boolean {
   if (anyMessageMatches(messages, /ask_user_questions was cancelled before receiving a response/i)) return true;
   if (anyMessageMatches(messages, REMOTE_QUESTION_FAILURE_RE)) return true;
-  const text = lastAssistantText(messages);
+  const text = lastAssistantVisibleText(messages);
   if (!text) return false;
   if (APPROVAL_WAIT_RE.test(text)) return true;
   return hasApprovalQuestion(text);
@@ -158,7 +190,7 @@ export function shouldPauseForUserApprovalQuestion(
   if (!unitType || !USER_APPROVAL_UNIT_TYPES.has(unitType)) return false;
   if (anyMessageMatches(messages, /ask_user_questions was cancelled before receiving a response/i)) return true;
   if (anyMessageMatches(messages, REMOTE_QUESTION_FAILURE_RE)) return true;
-  const text = lastAssistantText(messages);
+  const text = lastAssistantVisibleText(messages);
   if (!text) return false;
   if (APPROVAL_WAIT_RE.test(text)) return true;
   if (unitType === "research-decision") return hasResearchDecisionQuestion(text);

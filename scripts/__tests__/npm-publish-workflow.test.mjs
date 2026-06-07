@@ -39,7 +39,7 @@ test("production publish keeps the prod approval gate", () => {
 
 test("prerelease publish preserves channel-specific default refs", () => {
   const checkout = workflow.jobs["prerelease-publish"].steps.find(
-    (step) => step.uses === "actions/checkout@v6",
+    (step) => step.uses?.startsWith("actions/checkout@"),
   );
 
   assert.equal(workflow.on.workflow_dispatch.inputs.ref.default, "");
@@ -56,7 +56,7 @@ test("npm publish supports token auth fallback for prerelease", () => {
   assert.deepEqual(input.options, ["trusted", "token"]);
 
   const setupNode = workflow.jobs["prerelease-publish"].steps.find(
-    (step) => step.uses === "actions/setup-node@v6",
+    (step) => step.uses?.startsWith("actions/setup-node@"),
   );
   assert.equal(
     setupNode.env.NODE_AUTH_TOKEN,
@@ -78,7 +78,7 @@ test("production publish plans the release and builds native artifacts in the sa
   assert.equal(plan.outputs.version, "${{ steps.release.outputs.version }}");
   assert.equal(plan.outputs.source_sha, "${{ steps.release.outputs.source_sha }}");
   assert.ok(
-    plan.steps.some((step) => step.uses === "actions/upload-artifact@v5"),
+    plan.steps.some((step) => step.uses?.startsWith("actions/upload-artifact@")),
     "release metadata must be passed to the gated publish job",
   );
 
@@ -95,7 +95,7 @@ test("production publish plans the release and builds native artifacts in the sa
     ],
   );
   assert.ok(
-    nativeBuild.steps.some((step) => step.uses === "actions/upload-artifact@v5"),
+    nativeBuild.steps.some((step) => step.uses?.startsWith("actions/upload-artifact@")),
     "native artifacts must be uploaded for the production release job",
   );
 });
@@ -173,6 +173,30 @@ test("main package publish validates tarball before publishing", () => {
   assert.ok(prodValidate, "production publish must run validate-pack");
   assert.match(prodValidate.run, /pnpm run validate-pack/);
   assert.ok(prodSteps.indexOf(prodValidate) < prodPublishIndex);
+});
+
+test("production release publishes workspace packages and verifies ALL packages before cutting the GitHub release", () => {
+  const steps = workflow.jobs["prod-release"].steps;
+  const idx = (name) => steps.findIndex((s) => s.name === name);
+
+  const workspacePublish = idx("Publish workspace packages to npm");
+  const mainPublish = idx("Publish release to npm @latest");
+  const verifyAll = idx("Verify all required packages are published on npm");
+  const pushTag = idx("Push release commit and tag");
+  const ghRelease = idx("Create GitHub Release");
+
+  // Workspace packages publish before the main package.
+  assert.ok(workspacePublish > -1, "prod-release must publish workspace packages");
+  assert.ok(workspacePublish < mainPublish, "workspace packages must publish before the main package");
+  assert.match(steps[workspacePublish].run, /publish-workspace-packages\.sh/);
+  assert.match(steps[workspacePublish].run, /prepack-resolve-workspace\.cjs/);
+
+  // The full verification gate runs AFTER all publishing and BEFORE the release is cut.
+  assert.ok(verifyAll > -1, "prod-release must verify all required packages on npm");
+  assert.match(steps[verifyAll].run, /verify-npm-release\.mjs/);
+  assert.ok(verifyAll > mainPublish, "verify must run after the main package is published");
+  assert.ok(verifyAll < pushTag, "verify must run before the release tag is pushed");
+  assert.ok(verifyAll < ghRelease, "verify must run before the GitHub release is created");
 });
 
 test("main package publish uses explicit prepack and disables npm lifecycle reruns", () => {

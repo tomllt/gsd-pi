@@ -85,6 +85,18 @@ describe("ToolExecutionComponent", () => {
 		assert.doesNotMatch(rendered, /Tool demo\u00b7do_thing/);
 		assert.match(rendered, /running/);
 		assert.match(rendered, /running · \d+(ms|s)/);
+		assert.match(rendered, /━/, "running cards should show the active rail sweep");
+	});
+
+	test("does not render active rail sweep on completed cards", () => {
+		const rendered = renderToolCollapsed(
+			"mcp__demo__do_thing",
+			{ ok: true },
+			{ content: [{ type: "text", text: "done" }], isError: false },
+		);
+
+		assert.match(rendered, /success · \d+(ms|s)/);
+		assert.doesNotMatch(rendered, /━/);
 	});
 
 	test("does not duplicate running generic tool labels before args", () => {

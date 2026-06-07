@@ -25,6 +25,7 @@ const _counters = {
   parsePlanTotalMs: 0,
   dispatches: 0,
   renders: 0,
+  gitInvocations: 0,
 };
 
 /** Max debug log files to keep. Older ones are pruned on enable. */
@@ -131,6 +132,15 @@ export function debugCount(counter: keyof typeof _counters, value = 1): void {
   _counters[counter] += value;
 }
 
+/**
+ * Snapshot the current debug counters. Used by the per-dispatch benchmark
+ * harness (#442) to read counts without disabling debug (which is what
+ * writeDebugSummary does). Returns a copy so callers can't mutate internal state.
+ */
+export function getDebugCounters(): Readonly<typeof _counters> {
+  return { ..._counters };
+}
+
 /** Record a peak value (only updates if new value is higher). */
 export function debugPeak(counter: keyof typeof _counters, value: number): void {
   if (!_enabled) return;
@@ -168,6 +178,7 @@ export function writeDebugSummary(): string | null {
     avgTtsrCheck_ms,
     ttsrPeakBuffer: _counters.ttsrPeakBuffer,
     renders: _counters.renders,
+    gitInvocations: _counters.gitInvocations,
   });
 
   return disableDebug();

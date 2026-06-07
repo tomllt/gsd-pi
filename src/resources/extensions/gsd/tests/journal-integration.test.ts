@@ -30,6 +30,7 @@ import {
   insertTask,
   openDatabase,
 } from "../gsd-db.js";
+import { SourceObservationStore } from "../source-observations.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,7 @@ function makeSession() {
     currentMilestoneId: "M001",
     currentUnit: null,
     currentUnitRouting: null,
+    sourceObservations: new SourceObservationStore(),
     completedUnits: [],
     resourceVersionOnStart: null,
     lastPromptCharCount: undefined,
@@ -206,6 +208,19 @@ function makeSession() {
     cmdCtx: {
       newSession: () => Promise.resolve({ cancelled: false }),
       getContextUsage: () => ({ percent: 10, tokens: 1000, limit: 10000 }),
+    },
+    setCurrentUnit(this: any, unit: any) {
+      this.currentUnit = unit;
+      this.sourceObservations.beginUnit({
+        unitType: unit.type,
+        unitId: unit.id,
+        startedAt: unit.startedAt,
+        basePath: unit.workspaceRoot ?? this.basePath,
+      });
+    },
+    clearCurrentUnit(this: any) {
+      this.currentUnit = null;
+      this.sourceObservations.clear();
     },
     clearTimers: () => {},
   } as any;

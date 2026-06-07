@@ -66,7 +66,7 @@ const dark: ThemeJson = {
 		toolOutput: "textSoft",
 		surfaceTitle: "accent",
 		surfaceAccent: "accent",
-		toolRunning: "accent",
+		toolRunning: "#f59e0b",
 		toolSuccess: "green",
 		toolError: "red",
 

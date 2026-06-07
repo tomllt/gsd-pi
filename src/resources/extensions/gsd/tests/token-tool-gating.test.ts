@@ -24,7 +24,9 @@ test("buildMinimalGsdToolSet preserves non-GSD tools and replaces broad GSD surf
     "gsd_milestone_status",
     "gsd_checkpoint_db",
     "memory_query",
+    "gsd_memory_query",
     "capture_thought",
+    "gsd_capture_thought",
     "gsd_graph",
   ]);
 
@@ -573,6 +575,42 @@ test("scopeGsdWorkflowToolsForDispatch applies and restores per-unit skill visib
   ]);
   assert.deepEqual(visibleSkills, ["previous-skill"]);
   assert.equal(calls.filter((call) => call.kind === "skills").length, 2);
+});
+
+// ── Regression #534: auto-mode subprocess cannot call gsd_memory_query / gsd_capture_thought ──
+// MCP-workflow subprocesses register the gsd_-prefixed variants, not the pi-native names.
+// MINIMAL_GSD_TOOL_NAMES must include both so resolveScopedToolNames exposes them.
+
+test("MINIMAL_GSD_TOOL_NAMES includes gsd_memory_query and gsd_capture_thought (regression #534)", () => {
+  assert.ok(
+    (MINIMAL_GSD_TOOL_NAMES as readonly string[]).includes("gsd_memory_query"),
+    "MINIMAL_GSD_TOOL_NAMES must include gsd_memory_query for MCP-workflow surface parity",
+  );
+  assert.ok(
+    (MINIMAL_GSD_TOOL_NAMES as readonly string[]).includes("gsd_capture_thought"),
+    "MINIMAL_GSD_TOOL_NAMES must include gsd_capture_thought for MCP-workflow surface parity",
+  );
+});
+
+test("buildMinimalAutoGsdToolSet resolves MCP-scoped gsd_memory_query and gsd_capture_thought when subprocess only registers gsd_-prefixed variants (regression #534)", () => {
+  // Simulate a subprocess that only exposes gsd_-prefixed MCP tool names,
+  // not the pi-native memory_query / capture_thought variants.
+  const result = buildMinimalAutoGsdToolSet([
+    "bash",
+    "read",
+    "mcp__gsd-workflow__gsd_exec",
+    "mcp__gsd-workflow__gsd_memory_query",
+    "mcp__gsd-workflow__gsd_capture_thought",
+  ], "execute-task");
+
+  assert.ok(
+    result.includes("mcp__gsd-workflow__gsd_memory_query"),
+    "mcp__gsd-workflow__gsd_memory_query must be included when only the gsd_-prefixed variant is available",
+  );
+  assert.ok(
+    result.includes("mcp__gsd-workflow__gsd_capture_thought"),
+    "mcp__gsd-workflow__gsd_capture_thought must be included when only the gsd_-prefixed variant is available",
+  );
 });
 
 test("applyUnitSkillVisibility sets manifest or clears for wildcard", () => {

@@ -13,6 +13,7 @@ import { GSDError, GSD_GIT_ERROR } from "./errors.js";
 import { GIT_NO_PROMPT_ENV } from "./git-constants.js";
 import { getErrorMessage } from "./error-utils.js";
 import { isInfrastructureError } from "./auto/infra-errors.js";
+import { debugCount } from "./debug-logger.js";
 
 // Issue #453: keep auto-mode bookkeeping on the stable git CLI path unless a
 // caller explicitly opts into the native helper.
@@ -140,6 +141,8 @@ function loadNative(): typeof nativeModule {
 
 /** Run a git command via execFileSync. Returns trimmed stdout. */
 function gitExec(basePath: string, args: string[], allowFailure = false): string {
+  // Counts git CLI shell-outs only (native libgit2 paths bypass this helper).
+  debugCount("gitInvocations");
   try {
     return execFileSync("git", args, {
       cwd: basePath,
@@ -169,6 +172,8 @@ function execGitFileSyncWithRetry(
   args: string[],
   options: Partial<ExecFileSyncOptionsWithStringEncoding>,
 ): string {
+  // Counts git CLI shell-outs only (native libgit2 paths bypass this helper).
+  debugCount("gitInvocations");
   try {
     return execFileSync("git", args, {
       cwd: basePath,
@@ -180,6 +185,8 @@ function execGitFileSyncWithRetry(
   } catch (err) {
     if (!isRetryableGitError(err)) throw err;
     sleepSync(GIT_RETRY_DELAY_MS);
+    // Retry is a second physical shell-out — count it too.
+    debugCount("gitInvocations");
     return execFileSync("git", args, {
       cwd: basePath,
       stdio: ["ignore", "pipe", "pipe"],
@@ -192,6 +199,8 @@ function execGitFileSyncWithRetry(
 
 /** Run a git command via execFileSync. Returns trimmed stdout. */
 function gitFileExec(basePath: string, args: string[], allowFailure = false): string {
+  // Counts git CLI shell-outs only (native libgit2 paths bypass this helper).
+  debugCount("gitInvocations");
   try {
     return execFileSync("git", args, {
       cwd: basePath,
@@ -1088,6 +1097,45 @@ export function nativeMergeSquash(basePath: string, branch: string): GitMergeRes
     }
     // No conflicts detected — this is a non-conflict failure; re-throw
     // so the caller knows the merge did not succeed.
+    throw err;
+  }
+}
+
+/**
+ * Regular (non-squash) merge a branch (stages changes, does NOT commit).
+ * Uses --no-ff to ensure a proper merge commit and --no-commit so the caller
+ * can supply a custom commit message via nativeCommit.
+ * Respects the user's global git merge.ff config; --no-ff is additive here.
+ */
+export function nativeMergeRegular(basePath: string, branch: string): GitMergeResult {
+  try {
+    execFileSync("git", ["merge", "--no-ff", "--no-commit", branch], {
+      cwd: basePath,
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf-8",
+      env: GIT_NO_PROMPT_ENV,
+    });
+    return { success: true, conflicts: [] };
+  } catch (err: unknown) {
+    const stderr =
+      err instanceof Error ? (err as Error & { stderr?: string }).stderr ?? err.message : String(err);
+    if (
+      stderr.includes("local changes would be overwritten") ||
+      stderr.includes("not possible because you have unmerged files") ||
+      stderr.includes("overwritten by merge")
+    ) {
+      const dirtyFiles = stderr
+        .split("\n")
+        .filter((line) => line.startsWith("\t"))
+        .map((line) => line.trim())
+        .filter(Boolean);
+      return { success: false, conflicts: ["__dirty_working_tree__"], dirtyFiles };
+    }
+    const conflictOutput = gitExec(basePath, ["diff", "--name-only", "--diff-filter=U"], true);
+    const conflicts = conflictOutput ? conflictOutput.split("\n").filter(Boolean) : [];
+    if (conflicts.length > 0) {
+      return { success: false, conflicts };
+    }
     throw err;
   }
 }

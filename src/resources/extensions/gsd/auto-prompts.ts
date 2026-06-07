@@ -37,6 +37,7 @@ import {
 import { formatDecisionsCompact, formatRequirementsCompact } from "./structured-data-formatter.js";
 import { readPhaseAnchor, formatAnchorForPrompt } from "./phase-anchor.js";
 import { composeContextModeInstructions, composeInlinedContext, composeUnitContext, type ArtifactResolver, type ContextModeRenderMode, type ExcerptResolver } from "./unit-context-composer.js";
+import { resolveManifest } from "./unit-context-manifest.js";
 import { readCompactionSnapshot } from "./compaction-snapshot.js";
 import { logWarning } from "./workflow-logger.js";
 import { inlineGraphSubgraph } from "./graph-context.js";
@@ -1674,6 +1675,70 @@ export async function buildDiscussRequirementsPrompt(
   }));
 }
 
+/**
+ * Bounded codebase snapshot for research-milestone grounding (ADR-029).
+ *
+ * Reuses the in-process, ~millisecond `analyzeCodebase` / `formatCodebaseBrief`
+ * machinery that powers the guided-discuss Preparation Snapshot, so research
+ * grounds on current code reality instead of running an open-ended `rg`/`find`/
+ * `scout` survey on every dispatch (the auto-mode counterpart to ADR-028).
+ *
+ * Gated on the manifest's `codebaseMap` flag (previously a dead policy flag)
+ * and the `discuss_preparation` opt-out. Failures degrade silently — research
+ * still runs, it just falls back to on-demand reads.
+ */
+async function buildResearchCodebaseSnapshot(base: string): Promise<string | null> {
+  const manifest = resolveManifest("research-milestone");
+  if (!manifest?.codebaseMap) return null;
+  const prefs = loadEffectiveGSDPreferences(base)?.preferences;
+  if (prefs?.discuss_preparation === false) return null;
+  try {
+    const { analyzeCodebase, formatCodebaseBrief } = await import("./preparation.js");
+    const brief = await analyzeCodebase(base);
+    const formatted = formatCodebaseBrief(brief).trim();
+    if (!formatted) return null;
+    return [
+      "### Codebase Snapshot (current code reality)",
+      "Source: in-process bounded scan of the working tree.",
+      "",
+      "This snapshot describes what already exists. Treat it as authoritative for current code reality and do NOT re-survey the tree to rediscover it. Read a specific file only when a research question hinges on its exact contents.",
+      "",
+      formatted,
+    ].join("\n");
+  } catch (err) {
+    logWarning("prompt", `buildResearchCodebaseSnapshot failed: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
+/**
+ * Lightweight research resume block (ADR-029).
+ *
+ * When a prior attempt for this milestone left durable output — a partial
+ * RESEARCH artifact and/or a research phase anchor — inline it under a
+ * "continue, do not redo" banner so a re-dispatched research unit extends
+ * prior work instead of re-running every command from scratch (the
+ * restart-from-scratch pattern observed in the 789 run trace). No new state
+ * machine: the partial RESEARCH file and the existing phase anchor are the
+ * durable signals. Returns null when there is nothing to resume.
+ */
+async function buildResearchResumeBlock(base: string, mid: string): Promise<string | null> {
+  const researchPath = resolveMilestoneFile(base, mid, "RESEARCH");
+  const researchRel = relMilestoneFile(base, mid, "RESEARCH");
+  const partial = await inlineFileOptional(researchPath, researchRel, "Prior Partial Research");
+  const anchor = readPhaseAnchor(base, mid, "research-milestone");
+  if (!partial && !anchor) return null;
+  const lines: string[] = [
+    "### Resume — Prior Partial Research (continue, do not redo)",
+    "",
+    "A previous research attempt for this milestone left the durable output below. **Build on it — do not restart from scratch.** Re-run a command only when its prior result is missing or stale, and persist progress incrementally with `gsd_summary_save` so any interruption keeps your findings.",
+    "",
+  ];
+  if (anchor) lines.push(formatAnchorForPrompt(anchor), "");
+  if (partial) lines.push(partial);
+  return lines.join("\n").trimEnd();
+}
+
 export async function buildResearchMilestonePrompt(mid: string, midTitle: string, base: string): Promise<string> {
   const contextTelemetry: PromptContextTelemetryEntry[] = [];
 
@@ -1715,6 +1780,34 @@ export async function buildResearchMilestonePrompt(mid: string, midTitle: string
   const knowledgeInlineRM = await inlineKnowledgeBudgeted(base, extractKeywords(midTitle));
   const parts: string[] = [];
   if (composed.prepend) parts.push(composed.prepend);
+
+  // Resume grounding (ADR-029): if a prior attempt left partial research or a
+  // phase anchor, inline it prominently so a re-dispatched unit continues
+  // rather than re-running every command from scratch.
+  const resumeBlock = await buildResearchResumeBlock(base, mid);
+  if (resumeBlock) {
+    parts.push(resumeBlock);
+    trackPromptContext(contextTelemetry, "research-resume", "inline", resumeBlock);
+  } else {
+    trackPromptContext(contextTelemetry, "research-resume", "skipped", null, "no prior partial research");
+  }
+
+  // Project-size signal (ADR-029): same classification plan-milestone gets, so
+  // research right-sizes effort on tiny projects instead of over-researching.
+  const classificationBlock = formatProjectClassificationForPlanning(classifyProject(base));
+  parts.push(classificationBlock);
+  trackPromptContext(contextTelemetry, "project-classification", "inline", classificationBlock);
+
+  // Codebase snapshot (ADR-029): bounded, in-process code-reality grounding so
+  // research does not open-endedly survey the tree (auto-mode ADR-028).
+  const codebaseSnapshot = await buildResearchCodebaseSnapshot(base);
+  if (codebaseSnapshot) {
+    parts.push(codebaseSnapshot);
+    trackPromptContext(contextTelemetry, "codebase-snapshot", "inline", codebaseSnapshot);
+  } else {
+    trackPromptContext(contextTelemetry, "codebase-snapshot", "skipped", null, "disabled, empty, or scan failed");
+  }
+
   if (knowledgeInlineRM && composed.inline) {
     const idx = composed.inline.lastIndexOf("### Output Template:");
     if (idx > 0) {
@@ -3530,11 +3623,25 @@ export async function buildReassessRoadmapPrompt(
 
 // ─── Reactive Execute Prompt ──────────────────────────────────────────────
 
+/**
+ * Build the `with model: "…" and thinking: "…"` suffix injected into a prompt
+ * that instructs the coordinator how to dispatch a `subagent` call. Either or
+ * both may be absent (ADR-026 / #508).
+ */
+function subagentCallSuffix(model?: string, thinking?: string): string {
+  const parts: string[] = [];
+  if (model) parts.push(`model: "${model}"`);
+  if (thinking) parts.push(`thinking: "${thinking}"`);
+  return parts.length > 0 ? ` with ${parts.join(" and ")}` : "";
+}
+
 export async function buildReactiveExecutePrompt(
   mid: string, midTitle: string, sid: string, sTitle: string,
   readyTaskIds: string[], base: string,
   subagentModel?: string,
-  opts?: { sessionContextWindow?: number; modelRegistry?: MinimalModelRegistry; sessionProvider?: string },
+  // Reasoning effort travels inside opts here (not as a positional param) so
+  // existing positional `opts` callers don't shift (#508).
+  opts?: { sessionContextWindow?: number; modelRegistry?: MinimalModelRegistry; sessionProvider?: string; subagentThinking?: string },
 ): Promise<string> {
   const { loadSliceTaskIO, deriveTaskGraph, graphMetrics } = await import("./reactive-graph.js");
 
@@ -3627,7 +3734,7 @@ export async function buildReactiveExecutePrompt(
       `When done, say: "Task ${tid} complete."`,
     ].join("\n");
 
-    const modelSuffix = subagentModel ? ` with model: "${subagentModel}"` : "";
+    const modelSuffix = subagentCallSuffix(subagentModel, opts?.subagentThinking);
     subagentSections.push([
       `### ${tid}: ${tTitle}`,
       "",
@@ -3666,6 +3773,22 @@ export async function buildReactiveExecutePrompt(
 // See gate-registry.ts for the full ownership map.
 
 /**
+ * Adapt gate-registry guidance for section-close phases.
+ *
+ * Gate-registry text is shared with the gate-evaluate subagent, where
+ * "Return verdict ..." is literal. Section-close units write artifact sections
+ * instead, so translate that wording at render time without mutating the
+ * canonical guidance.
+ */
+function sectionModeGuidance(guidance: string): string {
+  return guidance.replace(
+    /Return verdict '([^']+)'/g,
+    (_match, verdict: string) =>
+      verdict === "omitted" ? "Leave the section empty" : `Record a \`${verdict}\``,
+  );
+}
+
+/**
  * Render a "Gates to Close" block for turns like `complete-slice` and
  * `validate-milestone` that own gates which are closed as a side-effect
  * of writing artifact sections (not via a dedicated gate-evaluate
@@ -3688,12 +3811,16 @@ function renderGatesToCloseBlock(
     "These quality gates are still pending for this unit. You MUST address every one before calling the closing tool — the handler closes the DB row based on whether the corresponding artifact section is present.",
   );
   lines.push("");
+  lines.push(
+    "**Do NOT call `gsd_save_gate_result` (or any gate-result tool) for these gates** — that tool belongs to a different phase and the call will be blocked. You close each gate purely by writing its named section: a populated section records `pass`, an empty section records `omitted`, and the completion handler persists the verdict for you. Treat any \"return verdict\" wording in the guidance below as describing that section outcome, not as an instruction to call a tool.",
+  );
+  lines.push("");
   for (const def of applicable) {
     lines.push(`### ${def.id} — ${def.promptSection}`);
     lines.push("");
     lines.push(`**Question:** ${def.question}`);
     lines.push("");
-    lines.push(def.guidance);
+    lines.push(sectionModeGuidance(def.guidance));
     if (opts.allowOmit) {
       lines.push("");
       lines.push(
@@ -3711,10 +3838,11 @@ export async function buildParallelResearchSlicesPrompt(
   slices: Array<{ id: string; title: string }>,
   basePath: string,
   subagentModel?: string,
+  subagentThinking?: string,
 ): Promise<string> {
   // Build individual research-slice prompts for each slice
   const subagentSections: string[] = [];
-  const modelSuffix = subagentModel ? ` with model: "${subagentModel}"` : "";
+  const modelSuffix = subagentCallSuffix(subagentModel, subagentThinking);
   for (const slice of slices) {
     const slicePrompt = await buildResearchSlicePrompt(mid, midTitle, slice.id, slice.title, basePath, { contextModeRenderMode: "nested" });
     subagentSections.push([
@@ -3742,6 +3870,7 @@ export async function buildGateEvaluatePrompt(
   mid: string, midTitle: string, sid: string, sTitle: string,
   base: string,
   subagentModel?: string,
+  subagentThinking?: string,
 ): Promise<string> {
   // Pull only the gates this turn actually owns (Q3/Q4). Filter via the
   // registry so that scope:"slice" gates owned by other turns (Q8) can't
@@ -3798,7 +3927,7 @@ export async function buildGateEvaluatePrompt(
       "- `findings`: detailed markdown findings (or empty if omitted)",
     ].join("\n");
 
-    const modelSuffix = subagentModel ? ` with model: "${subagentModel}"` : "";
+    const modelSuffix = subagentCallSuffix(subagentModel, subagentThinking);
     subagentSections.push([
       `### ${def.id}: ${def.question}`,
       "",

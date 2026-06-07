@@ -35,3 +35,28 @@ updates:
     labels:
       - "dependencies"
       - "security"
+
+  # GitHub Actions are SHA-pinned in .github/workflows for supply-chain safety.
+  # Pinning stops automatic upstream updates, so (unlike the npm/cargo ecosystems
+  # above, which are alert-only) this one opens PRs to bump the pinned SHA +
+  # version comment when a new release ships. Grouped into one PR to reduce noise.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    ignore:
+      # pnpm/action-setup v6 stops exposing pnpm's bundled node-gyp on PATH, so
+      # native rebuilds (node-pty, etc.) fail in the CI `build` job with
+      # "node-gyp: not found" (regressed main in #548). Stay on v4 until v6+ is
+      # verified to keep node-gyp available.
+      - dependency-name: "pnpm/action-setup"
+        update-types: ["version-update:semver-major"]

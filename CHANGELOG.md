@@ -8,6 +8,219 @@ This changelog starts from the `open-gsd/gsd-pi` ownership baseline. Earlier pro
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-06
+
+### Added
+- **tui**: add running tool rail sweep
+- **gsd**: per-phase thinking level configuration (#497, #508)
+- **gsd**: add planner handoff after planning
+- **update**: add gsd-browser release notices
+- **browser-tools**: use managed gsd-browser engine
+- **gsd**: add post-unit hook criticality gates
+- **gsd**: compact small auto widget
+- **tui**: instrument first-visible response latency
+- **pi-ai**: add MiniMax M3 direct model
+- **pi-ai**: generate anthropic vertex models
+- **web**: set wordmark logo to "GSD-Pi Web"
+- **pi-tui**: add mouse support (clicks + wheel) to the TUI
+- **gsd**: add opt-in local notification bell
+
+### Fixed
+- **issue**: [Bug]: Auto-mode re-dispatch loop: zero-tool rate-limit guard is blind to reasoning/thinking blocks
+- **issue**: auto-mode subprocess cannot call memory_query or capture_thought — tool name mismatch between pi-native and MCP-workflow surfaces
+- **gsd**: keep milestone closeout surface durable
+- **gsd**: port graduated stuck-recovery into the orchestrator (#442)
+- **test**: update prepareForUnit test to track refactored location in orchestrator.ts
+- **pi-coding-agent**: ignore empty stored api keys
+- **claude-code-cli**: load user Claude settings
+- **gsd**: stop malformed milestone lines from swallowing the next one
+- **gsd**: self-heal milestone sequence projection
+- **gsd**: soften section gate tool redirects
+- **gsd**: avoid false worktree planning pauses
+- **browser-tools**: scope artifacts to tool cwd
+- **tui**: hide thinking transcript cards
+- **gsd**: constrain source observation context
+- **gsd**: refresh source observations after file mutations
+- **gsd**: preserve active unit source context
+- **gsd**: harden slice planning output contract
+- **gsd**: prevent stale queued draft from blocking real active milestone
+- **gsd**: persist new milestone question drafts
+- **gsd**: honor inline thinking on a model-less models entry
+- **gsd**: floor + capability-clamp thinking on hook model override
+- **gsd**: add appliedThinkingLevel to loop-deps selectAndApplyModel return type
+- **gsd**: preserve per-phase thinking through hook model override
+- **gsd**: find unit-specific thinking block when model falls through to sibling
+- **gsd**: don't let a model-less phase entry shadow sibling fallback
+- **subagent**: add thinking to TaskParam so dispatch typechecks
+- **gsd**: treat milestone-complete finalize break as successful completion
+- **gsd**: clamp explicit no-model thinking instead of raw setThinkingLevel
+- **gsd**: address Bugbot review on per-phase thinking
+- **gsd**: clear stale gsd-step and gsd-progress on complete-milestone stop
+- **gsd**: repair descriptor stale-render plan output
+- **gsd**: stop auto timer after milestone closeout
+- **gsd**: canonicalize milestone id in stale-render plan/summary repairs
+- **gsd**: track DB recovery evidence surfaces
+- **gsd**: require explicit data-loss ack in interactive recover
+- **gsd**: canonicalize milestone ids in markdown hierarchy scan
+- **gsd**: address Cursor Bugbot review on recover safety
+- **gsd**: harden drift reconciliation single-writer + projection invariant
+- **gsd**: project prior-milestone summaries into worktrees
+- **gsd**: align quality gate evaluation contracts
+- **gsd**: remove planner command surface
+- **gsd**: align phase tool contracts with prompts
+- **gsd**: restore gsd-browser skill trigger
+- **browser-tools**: default browser automation to playwright
+- **gsd**: guard bare /gsd reentry call with non-fatal try/catch
+- **gsd**: re-enter active worktree on cold start instead of searching
+- **gsd**: surface manual UAT validation path for human checks
+- **browser-tools**: repair gsd-browser launch and auto-init for web apps
+- **gsd**: scope web-UAT gate to artifact-driven only
+- **gsd**: use canonical hasBrowserRequiredText for the web-UAT gate
+- **gsd**: launch gsd-browser for live/mixed UAT and gate web UAT classification
+- **issue**: [Bug]: Failed to run provider setup
+- **auto**: run-latency quick wins (stalled-tool timeout, resume thrash, skill bloat, switch noise)
+- apply tool result truncation in all modes, not just auto-mode
+- **bug-7**: getToolBaselineSnapshot returns stale baseline after MCP connects mid-session
+- **bug-6**: guided-flow transport preflight uses parent activeTools, breaking test
+- **bug-5**: preflight uses narrowed activeTools snapshot before baseline restore
+- pass activeTools/sessionAuthMode/sessionBaseUrl to resolveDispatch in decideNextUnit; restore lockfileVersion 9.0
+- **issue**: Auto-mode dispatches run-uat into tool-starved session; transport preflight never verifies MCP tools are connected — remaining changes
+- **bug-4**: register-hooks.ts buildRunUatGsdToolSet silently returns reduced surface on resolution failure `buildRunUatGsdToolSet` in `register-hooks.ts` now logs a warning when any required run-uat workflow tool is absent from the resolved surface.
+- **bug-3**: tool-contract.ts closeout regex omits 'uat', misclassifying gsd_uat_result_save added `uat` to the closeout regex in `tool-contract.ts` so `gsd_uat_result_save` is properly recognized as run-uat's closeout tool.
+- **bug-2**: auto-dispatch.ts run-uat rule never calls transport preflight before dispatch added `activeTools`/`sessionBaseUrl`/`sessionAuthMode` to `DispatchContext`, imported transport preflight in `auto-dispatch.ts`, and call it in the run-uat rule before incrementing the retry counter; pass the new fields from `auto/phases.ts`.
+- **bug-1**: getWorkflowTransportSupportError skips MCP tool verification when activeTools is known fixed `getWorkflowTransportSupportError` to check all required tools against `activeTools` when known, not just the non-MCP subset; updated 2 tests that asserted the buggy behavior.
+- **gsd**: control responses payload context
+- **issue**: Auto-mode re-dispatches zero-tool-call units with no cap, wasting ~4 billed prompts per stuck unit (phases.js:2055)
+- **issue**: Guided flow under claude-code falsely aborts: workflow-MCP surface tools re-validated against pi.getActiveTools()
+- **gsd**: present browser tools for executable UAT
+- **gsd**: reject unrecognized uatType values in executeUatResultSave
+- **gsd**: validate submitted presentation before canonical merge
+- **gsd**: always merge canonical presentation regardless of plan ID
+- **gsd**: harden run-uat tool contract
+- **gsd**: block split-brain milestone closeout
+- **gsd**: prevent double notification on 4th+ DB row recovery call
+- **gsd**: accept context-only discuss handoff
+- **gsd**: hide model-facing gate prompts in tool UI
+- **gsd**: preserve closeout UI during session reroot
+- **complete-slice**: backfill verification from prior summary when omitted
+- **issue**: Auto-mode loops to per-unit cost cap on MCP -32602 tool-validation errors (not classified as deterministic)
+- **update**: use effective browser version for checks
+- **mcp-server**: avoid remote question fetch handle leaks
+- **gsd**: block failed post-unit hook completion
+- **rtk**: surface validation diagnostics
+- **gsd**: resolve UAT runtime rebase conflicts
+- **gsd**: move artifact-driven check before nonAutomatable escape hatch
+- **gsd**: check runtime UAT evidence per-slice to prevent cross-slice bypass
+- **gsd**: accept runtime UAT evidence in browser gate
+- **gsd**: harden workflow tool contracts
+- **agent-core**: align threshold compaction with context estimate
+- **gsd**: also check heading titles for browser requirements
+- **gsd**: track heading depth in hasBrowserRequiredText to prevent section context loss
+- **gsd**: align run-uat result save prompt
+- **gsd**: repair UAT doctor recovery
+- **gsd**: guide absence checks away from grep counts
+- **gsd**: prevent serialized subagent task arrays
+- **gsd**: pause after discuss dispatches
+- **gsd**: pause unresolved task escalations
+- **gsd**: cap milestone discuss inlined context and deduplicate preparation prior-context
+- **gsd**: preserve decision memories during decay
+- **gsd**: preload milestone discuss context
+- **gsd**: scope forensics filing tools
+- **pi-ai**: scope stream handlers by provider
+- **auto**: also filter disk-based SUMMARY drift blockers from hard-pause path
+- restore pnpm lockfile format
+- **ci**: restore pnpm lockfile format
+- **issue**: auto-mode permanent pause: artifact_db_status_divergence from failure summaries blocks dispatch of pending tasks
+- tolerate missing latency hooks in chat controller
+- **issue**: dashboard-overlay: 2s timer invalidates render cache and forces 5 O(n) ledger scans every tick, causing UI lag
+- restore pnpm-lock.yaml to lockfileVersion 9.0 (broken by branch base mismatch)
+- **issue**: auto-mode: lastFinalizedUnitKey reset at orchestrator.js:259 lets completed units re-dispatch (X→Y→X)
+- **gsd**: resolve complete-slice prompt merge duplication
+- **gsd**: keep dashboard refresh timer from pinning tests
+- **ci**: install playwright browsers for integration
+- **gsd**: save run-uat assessments with registered tool
+- **gsd**: escape UAT assessment table cells
+- **gsd**: type exec sandbox metadata
+- **pack**: avoid mcp-server workspace dependency
+- **issue**: Irreversible next-step items self-execute instead of routing through ask_user_questions (confirm-first rule uncoupled from next-steps convention; destructive-guard hook is auto-only & warn-only)
+- **issue**: [claude-code] session-limit message not matched by zero-tool prefix regex — auto-mode hot-loops instead of pausing until reset
+- **issue**: gsd_plan_milestone unavailable in Gate 1b recovery turns (not in MINIMAL_GSD_TOOL_NAMES)
+- **issue**: reactive-execute leaks dirty files into next execute-task commit, triggering false 'unexpected file change' safety warning
+- **gsd**: skip roadmap drift during slice planning
+- **issue**: Reconciler infinite roadmap-divergence loop during transient milestone planning state
+- **gsd**: unblock remediation reassess dispatch
+- **gsd**: activate complete-slice skill rules
+- **gsd**: allow run-uat subagent dispatch
+- **issue**: complete-slice unit ignores skill_rules preferences (missing buildSkillActivationBlock call)
+- accept UAT evidence from worktrees
+- **pi-tui**: disable mouse reporting by default
+- rename gsd mcp prep notification
+- scope run-uat workflow mcp tools
+- scope run-uat workflow mcp tools
+- adopt next milestone in orchestration dispatch
+- adopt next milestone in orchestration dispatch
+- add tool presentation plan source
+- add tool presentation plan source
+- prevent closed milestone resume drift
+- guard gsd recover and rebuild markdown
+- settle orphaned tool cards on agent end
+- start workflow mcp for claude code gsd phases
+- auto-init claude code mcp
+- **pi-coding-agent**: use gsd config dir in vendored package
+- **ci**: install native build deps for canvas fallback
+- **ci**: harden remote question channel ids
+- **issue**: Remote questions: large Discord channel ID snowflake silently truncated by YAML number parser, breaking all ask_user_questions dispatches
+- **bug-2**: Renderer emits unvalidated risk/title values into roadmap markdown normalized `risk` to valid `RiskLevel` and sanitized inline slice title text before rendering roadmap markdown.
+- **bug-1**: Checkbox slice parser misclassifies piped lines as table rows tightened table-row detection so checkbox slice lines containing `|` no longer trigger table parsing mode.
+- **issue**: cleanupBundledSkillsFromEcosystemDir: false-positive collision warning on every startup
+- use selected unit model for workflow MCP prep
+- **web**: capture keyboard selection for UI questions
+- **issue**: auto-mode hard-stops on workflow-capability when bundled MCP CLI exists but project mcp.json is missing — should pause with remediation instead
+- **gsd**: route slice discuss through worktree
+- **claude-code-cli**: coalesce internal sub-turn streams
+- **pi-coding-agent**: add anthropic vertex defaults
+- **gsd**: hard gate auto unit lifecycle tools
+- **pi-ai**: restore anthropic vertex provider
+- **gsd**: route status command to dashboard
+- **gsd**: stop visible from tripping browser evidence gate
+- **gsd**: classify websocket errors as network
+- **rpc-client**: handle child process spawn errors
+- **gsd**: verify sidecar capture artifacts
+- **login**: restore provider auth flows
+- **gsd**: avoid workflow MCP transport gate false positive
+- **web**: make packaged standalone host bootable and fail fast on boot errors (#328)
+- **web**: reclaim project bridges via shutdown gate, not global hooks
+- **ci**: sync pnpm-lock.yaml with @opengsd/engine optional deps
+- **memory**: plug long-running service leaks and bound unbounded growth
+- **pi-ai**: replay DeepSeek reasoning under reasoning_content on non-deepseek baseUrls
+- **gsd**: let burn-max and unit_cost_spike_multiplier opt out of cost-spike pause
+- **compaction**: reframe prompts as state-snapshot handoff briefings
+
+### Changed
+- **gsd**: preload-authoritative auto research & validate (ADR-028/029)
+- **agent-modes**: avoid duplicate transcript truncation
+- **gsd**: collapse the 9 auto-orchestration adapter seams (#442)
+- **gsd**: resolve repo-ness once per pre-dispatch health gate (#442)
+- **gsd**: share one artifact/DB drift walk across its 3 handlers (#442)
+- **gsd**: cache detectStaleRenders projection parses by file identity (#442)
+- **gsd**: hoist parser require out of detectStaleRenders hot loop (#442)
+- **gsd**: commit Phase 0 auto-dispatch baseline (#442)
+- **gsd**: add per-dispatch benchmark harness (#442)
+- **gsd**: time advance() pipeline via debugTime (#442)
+- **gsd**: add gitInvocations counter to debug-logger (#442)
+- **pi-tui**: eliminate render-loop Intl.Segmenter GC churn
+- **gsd**: centralize UAT policy and run records
+- **ci**: retrigger pr checks
+- refresh pnpm lockfile for engine packages
+- refresh pnpm lockfile for engine packages
+- refresh pnpm lockfile for engine packages
+- refresh pnpm lockfile for engine packages
+- refresh pnpm lockfile for engine packages
+- gitignore Node.js V8 compile cache
+- refresh CI
+- refresh CI
+- **deps**: update next lockfile
+
 ## [1.1.1] - 2026-05-31
 
 ### Fixed

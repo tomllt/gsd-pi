@@ -25,6 +25,8 @@ export interface SubagentLaunchInput {
 	task: string;
 	tmpPromptPath: string | null;
 	modelOverride?: string;
+	/** Reasoning effort override forwarded as `--thinking` (ADR-026 / #508). */
+	thinkingOverride?: string;
 	contextMode?: SubagentContextMode;
 	parentSessionManager?: SubagentParentSessionManager;
 	session?: SubagentSessionArgs;
@@ -60,6 +62,7 @@ export function buildSubagentProcessArgs(
 	task: string,
 	tmpPromptPath: string | null,
 	modelOverride?: string,
+	thinkingOverride?: string,
 	session: SubagentSessionArgs = { mode: "fresh" },
 ): string[] {
 	const args: string[] = ["--mode", "json", "-p"];
@@ -71,6 +74,10 @@ export function buildSubagentProcessArgs(
 	}
 	const effectiveModel = modelOverride ?? agent.model;
 	if (effectiveModel) args.push("--model", effectiveModel);
+	// Reasoning effort travels with the model (ADR-026 / #508). The child CLI
+	// validates `--thinking` and clamps to the resolved model at dispatch.
+	const effectiveThinking = thinkingOverride ?? agent.thinking;
+	if (effectiveThinking) args.push("--thinking", effectiveThinking);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 	if (tmpPromptPath) args.push("--append-system-prompt", tmpPromptPath);
 	args.push(`Task: ${task}`);
@@ -122,6 +129,7 @@ export function createSubagentLaunchPlan(input: SubagentLaunchInput): SubagentLa
 			input.task,
 			input.tmpPromptPath,
 			input.modelOverride,
+			input.thinkingOverride,
 			session,
 		),
 		env: buildSubagentProcessEnv(),

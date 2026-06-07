@@ -1284,7 +1284,7 @@ export async function autoLoop(
         unitId: iterData.unitId,
       });
       const finalizeReason = finalizeResult.action === "break" ? finalizeResult.reason : undefined;
-      const finalizeStatus = finalizeReason === "step-wizard"
+      const finalizeStatus = (finalizeReason === "step-wizard" || finalizeReason === "milestone-complete")
         ? "completed"
         : finalizeResult.action === "next"
           ? "completed"
@@ -1353,7 +1353,9 @@ export async function autoLoop(
       stuckStatePersistedThisIteration = true;
       finishTurn("completed");
       if (finalizeDecision.action === "complete-and-break") {
-        s.preserveStepSurfaceAfterLoopExit = true;
+        if (!s.completionStopInProgress) {
+          s.preserveStepSurfaceAfterLoopExit = true;
+        }
         break;
       }
     } catch (loopErr) {

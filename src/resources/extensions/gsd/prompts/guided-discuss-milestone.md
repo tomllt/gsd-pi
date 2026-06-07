@@ -19,15 +19,13 @@ Discuss milestone {{milestoneId}} ("{{milestoneTitle}}"). Identify real gray are
 Before asking, read `.gsd/PROJECT.md` and find `## Project Shape` -> `**Complexity:**`. Use `simple` or `complex`; default to `complex` if missing, stale, or unclear.
 
 - `simple`: 1-2 plain-text rounds; skip parallel-research investigation; use `ask_user_questions` only for concrete alternatives.
-- `complex`: investigate first, use 3-4-option structured questions, and expect multiple rounds.
+- `complex`: ground in the preloaded context first, use 3-4-option structured questions, and expect multiple rounds.
 
 ### Before your first question round
 
-Investigate enough to avoid assumption-driven questions:
-- Scout existing code with `rg`, `find`, or `scout`.
-- Check roadmap context above for surrounding scope.
-- Use `resolve_library` / `get_library_docs` for unfamiliar libraries; prefer them over web search.
+Ground your questions in the **preloaded context above** (milestone roadmap/context/research, the decisions register, prior-milestone summaries) plus any Preparation Context snapshot — those are authoritative. **Do not survey the codebase** with `rg`/`find`/`scout` before asking; the preloaded files are marked do-not-re-read. Read a specific file only when a question's answer genuinely hinges on it.
 - Identify the 3-5 behavioral or architectural unknowns that materially change what gets built.
+- Use `resolve_library` / `get_library_docs` for unfamiliar libraries; prefer them over web search.
 
 **Web search budget:** Limited per turn, typically 3-5. Prefer docs tools and `search_and_read`; use 2-3 searches in the first pass and save the rest.
 
@@ -43,13 +41,13 @@ Ask **1–3 questions per round**. Target one focus at a time:
 
 **Never fabricate or simulate user input.** Never generate fake transcript markers like `[User]`, `[Human]`, or `User:`. Ask one question round, then wait for the user's actual response before continuing.
 
-**Single user-facing message (NON-BYPASSABLE):** After investigation, send **one** assistant message that contains your questions (and at most a short recap — 2-3 sentences, not a feature catalog). **End the turn there.** Do not send a second message that restates the same ask ("what do you want M00X to be?", "before I can write the context file…", etc.). If you already asked, stop — do not elaborate in a follow-up message in the same turn.
+**Single user-facing message (NON-BYPASSABLE):** After grounding in the preloaded context, send **one** assistant message that contains your questions (and at most a short recap — 2-3 sentences, not a feature catalog). **End the turn there.** Do not send a second message that restates the same ask ("what do you want M00X to be?", "before I can write the context file…", etc.). If you already asked, stop — do not elaborate in a follow-up message in the same turn.
 
 **If `{{structuredQuestionsAvailable}}` is `true`:** use `ask_user_questions` exactly once per turn with 1-3 question objects. Keep labels short (3-5 words). In `complex` mode, multi-choice questions MUST offer **3 or 4 concrete, researched options** plus **"Other — let me discuss"**; options must be grounded in the investigation, not placeholders. In `simple` mode, 2 options is fine for binary alternatives. Binary depth-check/wrap-up gates are exempt. If the user chooses "Other — let me discuss" or gives a long freeform answer, switch to plain-text follow-up before resuming structured questions.
 
 **If `{{structuredQuestionsAvailable}}` is `false`:** ask questions in plain text. Keep each round to 1–3 focused questions. Wait for answers before asking the next round.
 
-After each answer, investigate only new unknowns, then ask the next round.
+After each answer, resolve only the new unknowns from context (re-read a specific file only if one is needed), then ask the next round.
 
 ### Round cadence
 

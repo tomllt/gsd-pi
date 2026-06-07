@@ -53,3 +53,34 @@ describe("buildSubagentProcessArgs model override", () => {
 		assert.equal(args[modelIndex + 1], "model-override");
 	});
 });
+
+describe("buildSubagentProcessArgs thinking override (#508)", () => {
+	it("forwards thinkingOverride as --thinking", () => {
+		const args = buildSubagentProcessArgs(makeAgent(), "task", null, undefined, "low");
+		const idx = args.indexOf("--thinking");
+		assert.notEqual(idx, -1, "should include --thinking flag");
+		assert.equal(args[idx + 1], "low");
+	});
+
+	it("falls back to agent.thinking when no override provided", () => {
+		const args = buildSubagentProcessArgs(makeAgent({ thinking: "high" }), "task", null);
+		const idx = args.indexOf("--thinking");
+		assert.equal(args[idx + 1], "high");
+	});
+
+	it("override takes precedence over agent.thinking", () => {
+		const args = buildSubagentProcessArgs(makeAgent({ thinking: "high" }), "task", null, undefined, "minimal");
+		assert.equal(args[args.indexOf("--thinking") + 1], "minimal");
+	});
+
+	it("omits --thinking when neither override nor agent.thinking is set", () => {
+		const args = buildSubagentProcessArgs(makeAgent(), "task", null);
+		assert.equal(args.indexOf("--thinking"), -1, "should not include --thinking flag");
+	});
+
+	it("forwards both model and thinking together", () => {
+		const args = buildSubagentProcessArgs(makeAgent(), "task", null, "model-x", "xhigh");
+		assert.equal(args[args.indexOf("--model") + 1], "model-x");
+		assert.equal(args[args.indexOf("--thinking") + 1], "xhigh");
+	});
+});

@@ -699,7 +699,7 @@ export function registerDbTools(pi: ExtensionAPI): void {
         files: Type.Array(Type.String(), { description: "Array<string> of files likely touched; pass [\"path\"] or [], never a single string" }),
         verify: Type.String({ description: "Verification command or block" }),
         inputs: Type.Array(Type.String(), { description: "Array<string> of input files or references; pass [\"path\"] or [], never a single string" }),
-        expectedOutput: Type.Array(Type.String(), { description: "Array<string> of expected output files or artifacts; pass [\"path\"] or [], never a single string" }),
+        expectedOutput: Type.Array(Type.String(), { description: "Array<string> of files this task creates or overwrites; pass [\"path\"] or [], never prose or a single string" }),
         observabilityImpact: Type.Optional(Type.String({ description: "Task observability impact" })),
       }), { description: "Planned tasks for the slice" }),
       // ── Enrichment metadata (optional — defaults to empty) ────────────
@@ -779,7 +779,7 @@ export function registerDbTools(pi: ExtensionAPI): void {
       files: Type.Array(Type.String(), { description: "Array<string> of files likely touched; pass [\"path\"] or [], never a single string" }),
       verify: Type.String({ description: "Verification command or block" }),
       inputs: Type.Array(Type.String(), { description: "Array<string> of input files or references; pass [\"path\"] or [], never a single string" }),
-      expectedOutput: Type.Array(Type.String(), { description: "Array<string> of expected output files or artifacts; pass [\"path\"] or [], never a single string" }),
+      expectedOutput: Type.Array(Type.String(), { description: "Array<string> of files this task creates or overwrites; pass [\"path\"] or [], never prose or a single string" }),
       observabilityImpact: Type.Optional(Type.String({ description: "Task observability impact" })),
       // Single-writer v3 audit trail (Stream 2): caller-provided actor identity + causation.
       actorName: Type.Optional(Type.String({ description: "Caller-provided actor identity for the audit trail (e.g. 'executor-01', 'gsd-orchestrator')" })),
@@ -1160,7 +1160,7 @@ export function registerDbTools(pi: ExtensionAPI): void {
           files: Type.Array(Type.String(), { description: "Files likely touched" }),
           verify: Type.String({ description: "Verification command or block" }),
           inputs: Type.Array(Type.String(), { description: "Input files or references" }),
-          expectedOutput: Type.Array(Type.String(), { description: "Expected output files or artifacts" }),
+          expectedOutput: Type.Array(Type.String(), { description: "Files this task creates or overwrites" }),
         }),
         { description: "Tasks to upsert (update existing or insert new)" },
       ),

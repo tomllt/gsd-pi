@@ -15,7 +15,7 @@ test("pipeline workflow can be manually dispatched to bootstrap the builder imag
 });
 
 test("manual pipeline dispatch checks out main and forces a builder image push", () => {
-  const checkout = job.steps.find((step) => step.uses === "actions/checkout@v6");
+  const checkout = job.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
   const check = job.steps.find((step) => step.id === "check");
 
   assert.match(checkout.with.ref, /github\.event_name == 'workflow_dispatch'/);

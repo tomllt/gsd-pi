@@ -67,6 +67,14 @@ test("Tool Contract compiles known Unit prompt and tool policy", () => {
   assert.deepEqual(result.ok && result.contract.forbiddenWorkflowTools, []);
   assert.equal(result.ok && result.contract.toolsPolicy.mode, "all");
   assert.ok(result.ok && result.contract.validationRules.includes("closeout-tool-present"));
+  assert.ok(result.ok && result.contract.validationRules.includes("source-observation-contract-present"));
+  assert.deepEqual(result.ok && result.contract.sourceObservations, {
+    mode: "whole-file-active-unit",
+    seedFields: ["task.files", "task.inputs"],
+    excludedFields: ["expectedOutput"],
+    maxBytes: 50 * 1024,
+    maxLines: 2000,
+  });
 });
 
 test("Tool Contract records high-risk cross-phase tool boundaries without single-owning every tool", () => {

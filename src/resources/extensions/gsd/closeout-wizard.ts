@@ -5,6 +5,7 @@ import type { ExtensionCommandContext } from "@gsd/pi-coding-agent";
 
 import type { NextAction } from "../shared/next-action-ui.js";
 import type { GSDState } from "./types.js";
+import { setAutoOutcomeWidget } from "./auto-dashboard.js";
 import { invalidateAllCaches } from "./cache.js";
 import { mergeCompletedMilestone } from "./parallel-merge.js";
 import { cleanupQuickBranch, detectStrandedQuickBranch, type StrandedQuickBranch } from "./quick.js";
@@ -20,6 +21,13 @@ export interface CloseoutContext {
   strandedQuick: StrandedQuickBranch | null;
   unmergedMilestones: UnmergedMilestoneBlocker[];
 }
+
+const MILESTONE_MERGE_CLOSEOUT_COMMANDS = [
+  "/gsd status for overview",
+  "/gsd visualize to inspect",
+  "/gsd notifications for history",
+  "/gsd start for new work",
+];
 
 export async function loadCloseoutContext(basePath: string): Promise<CloseoutContext> {
   const unmergedMilestones = await findUnmergedCompletedMilestones(basePath);
@@ -91,6 +99,23 @@ export function buildIdleMenuSummary(state: GSDState, closeout: CloseoutContext)
   return [state.nextAction || "No active milestone."];
 }
 
+export function showMilestoneMergeCloseout(
+  ctx: ExtensionCommandContext,
+  blocker: UnmergedMilestoneBlocker,
+): void {
+  ctx.ui.setStatus?.("gsd-auto", undefined);
+  ctx.ui.setStatus?.("gsd-step", undefined);
+  ctx.ui.setWidget?.("gsd-progress", undefined);
+
+  setAutoOutcomeWidget(ctx, {
+    status: "complete",
+    title: `Milestone ${blocker.milestoneId} merged`,
+    detail: `Merged ${blocker.branch} into ${blocker.integrationBranch}. Product changes are now on ${blocker.integrationBranch}.`,
+    nextAction: "Review the closeout, then start the next milestone when ready.",
+    commands: MILESTONE_MERGE_CLOSEOUT_COMMANDS,
+  });
+}
+
 export async function runMergeQuickTask(
   ctx: ExtensionCommandContext,
   basePath: string,
@@ -113,6 +138,33 @@ export async function runMergeQuickTask(
   return false;
 }
 
+export async function runMergeMilestoneBlocker(
+  ctx: ExtensionCommandContext,
+  basePath: string,
+  blocker: UnmergedMilestoneBlocker,
+): Promise<boolean> {
+  ctx.ui.notify(
+    `Completing preserved milestone merge for ${blocker.milestoneId} from ${blocker.branch} into ${blocker.integrationBranch}.`,
+    "info",
+  );
+  const result = await mergeCompletedMilestone(basePath, blocker.milestoneId);
+  if (result.success) {
+    invalidateAllCaches();
+    showMilestoneMergeCloseout(ctx, blocker);
+    ctx.ui.notify(
+      `Milestone ${blocker.milestoneId} merged to ${blocker.integrationBranch}. Closeout is complete.`,
+      "info",
+    );
+    return true;
+  }
+
+  ctx.ui.notify(
+    `Milestone ${blocker.milestoneId} merge failed: ${result.error ?? "unknown error"}`,
+    "error",
+  );
+  return false;
+}
+
 export async function runMergeMilestone(
   ctx: ExtensionCommandContext,
   basePath: string,
@@ -127,25 +179,7 @@ export async function runMergeMilestone(
     return false;
   }
 
-  ctx.ui.notify(
-    `Completing preserved milestone merge for ${blocker.milestoneId} from ${blocker.branch} into ${blocker.integrationBranch}.`,
-    "info",
-  );
-  const result = await mergeCompletedMilestone(basePath, blocker.milestoneId);
-  if (result.success) {
-    ctx.ui.notify(
-      `Milestone ${blocker.milestoneId} merged to ${blocker.integrationBranch}. Run /gsd again when ready.`,
-      "info",
-    );
-    invalidateAllCaches();
-    return true;
-  }
-
-  ctx.ui.notify(
-    `Milestone ${blocker.milestoneId} merge failed: ${result.error ?? "unknown error"}`,
-    "error",
-  );
-  return false;
+  return runMergeMilestoneBlocker(ctx, basePath, blocker);
 }
 
 export async function handleCloseoutChoice(

@@ -42,10 +42,27 @@ jobs:
 
           REMOVED=0
           while IFS= read -r VERSION; do
-            PUBLISH_TIME=$(npm view "${PACKAGE}@${VERSION}" time --json 2>/dev/null | node -e "
+            # `npm view pkg@ver time --json` returns the FULL time map
+            # ({created, modified, "<ver>": "<iso>"}), not a single timestamp —
+            # `new Date(map)` is NaN, which silently disabled this whole job.
+            # Index the map by the specific version (fall back to `modified`).
+            # TARGET_VERSION is prefixed on `node`, not `npm view`: the two sides
+            # of the pipe are separate processes, so a prefix on `npm view` never
+            # reaches the parser — `data[undefined]` would silently fall back to
+            # `modified` instead of the version-specific publish timestamp.
+            if ! PUBLISH_TIME=$(npm view "${PACKAGE}@${VERSION}" time --json 2>/dev/null | TARGET_VERSION="${VERSION}" node -e "
               const data = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-              console.log(Math.floor(new Date(data).getTime() / 1000));
-            " 2>/dev/null || echo "0")
+              const iso = data[process.env.TARGET_VERSION] ?? data.modified;
+              const ts = Math.floor(new Date(iso).getTime() / 1000);
+              if (!Number.isFinite(ts)) {
+                console.error('Could not resolve publish time for ' + process.env.TARGET_VERSION + ' from: ' + JSON.stringify(data));
+                process.exit(1);
+              }
+              console.log(ts);
+            " 2>&1); then
+              echo "::warning::Could not parse publish time for ${PACKAGE}@${VERSION} — skipping."
+              continue
+            fi
 
             if [ "${PUBLISH_TIME}" -gt 0 ] && [ "${PUBLISH_TIME}" -lt "${CUTOFF}" ]; then
               echo "Unpublishing ${PACKAGE}@${VERSION} (published $(date -u -d "@${PUBLISH_TIME}" +%Y-%m-%d 2>/dev/null || date -u -r "${PUBLISH_TIME}" +%Y-%m-%d))"

@@ -1,7 +1,93 @@
 import { eastAsianWidth } from "get-east-asian-width";
+import { isNativeAddonLoaded } from "@gsd/native";
+import { truncateToWidth as nativeTruncateToWidth } from "@gsd/native/text";
+
+// Gate native routing on a real Rust addon being loaded. The @gsd/native/text
+// wrappers carry their own lossy JS fallback (strips ANSI, no reset-bracket);
+// this avoids it, using this module's own JS fallback when native is absent.
+const nativeAddonLoaded = (() => {
+	try {
+		return isNativeAddonLoaded();
+	} catch {
+		return false;
+	}
+})();
 
 // Grapheme segmenter (shared instance)
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+// Codepoints that can form or modify a multi-codepoint grapheme: \p{Mark} plus
+// non-Mark joiners (ZWNJ/ZWJ, Thai/Lao AM, halfwidth voiced marks, variation
+// selectors, regional indicators, skin-tone modifiers, emoji tags). Verified
+// complete against Intl.Segmenter over U+0020-U+10FFFF (see the fast-path test).
+const SEG_TRIGGER =
+	/\p{Mark}|[\u200C\u200D\u0E33\u0EB3\uFF9E\uFF9F\uFE00-\uFE0F\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{E0020}-\u{E007F}\u{E0100}-\u{E01EF}]/u;
+
+/**
+ * True when `clean` may contain a multi-codepoint grapheme and therefore needs
+ * Intl.Segmenter to measure correctly. When false, each codepoint is its own
+ * grapheme and visibleWidth can sum graphemeWidth() per codepoint — avoiding the
+ * per-call ICU break-iterator allocation that drives render-loop GC churn on
+ * long sessions. Erring toward true is always safe (slower, never wrong).
+ */
+function needsSegmentation(clean: string): boolean {
+	return SEG_TRIGGER.test(clean);
+}
+
+/**
+ * Probe whether the loaded native engine produces the canonical reset-bracketed
+ * truncation. Older engine binaries (before the reset-bracket + NUL fixes) emit
+ * a bare ellipsis that would diverge from the JS path, so a stale binary falls
+ * back to JS instead of silently changing output. Run once at startup.
+ */
+function probeNativeTruncate(): boolean {
+	if (!nativeAddonLoaded) return false;
+	try {
+		// "ab" truncated to width 1 with the unicode ellipsis must bracket the
+		// ellipsis: "\x1b[0m\u2026\x1b[0m". A fixed engine returns exactly this.
+		return nativeTruncateToWidth("ab", 1, 0, false) === "\x1b[0m\u2026\x1b[0m";
+	} catch {
+		return false;
+	}
+}
+
+let nativeTruncateOk = probeNativeTruncate();
+
+function ellipsisKind(ellipsis: string): 0 | 1 | 2 | null {
+	if (ellipsis === "\u2026") return 0;
+	if (ellipsis === "...") return 1;
+	if (ellipsis === "") return 2;
+	return null;
+}
+
+/**
+ * True when `text` contains a lone/malformed ESC (one not beginning a
+ * recognized CSI/OSC/APC sequence). Native and JS width-account such bytes
+ * differently, so truncate falls back to JS for these rare (corrupted-output)
+ * inputs; hot callers always pass well-formed lines.
+ */
+function hasMalformedEscape(text: string): boolean {
+	let i = text.indexOf("\x1b");
+	while (i !== -1) {
+		if (extractAnsiCode(text, i) === null) {
+			return true;
+		}
+		i = text.indexOf("\x1b", i + 1);
+	}
+	return false;
+}
+
+function routedTruncateToWidth(text: string, maxWidth: number, ellipsis: string, pad: boolean): string {
+	const kind = ellipsisKind(ellipsis);
+	if (kind !== null && nativeTruncateOk && !(text.includes("\x1b") && hasMalformedEscape(text))) {
+		try {
+			return nativeTruncateToWidth(text, maxWidth, kind, pad);
+		} catch {
+			nativeTruncateOk = false;
+		}
+	}
+	return truncateToWidthJs(text, maxWidth, ellipsis, pad);
+}
 
 /**
  * Get the shared grapheme segmenter instance.
@@ -138,12 +224,14 @@ function finalizeTruncatedResult(
 	const reset = "\x1b[0m";
 	const visibleWidth = prefixWidth + ellipsisWidth;
 	let result: string;
-	const needsReset = prefix.includes("\x1b") || ellipsis.includes("\x1b");
 
 	if (ellipsis.length > 0) {
-		result = needsReset ? `${prefix}${reset}${ellipsis}${reset}` : `${prefix}${ellipsis}`;
+		// Always bracket the ellipsis so it can't inherit or leak surrounding SGR
+		// state. The added resets are zero-width, so width-based assertions are
+		// unaffected. Matches the native engine's truncate output.
+		result = `${prefix}${reset}${ellipsis}${reset}`;
 	} else {
-		result = needsReset ? `${prefix}${reset}` : prefix;
+		result = prefix.includes("\x1b") ? `${prefix}${reset}` : prefix;
 	}
 
 	return pad ? result + " ".repeat(Math.max(0, maxWidth - visibleWidth)) : result;
@@ -198,6 +286,13 @@ function graphemeWidth(segment: string): number {
 
 /**
  * Calculate the visible width of a string in terminal columns.
+ *
+ * Uses a codepoint fast-path that avoids Intl.Segmenter for strings whose
+ * graphemes are all single-codepoint (the common case for transcript content),
+ * eliminating the ICU break-iterator GC churn on the hot render path. Strings
+ * that contain combining marks, ZWJ, regional indicators, variation selectors,
+ * etc. fall back to the exact segmenter path. The width logic is identical in
+ * both branches, so output is unchanged.
  */
 export function visibleWidth(str: string): number {
 	if (str.length === 0) {
@@ -238,10 +333,18 @@ export function visibleWidth(str: string): number {
 		clean = stripped;
 	}
 
-	// Calculate width
+	// Calculate width. Without multi-codepoint graphemes, sum graphemeWidth() per
+	// codepoint and skip the Intl.Segmenter allocation (the ICU break-iterator
+	// churn); the per-grapheme width logic is identical to the segmenter branch.
 	let width = 0;
-	for (const { segment } of segmenter.segment(clean)) {
-		width += graphemeWidth(segment);
+	if (needsSegmentation(clean)) {
+		for (const { segment } of segmenter.segment(clean)) {
+			width += graphemeWidth(segment);
+		}
+	} else {
+		for (const ch of clean) {
+			width += graphemeWidth(ch);
+		}
 	}
 
 	// Cache result
@@ -859,6 +962,10 @@ export function applyBackgroundToLine(line: string, width: number, bgFn: (text: 
  * Optionally pad with spaces to reach exactly maxWidth.
  * Properly handles ANSI escape codes (they don't count toward width).
  *
+ * Routes to the native engine for the three known ellipsis kinds ("\u2026",
+ * "...", ""), falling back to the JS implementation for arbitrary ellipsis
+ * strings or unsupported platforms (see probeNativeTruncate).
+ *
  * @param text - Text to truncate (may contain ANSI codes)
  * @param maxWidth - Maximum visible width
  * @param ellipsis - Ellipsis string to append when truncating (default: "...")
@@ -866,6 +973,19 @@ export function applyBackgroundToLine(line: string, width: number, bgFn: (text: 
  * @returns Truncated text, optionally padded to exactly maxWidth
  */
 export function truncateToWidth(
+	text: string,
+	maxWidth: number,
+	ellipsis: string = "...",
+	pad: boolean = false,
+): string {
+	return routedTruncateToWidth(text, maxWidth, ellipsis, pad);
+}
+
+/**
+ * JS implementation of truncateToWidth (Intl.Segmenter based). Retained as the
+ * fallback for unsupported platforms and arbitrary ellipsis strings.
+ */
+function truncateToWidthJs(
 	text: string,
 	maxWidth: number,
 	ellipsis: string = "...",

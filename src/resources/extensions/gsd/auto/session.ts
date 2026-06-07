@@ -22,6 +22,7 @@ import type { Api, Model } from "@gsd/pi-ai";
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";
 import type { GitServiceImpl } from "../git-service.js";
 import type { CaptureEntry } from "../captures.js";
+import { SourceObservationStore, supportsSourceObservationsForUnit } from "../source-observations.js";
 import type { BudgetAlertLevel } from "../auto-budget.js";
 import type { AutoOrchestrationModule } from "./contracts.js";
 import { resolveWorktreeProjectRoot } from "../worktree-root.js";
@@ -156,6 +157,7 @@ export class AutoSession {
   currentTurnId: string | null = null;
   currentUnitRouting: UnitRouting | null = null;
   currentMilestoneId: string | null = null;
+  readonly sourceObservations = new SourceObservationStore();
 
   // ── Model state ──────────────────────────────────────────────────────────
   autoModeStartModel: StartModel | null = null;
@@ -283,6 +285,25 @@ export class AutoSession {
     this.unitLifetimeDispatches.clear();
   }
 
+  setCurrentUnit(unit: CurrentUnit): void {
+    this.currentUnit = unit;
+    if (!supportsSourceObservationsForUnit(unit.type)) {
+      this.sourceObservations.clear();
+      return;
+    }
+    this.sourceObservations.beginUnit({
+      unitType: unit.type,
+      unitId: unit.id,
+      startedAt: unit.startedAt,
+      basePath: unit.workspaceRoot ?? this.basePath,
+    });
+  }
+
+  clearCurrentUnit(): void {
+    this.currentUnit = null;
+    this.sourceObservations.clear();
+  }
+
   get lockBasePath(): string {
     return resolveWorktreeProjectRoot(this.basePath, this.originalBasePath);
   }
@@ -340,7 +361,7 @@ export class AutoSession {
     this.unitRecoveryCount.clear();
 
     // Unit
-    this.currentUnit = null;
+    this.clearCurrentUnit();
     this.currentTraceId = null;
     this.currentTurnId = null;
     this.currentUnitRouting = null;

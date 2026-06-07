@@ -34,8 +34,7 @@ Before your first action, print this banner verbatim in chat:
 
 ### Before your first question round
 
-Before questioning, investigate enough to avoid assumption-driven requirements:
-- Scout existing capabilities; already-built work is `Validated` or `Active`.
+Ground your requirements in **PROJECT.md, any existing REQUIREMENTS.md, and the Preparation Context snapshot** — those are authoritative for what already exists (already-built work is `Validated` or `Active`). **Do not survey the codebase**; read a specific file only when a requirement's scope genuinely hinges on it.
 - Cross-check milestone sequence; every milestone needs at least one owned Active requirement.
 - Use `resolve_library` / `get_library_docs` for libraries that imply capabilities.
 - Identify domain table-stakes only when PROJECT.md confidence is low.

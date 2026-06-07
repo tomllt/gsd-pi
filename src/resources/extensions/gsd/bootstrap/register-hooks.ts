@@ -1,7 +1,7 @@
 // Project/App: gsd-pi
 // File Purpose: Registers GSD extension runtime hooks and token-saving tool policies.
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -12,12 +12,23 @@ import { ALWAYS_PRESERVED_SHIM_TOOL_NAMES } from "@gsd/pi-ai";
 import type { GSDEcosystemBeforeAgentStartHandler } from "../ecosystem/gsd-extension-api.js";
 import { updateSnapshot } from "../ecosystem/gsd-extension-api.js";
 
-import { buildMilestoneFileName, resolveMilestonePath, resolveSliceFile, resolveSlicePath } from "../paths.js";
+import { buildMilestoneFileName, clearPathCache, milestonesDir, resolveMilestonePath, resolveSliceFile, resolveSlicePath } from "../paths.js";
 import { canonicalToolName, clearDiscussionFlowState, isDepthConfirmationAnswer, isMilestoneDepthVerified, isQueuePhaseActive, markApprovalGateVerified, markDepthVerified, resetWriteGateState, shouldBlockContextWrite, shouldBlockPlanningUnit, shouldBlockQueueExecution, shouldBlockWorktreeWrite, isGateQuestionId, setPendingGate, clearPendingGate, getPendingGate, shouldBlockPendingGate, shouldBlockPendingGateBash, extractDepthVerificationMilestoneId } from "./write-gate.js";
 import { resolveManifest } from "../unit-context-manifest.js";
 import { isBlockedStateFile, isBashWriteToStateFile, BLOCKED_WRITE_ERROR } from "../write-intercept.js";
 import { loadFile, saveFile, formatContinue } from "../files.js";
-import { clearToolInvocationError, getAutoRuntimeSnapshot, isAutoActive, isAutoCompletionStopInProgress, isAutoPaused, markToolEnd, markToolStart, recordToolInvocationError } from "../auto-runtime-state.js";
+import {
+  clearAutoCompletionStopInProgress,
+  clearToolInvocationError,
+  getAutoRuntimeSnapshot,
+  getSourceObservationStore,
+  isAutoActive,
+  isAutoCompletionStopInProgress,
+  isAutoPaused,
+  markToolEnd,
+  markToolStart,
+  recordToolInvocationError,
+} from "../auto-runtime-state.js";
 
 import { checkToolCallLoop, resetToolCallLoopGuard } from "./tool-call-loop-guard.js";
 import { maybePauseAutoForApprovalGate, resetPendingGatePauseGuard } from "./pending-gate-pause.js";
@@ -39,6 +50,7 @@ import { registerPlanMilestoneSchemaRecovery } from "./plan-milestone-schema-rec
 import { AUTO_UNIT_SCOPED_TOOLS, RUN_UAT_BROWSER_TOOL_NAMES, isWorkflowAliasTool } from "../auto-unit-tool-scope.js";
 import { filterToolsForProvider } from "../model-router.js";
 import { RUN_UAT_READ_ONLY_TOOL_NAMES, RUN_UAT_WORKFLOW_TOOL_NAMES } from "../tool-presentation-plan.js";
+import { injectSourceContextBlockIntoPayload, supportsSourceObservationsForUnit } from "../source-observations.js";
 
 let approvalQuestionAbortInFlight = false;
 
@@ -127,7 +139,9 @@ export const MINIMAL_GSD_TOOL_NAMES = [
   "gsd_checkpoint_db",
   "gsd_plan_milestone",
   "memory_query",
+  "gsd_memory_query",
   "capture_thought",
+  "gsd_capture_thought",
 ] as const;
 
 export const MINIMAL_AUTO_BASE_TOOL_NAMES = [
@@ -474,6 +488,55 @@ function contextBasePath(ctx?: { cwd?: string }): string {
   return typeof ctx?.cwd === "string" ? ctx.cwd : process.cwd();
 }
 
+function beginSourceObservationStoreForCurrentUnit(
+  ctx?: { cwd?: string },
+): ReturnType<typeof getSourceObservationStore> | null {
+  if (!isAutoActive()) return null;
+  const dash = getAutoRuntimeSnapshot();
+  if (!dash.currentUnit) return null;
+  if (!supportsSourceObservationsForUnit(dash.currentUnit.type)) return null;
+
+  const store = getSourceObservationStore();
+  store.beginUnit({
+    unitType: dash.currentUnit.type,
+    unitId: dash.currentUnit.id,
+    startedAt: dash.currentUnit.startedAt,
+    basePath: dash.currentUnit.workspaceRoot ?? (dash.basePath || contextBasePath(ctx)),
+  });
+  return store;
+}
+
+function refreshSourceObservationAfterMutation(
+  canonicalName: string,
+  input: unknown,
+  ctx?: { cwd?: string },
+): void {
+  if (canonicalName !== "edit" && canonicalName !== "write") return;
+  if (!input || typeof input !== "object") return;
+
+  const store = beginSourceObservationStoreForCurrentUnit(ctx);
+  if (!store) return;
+  store.observeMutation(input as { path?: unknown; file_path?: unknown });
+}
+
+function clearSourceObservationsAfterShell(
+  canonicalName: string,
+): void {
+  if (!isAutoActive()) return;
+  if (!isShellExecutionTool(canonicalName)) return;
+  const dash = getAutoRuntimeSnapshot();
+  if (!dash.currentUnit || !supportsSourceObservationsForUnit(dash.currentUnit.type)) return;
+  getSourceObservationStore().clear();
+}
+
+function isShellExecutionTool(canonicalName: string): boolean {
+  return canonicalName === "bash" ||
+    canonicalName === "bg_shell" ||
+    canonicalName === "async_bash" ||
+    canonicalName === "shell" ||
+    canonicalName === "powershell";
+}
+
 function activateDeferredApprovalGate(basePath: string): void {
   if (deferredApprovalGate?.basePath !== basePath) return;
   setPendingGate(deferredApprovalGate.gateId, basePath);
@@ -495,6 +558,109 @@ function isContextDraftSummarySave(toolName: string, input: unknown): boolean {
   if (toolName !== "gsd_summary_save" && toolName !== "summary_save") return false;
   if (!input || typeof input !== "object") return false;
   return (input as { artifact_type?: unknown }).artifact_type === "CONTEXT-DRAFT";
+}
+
+type StructuredQuestion = {
+  id?: string;
+  header?: string;
+  question?: string;
+  options?: Array<{ label?: string; description?: string }>;
+};
+
+type StructuredAnswer = {
+  selected?: unknown;
+  notes?: unknown;
+};
+
+function selectedAnswerLabel(selected: unknown): string {
+  if (Array.isArray(selected)) return selected.map(String).join(", ");
+  if (selected == null) return "";
+  return String(selected);
+}
+
+function formatQuestionExchange(
+  questions: StructuredQuestion[],
+  answers: Record<string, StructuredAnswer> | undefined,
+): string {
+  const lines: string[] = [];
+  for (const question of questions) {
+    lines.push(`### ${question.header ?? "Question"}`, "", question.question ?? "");
+    if (Array.isArray(question.options)) {
+      lines.push("");
+      for (const opt of question.options) {
+        lines.push(`- **${opt.label ?? ""}** — ${opt.description ?? ""}`);
+      }
+    }
+
+    const answer = question.id ? answers?.[question.id] : undefined;
+    if (answer) {
+      lines.push("");
+      const selected = selectedAnswerLabel(answer.selected);
+      if (selected) lines.push(`**Selected:** ${selected}`);
+      if (answer.notes) lines.push(`**Notes:** ${String(answer.notes)}`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+async function ensureMilestoneShell(basePath: string, milestoneId: string): Promise<string> {
+  const milestoneDir = resolveMilestonePath(basePath, milestoneId)
+    ?? join(milestonesDir(basePath), milestoneId);
+  mkdirSync(milestoneDir, { recursive: true });
+  clearPathCache();
+
+  try {
+    const { ensureDbOpen } = await import("./dynamic-tools.js");
+    if (await ensureDbOpen(basePath)) {
+      const { getMilestone, insertMilestone } = await import("../gsd-db.js");
+      if (!getMilestone(milestoneId)) {
+        insertMilestone({
+          id: milestoneId,
+          title: `New milestone ${milestoneId}`,
+          status: "queued",
+        });
+      }
+    }
+  } catch (err) {
+    safetyLogWarning("guided", `failed to persist milestone shell for ${milestoneId}: ${(err as Error).message}`);
+  }
+
+  return milestoneDir;
+}
+
+async function saveDiscussionQuestionRound(
+  basePath: string,
+  milestoneId: string,
+  questions: StructuredQuestion[],
+  details: any,
+): Promise<void> {
+  const milestoneDir = await ensureMilestoneShell(basePath, milestoneId);
+  const answers = details?.response?.answers;
+  const timestamp = new Date().toISOString();
+  const exchange = formatQuestionExchange(questions, answers);
+
+  const discussionPath = join(milestoneDir, buildMilestoneFileName(milestoneId, "DISCUSSION"));
+  const existingDiscussion = await loadFile(discussionPath) ?? `# ${milestoneId} Discussion Log\n\n`;
+  await saveFile(
+    discussionPath,
+    `${existingDiscussion}## Exchange — ${timestamp}\n\n${exchange}---\n\n`,
+  );
+
+  const draftPath = join(milestoneDir, buildMilestoneFileName(milestoneId, "CONTEXT-DRAFT"));
+  const existingDraft = await loadFile(draftPath);
+  const draftHeader = existingDraft
+    ?? [
+      `# ${milestoneId}: New milestone ${milestoneId}`,
+      "",
+      "This draft was captured automatically from structured question responses.",
+      "Use it so `/gsd` can resume the in-flight milestone discussion.",
+      "",
+    ].join("\n");
+  await saveFile(
+    draftPath,
+    `${draftHeader.trimEnd()}\n\n## Captured Question Round — ${timestamp}\n\n${exchange}`,
+  );
 }
 
 function withDepthGateDisplayReason<T extends { block: boolean; reason?: string }>(
@@ -627,6 +793,7 @@ export function registerHooks(
   });
 
   pi.on("before_agent_start", async (event, ctx: ExtensionContext) => {
+    clearAutoCompletionStopInProgress();
     resetPendingGatePauseGuard();
     applyMinimalGsdToolSurface(pi);
 
@@ -1129,6 +1296,17 @@ export function registerHooks(
     if (isAutoActive() && typeof event.toolCallId === "string") {
       markToolEnd(event.toolCallId);
     }
+    const toolName = canonicalToolName(event.toolName);
+    if (isAutoActive() && toolName === "read" && !event.isError) {
+      const store = beginSourceObservationStoreForCurrentUnit(ctx);
+      if (store) {
+        store.observeRead(event.input);
+      }
+    }
+    if (!event.isError) {
+      refreshSourceObservationAfterMutation(toolName, event.input, ctx);
+      clearSourceObservationsAfterShell(toolName);
+    }
     if (isAutoActive() && event.isError) {
       const resultPayload = ("result" in event ? event.result : undefined) as any;
       const errorText = typeof resultPayload === "string"
@@ -1144,11 +1322,9 @@ export function registerHooks(
     } else if (isAutoActive()) {
       clearToolInvocationError();
     }
-    const toolName = canonicalToolName(event.toolName);
     if (toolName !== "ask_user_questions") return;
     const basePath = contextBasePath(ctx);
     const milestoneId = await getDiscussionMilestoneIdFor(basePath);
-    const queueActive = isQueuePhaseActive(basePath);
 
     const details = event.details as any;
 
@@ -1227,36 +1403,8 @@ export function registerHooks(
       }
     }
 
-    if (!milestoneId && !queueActive) return;
     if (!milestoneId) return;
-    const milestoneDir = resolveMilestonePath(basePath, milestoneId);
-    if (!milestoneDir) return;
-
-    const discussionPath = join(milestoneDir, buildMilestoneFileName(milestoneId, "DISCUSSION"));
-    const timestamp = new Date().toISOString();
-    const lines: string[] = [`## Exchange — ${timestamp}`, ""];
-    for (const question of questions) {
-      lines.push(`### ${question.header ?? "Question"}`, "", question.question ?? "");
-      if (Array.isArray(question.options)) {
-        lines.push("");
-        for (const opt of question.options) {
-          lines.push(`- **${opt.label}** — ${opt.description ?? ""}`);
-        }
-      }
-      const answer = details.response?.answers?.[question.id];
-      if (answer) {
-        lines.push("");
-        const selected = Array.isArray(answer.selected) ? answer.selected.join(", ") : answer.selected;
-        lines.push(`**Selected:** ${selected}`);
-        if (answer.notes) {
-          lines.push(`**Notes:** ${answer.notes}`);
-        }
-      }
-      lines.push("");
-    }
-    lines.push("---", "");
-    const existing = await loadFile(discussionPath) ?? `# ${milestoneId} Discussion Log\n\n`;
-    await saveFile(discussionPath, existing + lines.join("\n"));
+    await saveDiscussionQuestionRound(basePath, milestoneId, questions, details);
   });
 
   pi.on("tool_execution_start", async (event, ctx) => {
@@ -1310,48 +1458,57 @@ export function registerHooks(
     const payload = event.payload as Record<string, unknown> | null;
     if (!payload || typeof payload !== "object") return;
 
-    // ── Observation Masking ─────────────────────────────────────────────
-    // Replace old tool results with placeholders to reduce context bloat.
-    // Only active during auto-mode when context_management.observation_masking is enabled.
-    if (isAutoActive()) {
-      try {
-        const { loadEffectiveGSDPreferences } = await import("../preferences.js");
-        const {
-          createObservationMask,
-          createResponsesInputObservationMask,
-          truncateContextResultMessages,
-          truncateResponsesInputResultItems,
-        } = await import("../context-masker.js");
-        const prefs = loadEffectiveGSDPreferences();
-        const cmConfig = prefs?.preferences.context_management;
+    // ── Context Management ──────────────────────────────────────────────
+    // Load preferences once for both masking and truncation.
+    try {
+      const { loadEffectiveGSDPreferences } = await import("../preferences.js");
+      const {
+        createObservationMask,
+        createResponsesInputObservationMask,
+        truncateContextResultMessages,
+        truncateResponsesInputResultItems,
+      } = await import("../context-masker.js");
+      const prefs = loadEffectiveGSDPreferences();
+      const cmConfig = prefs?.preferences.context_management;
 
-        // Observation masking: replace old tool results with placeholders
-        if (cmConfig?.observation_masking !== false) {
-          const keepTurns = cmConfig?.observation_mask_turns ?? 8;
-          const messages = payload.messages;
-          if (Array.isArray(messages)) {
-            payload.messages = createObservationMask(keepTurns)(messages);
-          }
-          const input = payload.input;
-          if (Array.isArray(input)) {
-            payload.input = createResponsesInputObservationMask(keepTurns)(input);
-          }
-        }
-
-        // Tool result truncation: cap individual tool result content length.
-        // In pi-ai format, toolResult messages have role: "toolResult" and content: TextContent[].
-        // Creates new objects to avoid mutating shared conversation state.
-        const maxChars = cmConfig?.tool_result_max_chars ?? 800;
-        const msgs = payload.messages;
-        if (Array.isArray(msgs)) {
-          payload.messages = truncateContextResultMessages(msgs as any, maxChars);
+      // Observation masking: replace old tool results with placeholders.
+      // Only active during auto-mode when context_management.observation_masking is enabled.
+      if (isAutoActive() && cmConfig?.observation_masking !== false) {
+        const keepTurns = cmConfig?.observation_mask_turns ?? 8;
+        const messages = payload.messages;
+        if (Array.isArray(messages)) {
+          payload.messages = createObservationMask(keepTurns)(messages);
         }
         const input = payload.input;
         if (Array.isArray(input)) {
-          payload.input = truncateResponsesInputResultItems(input as any, maxChars);
+          payload.input = createResponsesInputObservationMask(keepTurns)(input);
         }
-      } catch { /* non-fatal */ }
-    }
+      }
+
+      // Tool result truncation: cap individual tool result content length.
+      // Applies in ALL modes (auto + interactive) to prevent context bloat.
+      // In pi-ai format, toolResult messages have role: "toolResult" and content: TextContent[].
+      // Creates new objects to avoid mutating shared conversation state.
+      const maxChars = cmConfig?.tool_result_max_chars ?? 800;
+      const msgs = payload.messages;
+      if (Array.isArray(msgs)) {
+        payload.messages = truncateContextResultMessages(msgs as any, maxChars);
+      }
+      const input = payload.input;
+      if (Array.isArray(input)) {
+        payload.input = truncateResponsesInputResultItems(input as any, maxChars);
+      }
+    } catch { /* non-fatal */ }
+
+    try {
+      if (isAutoActive()) {
+        const sourceContextBlock = getSourceObservationStore().renderActiveBlock();
+        if (sourceContextBlock) {
+          const nextPayload = injectSourceContextBlockIntoPayload(payload, sourceContextBlock);
+          Object.assign(payload, nextPayload);
+        }
+      }
+    } catch { /* non-fatal */ }
 
     // ── Service Tier ────────────────────────────────────────────────────
     const modelId = event.model?.id;

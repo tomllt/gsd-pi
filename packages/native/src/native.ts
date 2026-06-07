@@ -36,6 +36,28 @@ function loadNative(): Record<string, unknown> {
   if (process.env.GSD_NATIVE_DISABLE === "1") {
     errors.push("disabled by GSD_NATIVE_DISABLE=1");
   } else {
+    // 0. Local dev override: when GSD_NATIVE_PREFER_LOCAL=1, load the locally
+    // built addon (native/addon/*.node) ahead of the published
+    // @opengsd/engine-* package. This lets engine changes in native/crates be
+    // tested without overwriting the installed npm binary, whose version is
+    // pinned and only refreshed at release time.
+    if (process.env.GSD_NATIVE_PREFER_LOCAL === "1") {
+      const localCandidates = [
+        path.join(addonDir, `gsd_engine.${platformTag}.node`),
+        path.join(addonDir, "gsd_engine.dev.node"),
+      ];
+      for (const candidate of localCandidates) {
+        try {
+          const loaded = _require(candidate) as Record<string, unknown>;
+          _loadedSuccessfully = true;
+          return loaded;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          errors.push(`${candidate} (prefer-local): ${message}`);
+        }
+      }
+    }
+
     // 1. Try the platform-specific npm optional dependency
     const packageSuffix = platformPackageMap[platformTag];
     if (packageSuffix) {

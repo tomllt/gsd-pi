@@ -115,6 +115,21 @@ test('debugCount increments counters', () => {
   assert.strictEqual(summary.dispatches, 5);
 });
 
+test('debugCount tracks gitInvocations and writeDebugSummary reports it', () => {
+  const tmp = createTempGsdDir();
+  enableDebug(tmp);
+
+  debugCount('gitInvocations');
+  debugCount('gitInvocations', 13);
+
+  const logPath = writeDebugSummary()!;
+  const lines = readLogLines(logPath);
+
+  const summary = lines.find(l => l.event === 'debug-summary') as any;
+  assert.ok(summary, 'should have debug-summary event');
+  assert.strictEqual(summary.gitInvocations, 14);
+});
+
 test('debugPeak tracks max values', () => {
   const tmp = createTempGsdDir();
   enableDebug(tmp);

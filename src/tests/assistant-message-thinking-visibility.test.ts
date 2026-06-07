@@ -21,7 +21,7 @@ test("assistant-message caps thinking block height when text content is present"
       { type: "thinking", thinking: longThinking() },
       { type: "text", text: "final answer" },
     ],
-  } as any);
+  } as any, false);
 
   assert.equal(firstRenderedMarkdown(component).maxLines, 8);
 });
@@ -37,7 +37,7 @@ test("assistant-message caps thinking block height when tool content is present"
       { type: "thinking", thinking: longThinking() },
       { type: "toolCall", toolCallId: "tool-1", toolName: "bash", args: {} },
     ],
-  } as any);
+  } as any, false);
 
   assert.equal(firstRenderedMarkdown(component).maxLines, 8);
 });
@@ -50,7 +50,7 @@ test("assistant-message caps claude-code thinking-only traces", () => {
     provider: "claude-code",
     model: "test-model",
     content: [{ type: "thinking", thinking: longThinking() }],
-  } as any);
+  } as any, false);
 
   assert.equal(firstRenderedMarkdown(component).maxLines, 8);
 });

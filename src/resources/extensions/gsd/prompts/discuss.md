@@ -31,18 +31,17 @@ After reflection is confirmed, choose the approach from actual scope, not a labe
 
 {{preparationContext}}
 
-## Mandatory Investigation Before First Question Round
+## Ground the First Question Round
 
-Before the first question round, gather enough evidence for grounded questions:
-1. Scout relevant code with `ls`, `find`, `rg`, or `scout`.
-2. Check mentioned tech with `resolve_library` / `get_library_docs`.
-3. Use web tools only for current external facts.
+Ground your questions in the **Preparation Context above** (codebase snapshot, prior context) plus the user's reflected vision — that is authoritative. **Do not survey the codebase** with `ls`/`find`/`rg`/`scout` before asking; the snapshot already covers code reality. Read a specific file only when a question's answer genuinely hinges on it.
+1. Check mentioned tech with `resolve_library` / `get_library_docs`.
+2. Use web tools only for current external facts.
 
-Budget searches across the discussion; prefer docs and one-shot `search_and_read`. Re-investigate only when answers expose new gaps.
+Budget searches across the discussion; prefer docs and one-shot `search_and_read`. Read on-demand only when an answer exposes a specific gap.
 
 ## Layered Question Rounds
 
-Questions have four layers. At each layer, ask 1-3 open questions per round, investigate as needed, and gate before advancing.
+Questions have four layers. At each layer, ask 1-3 open questions per round, read a specific file on-demand if an answer needs it, and gate before advancing.
 
 **Default to open questions.** Use `ask_user_questions` only for 2-3 distinct paths with clear tradeoffs. Use plain text for nuanced design questions.
 

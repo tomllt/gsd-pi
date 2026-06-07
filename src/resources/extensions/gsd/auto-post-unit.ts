@@ -1521,6 +1521,8 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
       }
     }
 
+    let blockingContentViolation: string | null = null;
+
     // ── Safety harness: post-unit validation ──
     try {
       const { loadEffectiveGSDPreferences } = await import("./preferences.js");
@@ -1668,8 +1670,14 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
             const artifactPath = resolveArtifactForContent(s.currentUnit.type, s.currentUnit.id, s.basePath);
             const contentViolations = validateContent(s.currentUnit.type, artifactPath);
             for (const v of contentViolations) {
-              logWarning("safety", `content: ${v.reason}`);
-              ctx.ui.notify(`Content validation: ${v.reason}`, "warning");
+              if (v.severity === "error") {
+                blockingContentViolation ??= v.reason;
+                logError("safety", `content: ${v.reason}`);
+                ctx.ui.notify(`Content validation: ${v.reason}`, "error");
+              } else {
+                logWarning("safety", `content: ${v.reason}`);
+                ctx.ui.notify(`Content validation: ${v.reason}`, "warning");
+              }
             }
           } catch (e) {
             debugLog("postUnit", { phase: "safety-content-validation", error: String(e) });
@@ -1866,6 +1874,16 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
           );
           return "continue";
         }
+      }
+
+      if (blockingContentViolation && triggerArtifactVerified) {
+        triggerArtifactVerified = false;
+        debugLog("postUnit", {
+          phase: "content-validation-blocked-artifact",
+          unitType: s.currentUnit.type,
+          unitId: s.currentUnit.id,
+          reason: blockingContentViolation,
+        });
       }
 
       // When artifact verification fails for a unit type that has a known expected

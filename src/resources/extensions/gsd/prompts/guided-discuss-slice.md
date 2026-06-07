@@ -13,12 +13,11 @@ Do **not** center the discussion on tech stack trivia, naming, or speculative ar
 Before the first question round, read `.gsd/PROJECT.md` and look for `## Project Shape` → `**Complexity:**`. Verdicts are **`simple`** or **`complex`**; default to `complex` if missing or unclear.
 
 - **`simple`** — use 1–2 plain-text rounds, then write context. Skip parallel-research investigation.
-- **`complex`** — investigate first, then ask structured 3–4-option questions.
+- **`complex`** — ground in the preloaded context first, then ask structured 3–4-option questions.
 
-### Investigation
+### Grounding
 
-Do enough targeted investigation that questions reflect reality:
-- Scout touched code with `rg`, `find`, or `scout` for broad unfamiliar areas.
+Ground your questions in the **preloaded slice context above** plus any Preparation Context snapshot — those are authoritative. **Do not survey the codebase** with `rg`/`find`/`scout` before asking; read a specific file only when a question's answer genuinely hinges on it.
 - Check roadmap context for predecessor and dependent work.
 - For unfamiliar libraries, prefer `resolve_library` / `get_library_docs` over `search-the-web`.
 - Identify the 3–5 biggest behavioural unknowns where the user's answer materially changes the build.
@@ -31,7 +30,7 @@ Do **not** go deep; stop when you can ask grounded questions.
 
 **Never fabricate or simulate user input.** Never generate fake transcript markers like `[User]`, `[Human]`, or `User:`. Ask one question round, then wait for the user's actual response before continuing.
 
-**If `{{structuredQuestionsAvailable}}` is `true`:** Ask **1–3 questions per round** using `ask_user_questions`. In **`complex`** mode, each multi-choice question MUST present **3 or 4 concrete, researched options** plus final **"Other — let me discuss"** option; options must be grounded in the investigation above (codebase signals, library docs, prior `.gsd/` artifacts), not placeholders. In **`simple`** mode, 2 options is fine. Binary wrap-up gates are exempt. **Call `ask_user_questions` exactly once per turn — never make multiple calls with the same or overlapping questions. Wait for the user's response before asking the next round.**
+**If `{{structuredQuestionsAvailable}}` is `true`:** Ask **1–3 questions per round** using `ask_user_questions`. In **`complex`** mode, each multi-choice question MUST present **3 or 4 concrete, researched options** plus final **"Other — let me discuss"** option; options must be grounded in the preloaded context above (slice context, codebase snapshot, library docs, prior `.gsd/` artifacts), not placeholders. In **`simple`** mode, 2 options is fine. Binary wrap-up gates are exempt. **Call `ask_user_questions` exactly once per turn — never make multiple calls with the same or overlapping questions. Wait for the user's response before asking the next round.**
 **If `{{structuredQuestionsAvailable}}` is `false`:** Ask **1–3 numbered plain-text questions per round**, then wait.
 Focus questions on:
 - **UX and user-facing behaviour** — what users see, click, trigger, or experience.
@@ -39,7 +38,7 @@ Focus questions on:
 - **Scope boundaries** — what is in, out, or deferred.
 - **Feel and experience** — tone, responsiveness, feedback, transitions, and what "done" feels like.
 
-After answers, investigate new unknowns if needed, then ask the next round.
+After answers, resolve new unknowns from context (read a specific file only if needed), then ask the next round.
 
 ### Round cadence
 

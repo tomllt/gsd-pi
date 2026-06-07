@@ -11,6 +11,7 @@ import {
   centerLine,
   fitColumns,
 } from "../layout-utils.js";
+import { visibleWidth } from "@gsd/pi-tui";
 
 describe("formatDuration", () => {
   it("formats seconds", () => {
@@ -59,8 +60,10 @@ describe("joinColumns", () => {
 
   it("truncates when content overflows", () => {
     const result = joinColumns("a".repeat(20), "b".repeat(20), 30);
-    // Should be truncated to 30 chars
-    assert.ok(result.length <= 30);
+    // truncateToWidth is ANSI-aware and brackets the ellipsis with zero-width
+    // SGR resets, so the visible width — not the raw string length — is the
+    // invariant that must hold within the column budget.
+    assert.ok(visibleWidth(result) <= 30);
   });
 });
 
@@ -72,7 +75,9 @@ describe("centerLine", () => {
 
   it("truncates when content exceeds width", () => {
     const result = centerLine("abcdefgh", 4);
-    assert.ok(result.length <= 4);
+    // Visible width is the meaningful budget; the result may carry zero-width
+    // SGR reset codes around the ellipsis (see truncateToWidth).
+    assert.ok(visibleWidth(result) <= 4);
   });
 });
 

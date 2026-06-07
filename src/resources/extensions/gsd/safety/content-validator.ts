@@ -11,7 +11,7 @@ import { logWarning } from "../workflow-logger.js";
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface ContentViolation {
-  severity: "warning";
+  severity: "error" | "warning";
   reason: string;
 }
 
@@ -46,6 +46,9 @@ export function validateContent(
 
 type ContentValidatorFn = (content: string) => ContentViolation[];
 
+const TASK_MARKER_RE = /^\s*(?:-\s+\[[ xX]\]\s+\*\*T\d+:|#{2,4}\s+T\d+\b)/gm;
+const SLICE_MARKER_RE = /^\s*(?:-\s+\[[ xX]\]\s+\*\*S\d+:|#{2,4}\s+S\d+\b)/gm;
+
 const VALIDATORS: Record<string, ContentValidatorFn> = {
   "plan-slice": validatePlanSlice,
   "plan-milestone": validatePlanMilestone,
@@ -55,10 +58,10 @@ function validatePlanSlice(content: string): ContentViolation[] {
   const violations: ContentViolation[] = [];
 
   // Must have at least 1 task entry — single-task slices are valid (#3649)
-  const taskCount = (content.match(/- \[[ x]\] \*\*T\d+/g) || []).length;
+  const taskCount = (content.match(TASK_MARKER_RE) || []).length;
   if (taskCount < 1) {
     violations.push({
-      severity: "warning",
+      severity: "error",
       reason: `Slice plan has ${taskCount} task(s) — expected at least 1`,
     });
   }
@@ -86,10 +89,10 @@ function validatePlanMilestone(content: string): ContentViolation[] {
   const violations: ContentViolation[] = [];
 
   // Must have at least 1 slice entry
-  const sliceCount = (content.match(/##\s+S\d+/g) || []).length;
+  const sliceCount = (content.match(SLICE_MARKER_RE) || []).length;
   if (sliceCount < 1) {
     violations.push({
-      severity: "warning",
+      severity: "error",
       reason: `Milestone roadmap has ${sliceCount} slice(s) — expected at least 1`,
     });
   }

@@ -341,6 +341,7 @@ interface TaskParam {
 	task: string;
 	cwd?: string;
 	model?: string;
+	thinking?: string;
 	context?: SubagentContextMode;
 }
 
@@ -416,6 +417,9 @@ async function runSingleAgent(
 	parentSessionManager?: Parameters<typeof createSubagentLaunchPlan>[0]["parentSessionManager"],
 	sessionOverride?: SubagentSessionArgs,
 	trackingName?: string,
+	// Trailing param (kept after trackingName so existing positional call sites
+	// don't shift). Reasoning effort forwarded to the child (#508).
+	thinkingOverride?: string,
 ): Promise<SingleResult> {
 	const agent = agents.find((a) => a.name === agentName);
 
@@ -489,6 +493,7 @@ async function runSingleAgent(
 			task,
 			tmpPromptPath,
 			modelOverride,
+			thinkingOverride,
 			contextMode,
 			parentSessionManager,
 			session: sessionOverride,
@@ -581,10 +586,12 @@ async function runSingleAgentInCmuxSplit(
 	parentSessionManager?: Parameters<typeof createSubagentLaunchPlan>[0]["parentSessionManager"],
 	sessionOverride?: SubagentSessionArgs,
 	trackingName?: string,
+	// Trailing param (see runSingleAgent). Reasoning effort forwarded to the child (#508).
+	thinkingOverride?: string,
 ): Promise<SingleResult> {
 	const agent = agents.find((a) => a.name === agentName);
 	if (!agent) {
-		return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelOverride, contextMode, parentSessionManager, sessionOverride, trackingName);
+		return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelOverride, contextMode, parentSessionManager, sessionOverride, trackingName, thinkingOverride);
 	}
 
 	let tmpPromptDir: string | null = null;
@@ -631,7 +638,7 @@ async function runSingleAgentInCmuxSplit(
 			? await cmuxClient.createSplit(directionOrSurfaceId as "right" | "down" | "left" | "up")
 			: directionOrSurfaceId;
 		if (!cmuxSurfaceId) {
-			return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelOverride, contextMode, parentSessionManager, sessionOverride, trackingName);
+			return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelOverride, contextMode, parentSessionManager, sessionOverride, trackingName, thinkingOverride);
 		}
 
 		const bundledPaths = (process.env.GSD_BUNDLED_EXTENSION_PATHS ?? "").split(path.delimiter).map((s) => s.trim()).filter(Boolean);
@@ -641,6 +648,7 @@ async function runSingleAgentInCmuxSplit(
 			task,
 			tmpPromptPath,
 			modelOverride,
+			thinkingOverride,
 			contextMode,
 			parentSessionManager,
 			session: sessionOverride,
@@ -665,7 +673,7 @@ async function runSingleAgentInCmuxSplit(
 
 		const sent = await cmuxClient.sendSurface(cmuxSurfaceId, `bash -lc ${shellEscape(innerScript)}`);
 		if (!sent) {
-			return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelOverride, contextMode, parentSessionManager, sessionOverride, trackingName);
+			return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelOverride, contextMode, parentSessionManager, sessionOverride, trackingName, thinkingOverride);
 		}
 
 		const finished = await waitForFile(exitPath, signal);
@@ -726,11 +734,18 @@ async function runSingleAgentInCmuxSplit(
 	}
 }
 
+const ThinkingLevelSchema = StringEnum(["off", "minimal", "low", "medium", "high", "xhigh"] as const, {
+	description:
+		"Reasoning effort override for the subagent (forwarded as --thinking). " +
+		"Independent of model choice; unsupported levels are clamped to the model at dispatch.",
+});
+
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 	model: Type.Optional(Type.String({ description: "Model override for this task (e.g. 'claude-sonnet-4-6')" })),
+	thinking: Type.Optional(ThinkingLevelSchema),
 	context: Type.Optional(StringEnum(["fresh", "fork"] as const, {
 		description: 'Context mode for this task (see context field on the top-level params).',
 		default: "fresh",
@@ -742,6 +757,7 @@ const ChainItem = Type.Object({
 	task: Type.String({ description: "Task with optional {previous} placeholder for prior step output" }),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 	model: Type.Optional(Type.String({ description: "Model override for this step (e.g. 'claude-sonnet-4-6')" })),
+	thinking: Type.Optional(ThinkingLevelSchema),
 	context: Type.Optional(StringEnum(["fresh", "fork"] as const, {
 		description: 'Context mode for this step (see context field on the top-level params).',
 		default: "fresh",
@@ -779,6 +795,7 @@ const SubagentParams = Type.Object({
 	),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process (single mode)" })),
 	model: Type.Optional(Type.String({ description: "Model override for the subagent (e.g. 'claude-sonnet-4-6'). Takes precedence over the agent's frontmatter model." })),
+	thinking: Type.Optional(ThinkingLevelSchema),
 	isolated: Type.Optional(
 		Type.Boolean({
 			description:
@@ -930,6 +947,7 @@ export default function (pi: ExtensionAPI) {
 					ctx.sessionManager,
 					{ mode: "fork", sessionFile: selected.sessionFile, sessionDir: path.dirname(selected.sessionFile) },
 					selected.trackingName,
+					params.thinking,
 				);
 				return {
 					content: [{ type: "text", text: getFinalOutput(result.messages) || result.errorMessage || result.stderr || "(no output)" }],
@@ -1244,6 +1262,7 @@ export default function (pi: ExtensionAPI) {
 							ctx.sessionManager,
 							undefined,
 							dispatchTrackingNames[0],
+							params.thinking,
 						);
 						if (isolation && result.exitCode === 0) {
 							const patches = await isolation.captureDelta();
@@ -1317,6 +1336,7 @@ export default function (pi: ExtensionAPI) {
 						ctx.sessionManager,
 						undefined,
 						dispatchTrackingNames[i],
+						step.thinking || params.thinking,
 					);
 					results.push(result);
 					persistRunResults(results);
@@ -1397,6 +1417,7 @@ export default function (pi: ExtensionAPI) {
 				const results = await mapWithConcurrencyLimit(taskParams, MAX_CONCURRENCY, async (t, index) => {
 					const workerId = registerWorker(t.agent, t.task, index, batchSize, batchId);
 					const taskModel = t.model || params.model;
+						const taskThinking = t.thinking || params.thinking;
 					const updateParallelResult = (partial: AgentToolResult<SubagentDetails>) => {
 						if (partial.details?.results[0]) {
 							allResults[index] = partial.details.results[0];
@@ -1422,6 +1443,7 @@ export default function (pi: ExtensionAPI) {
 								ctx.sessionManager,
 								undefined,
 								dispatchTrackingNames[index],
+								taskThinking,
 							)
 						: runSingleAgent(
 								ctx.cwd,
@@ -1438,6 +1460,7 @@ export default function (pi: ExtensionAPI) {
 								ctx.sessionManager,
 								undefined,
 								dispatchTrackingNames[index],
+								taskThinking,
 							);
 					const runTask = async () => {
 						let isolation: IsolationEnvironment | null = null;
@@ -1536,6 +1559,7 @@ export default function (pi: ExtensionAPI) {
 							ctx.sessionManager,
 							undefined,
 							dispatchTrackingNames[0],
+							params.thinking,
 						)
 						: await runSingleAgent(
 							ctx.cwd,
@@ -1552,6 +1576,7 @@ export default function (pi: ExtensionAPI) {
 							ctx.sessionManager,
 							undefined,
 							dispatchTrackingNames[0],
+							params.thinking,
 						);
 					finalResults = [result];
 

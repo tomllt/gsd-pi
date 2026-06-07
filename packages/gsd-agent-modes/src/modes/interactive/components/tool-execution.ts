@@ -43,6 +43,7 @@ const BASH_PREVIEW_LINES = 5;
 // During partial write tool-call streaming, re-highlight the first N lines fully
 // to keep multiline tokenization mostly correct without re-highlighting the full file.
 const WRITE_PARTIAL_FULL_HIGHLIGHT_LINES = 50;
+const RUNNING_RAIL_RENDER_INTERVAL_MS = 70;
 
 /**
  * Replace tabs with spaces for consistent rendering
@@ -364,6 +365,7 @@ export class ToolExecutionComponent extends Container {
 	// When true, this component intentionally renders no lines
 	private hideComponent = false;
 	private toolRenderState: Record<string, unknown> = {};
+	private runningRailTimer: ReturnType<typeof setInterval> | undefined;
 
 	private createRenderContext(): ToolRenderContext {
 		return {
@@ -447,12 +449,36 @@ export class ToolExecutionComponent extends Container {
 	}
 
 	dispose(): void {
+		this.stopRunningRailTimer();
 		this.convertedImages.clear();
 		this.imageComponents = [];
 		this.imageSpacers = [];
 		this.editDiffPreview = undefined;
 		this.writeHighlightCache = undefined;
 		this.result = undefined;
+	}
+
+	private syncRunningRailTimer(): void {
+		if (!this.isInFlight() || this.hideComponent) {
+			this.stopRunningRailTimer();
+			return;
+		}
+		if (this.runningRailTimer) return;
+
+		this.runningRailTimer = setInterval(() => {
+			if (!this.isInFlight() || this.hideComponent) {
+				this.stopRunningRailTimer();
+				return;
+			}
+			this.ui.requestRender();
+		}, RUNNING_RAIL_RENDER_INTERVAL_MS);
+		this.runningRailTimer.unref?.();
+	}
+
+	private stopRunningRailTimer(): void {
+		if (!this.runningRailTimer) return;
+		clearInterval(this.runningRailTimer);
+		this.runningRailTimer = undefined;
 	}
 
 	updateArgs(args: any): void {
@@ -1002,6 +1028,7 @@ export class ToolExecutionComponent extends Container {
 		if (!useBuiltInRenderer && this.toolDefinition) {
 			this.hideComponent = !customRendererHasContent && this.imageComponents.length === 0;
 		}
+		this.syncRunningRailTimer();
 	}
 
 	/**

@@ -63,10 +63,14 @@ function isRepairableStaleRenderReason(reason: string): boolean {
 
 function canonicalizeMilestoneId(dirSegment: string): string {
   if (getMilestone(dirSegment)) return dirSegment;
-  // Descriptor layout: e.g. M001-old → M001; M001-a1b2c3 → M001
-  const canonical = dirSegment.match(/^(M\d+(?:-[a-z0-9]{6})?)/i)?.[1];
-  if (canonical && getMilestone(canonical)) return canonical;
-  return canonical ?? dirSegment;
+  const suffixId = dirSegment.match(/^(M\d+-[a-z0-9]{6})(?:$|-)/)?.[1];
+  if (suffixId && getMilestone(suffixId)) return suffixId;
+
+  // Descriptor layout: e.g. M001-DESCRIPTOR → M001
+  const baseId = dirSegment.match(/^(M\d+)(?:$|-)/i)?.[1];
+  if (baseId && getMilestone(baseId)) return baseId;
+
+  return suffixId ?? baseId ?? dirSegment;
 }
 
 function resolveRoadmapMilestoneIdFromPath(normPath: string): string {
@@ -115,7 +119,12 @@ async function repairStaleRenderFromBasePath(
       );
     }
     const milestoneId = canonicalizeMilestoneId(pathMatch[1]);
-    const wrote = await renderPlanCheckboxes(basePath, milestoneId, pathMatch[2]);
+    const wrote = await renderPlanCheckboxes(
+      basePath,
+      milestoneId,
+      pathMatch[2],
+      record.renderPath,
+    );
     if (!wrote) {
       throw new Error(
         `stale-render drift: plan re-render wrote nothing for ${milestoneId}/${pathMatch[2]} ` +

@@ -324,6 +324,14 @@ function renderConsole(report) {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
+// Filenames originate from attacker-controlled fork PRs. Even though the
+// workflow no longer interpolates this output into a shell, a backtick or pipe
+// in a filename could still break out of a markdown code span / table cell.
+// Neutralize the markdown-significant characters before embedding.
+function escapeCell(file) {
+  return String(file).replace(/[`|\\]/g, '\\$&').replace(/\r?\n/g, ' ');
+}
+
 function renderGitHubSummary(report) {
   const { changedFiles, systemsPerFile, unmatchedFiles, systemRisks, risk } = report;
 
@@ -356,11 +364,11 @@ function renderGitHubSummary(report) {
     lines.push('|------|------|---------|');
     for (const [file, systems] of systemsPerFile) {
       const tier = overallRisk(systems);
-      lines.push(`| ${TIER_EMOJI[tier]} | \`${file}\` | ${systems.join(', ')} |`);
+      lines.push(`| ${TIER_EMOJI[tier]} | \`${escapeCell(file)}\` | ${systems.join(', ')} |`);
     }
     if (unmatchedFiles.length > 0) {
       for (const file of unmatchedFiles) {
-        lines.push(`| ⚪ | \`${file}\` | *(unclassified)* |`);
+        lines.push(`| ⚪ | \`${escapeCell(file)}\` | *(unclassified)* |`);
       }
     }
     lines.push('');

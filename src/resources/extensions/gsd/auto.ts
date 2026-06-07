@@ -107,7 +107,7 @@ import {
 } from "./auto-tool-tracking.js";
 import { closeoutUnit } from "./auto-unit-closeout.js";
 import { recoverTimedOutUnit } from "./auto-timeout-recovery.js";
-import { selectAndApplyModel, resolveModelId, clearToolBaseline, getToolBaselineSnapshot } from "./auto-model-selection.js";
+import { selectAndApplyModel, resolveModelId, clearToolBaseline } from "./auto-model-selection.js";
 import { resetRoutingHistory, recordOutcome } from "./routing-history.js";
 import {
   checkPostUnitHooks,
@@ -270,18 +270,11 @@ import { runAutoLoopWithUok } from "./uok/kernel.js";
 import { resolveUokFlags } from "./uok/flags.js";
 import { validateDirectory } from "./validate-directory.js";
 import { createAutoOrchestrator } from "./auto/orchestrator.js";
-import type { AutoAdvanceResult, AutoOrchestrationModule, AutoOrchestratorDeps, DispatchAdapter } from "./auto/contracts.js";
-import { reconcileBeforeDispatch } from "./state-reconciliation.js";
-import { compileUnitToolContract } from "./tool-contract.js";
-import { createWorktreeSafetyModule } from "./worktree-safety.js";
+import type { AutoAdvanceResult, AutoOrchestrationModule } from "./auto/contracts.js";
 import {
   repairAutoWorktreeSafetyFailure,
   resolvePausedAutoWorktreePath,
 } from "./auto-worktree-repair.js";
-import { resolveManifest } from "./unit-context-manifest.js";
-import { classifyFailure } from "./recovery-classification.js";
-import { supportsStructuredQuestions } from "./workflow-mcp.js";
-import type { MinimalModelRegistry } from "./context-budget.js";
 // Slice-level parallelism (#2340)
 import { getEligibleSlices } from "./slice-parallel-eligibility.js";
 import { startSliceParallel } from "./slice-parallel-orchestrator.js";
@@ -317,7 +310,6 @@ import type {
   UnitRouting,
   StartModel,
   AutoSession,
-  PendingOrchestrationDispatch,
 } from "./auto/session.js";
 export {
   STUB_RECOVERY_THRESHOLD,
@@ -637,6 +629,26 @@ export function startAutoDetached(
 /** Returns true if the project is configured for `isolation:worktree` mode. */
 export function shouldUseWorktreeIsolation(basePath?: string): boolean {
   return getIsolationMode(basePath) === "worktree";
+}
+
+type AutoIsolationMode = ReturnType<typeof getIsolationMode>;
+
+function resolveEffectiveUnitIsolationMode(
+  configuredMode: AutoIsolationMode,
+  isolationDegraded: boolean,
+): AutoIsolationMode {
+  return configuredMode === "worktree" && isolationDegraded ? "branch" : configuredMode;
+}
+
+export function _resolveEffectiveUnitIsolationModeForTest(
+  configuredMode: AutoIsolationMode,
+  isolationDegraded: boolean,
+): AutoIsolationMode {
+  return resolveEffectiveUnitIsolationMode(configuredMode, isolationDegraded);
+}
+
+function getEffectiveUnitIsolationMode(basePath: string): AutoIsolationMode {
+  return resolveEffectiveUnitIsolationMode(getIsolationMode(basePath), s.isolationDegraded);
 }
 
 /** Crash recovery prompt — set by startAuto, consumed by the main loop */
@@ -1126,6 +1138,48 @@ function setLifecycleOutcome(
   });
 }
 
+const TERMINAL_CLOSEOUT_COMMANDS = [
+  "/gsd status for overview",
+  "/gsd visualize to inspect",
+  "/gsd notifications for history",
+  "/gsd start for new work",
+];
+
+function setTerminalCloseoutOutcome(
+  ctx: ExtensionContext | undefined,
+  input: {
+    milestoneId?: string | null;
+    milestoneTitle?: string | null;
+    allMilestonesComplete?: boolean;
+    reason?: string;
+  },
+): void {
+  if (!ctx?.hasUI) return;
+  const milestoneLabel = input.milestoneId ? `Milestone ${input.milestoneId}` : "Milestone";
+  const title = input.allMilestonesComplete ? "All milestones complete" : `${milestoneLabel} complete`;
+  const titleLine = input.milestoneTitle && input.milestoneId
+    ? `${input.milestoneTitle}. `
+    : "";
+  const nextAction = input.allMilestonesComplete
+    ? "Review the closeout, then start new work when ready."
+    : "Review the closeout, then start the next milestone when ready.";
+
+  ctx.ui.setHeader?.(() => ({
+    render(): string[] { return []; },
+    invalidate(): void {},
+  }));
+  ctx.ui.setStatus?.("gsd-step", undefined);
+  ctx.ui.setWidget?.("gsd-progress", undefined);
+  setLifecycleOutcome(ctx, {
+    status: "complete",
+    title,
+    detail: `${titleLine}${input.reason ?? "Milestone closeout finished."}`,
+    nextAction,
+    commands: TERMINAL_CLOSEOUT_COMMANDS,
+    unitLabel: input.milestoneId ? `complete-milestone ${input.milestoneId}` : null,
+  });
+}
+
 function handleLostSessionLock(
   ctx?: ExtensionContext,
   lockStatus?: SessionLockStatus,
@@ -1246,7 +1300,7 @@ export async function cleanupAfterLoopExit(ctx: ExtensionContext): Promise<void>
   const preserveStepSurface = s.preserveStepSurfaceAfterLoopExit;
   const preserveCompletionSurface = s.completionStopInProgress;
   const preservePausedSurface = s.paused;
-  s.currentUnit = null;
+  s.clearCurrentUnit();
   s.active = false;
   deactivateGSD();
   clearUnitTimeout();
@@ -1269,11 +1323,13 @@ export async function cleanupAfterLoopExit(ctx: ExtensionContext): Promise<void>
   // A transient provider-error pause intentionally leaves the paused badge
   // visible so the user still has a resumable auto-mode signal on screen.
   if (!s.paused) {
-    if (preserveStepSurface) {
-      s.preserveStepSurfaceAfterLoopExit = false;
-    } else if (preserveCompletionSurface) {
+    if (preserveCompletionSurface) {
       ctx.ui.setStatus("gsd-auto", undefined);
-      s.completionStopInProgress = false;
+      if (preserveStepSurface) {
+        s.preserveStepSurfaceAfterLoopExit = false;
+      }
+    } else if (preserveStepSurface) {
+      s.preserveStepSurfaceAfterLoopExit = false;
     } else {
       ctx.ui.setStatus("gsd-auto", undefined);
       ctx.ui.setWidget("gsd-progress", undefined);
@@ -1411,6 +1467,7 @@ export async function stopAuto(
     options.preserveCloseoutTranscript ?? completionStopRequested
   );
   const installCompletionWidget = completionStopRequested && !preserveCloseoutTranscript;
+  const installTerminalCloseoutOutcome = completionStopRequested && preserveCloseoutTranscript;
   const preserveCompletionSurface = completionStopRequested || preserveCloseoutTranscript;
   s.completionStopInProgress = preserveCompletionSurface;
   playNotificationBell("stop", loadedPreferences?.notifications);
@@ -1744,6 +1801,15 @@ export async function stopAuto(
       }
     }
 
+    if (installTerminalCloseoutOutcome && ctx && options.completionWidget) {
+      setTerminalCloseoutOutcome(ctx, {
+        milestoneId: completionMilestoneId,
+        milestoneTitle: options.completionWidget.milestoneTitle ?? null,
+        allMilestonesComplete: options.completionWidget.allMilestonesComplete,
+        reason: reason ?? "Milestone closeout finished.",
+      });
+    }
+
     // ── Step 9: Cmux sidebar / event log ──
     try {
       pi?.events.emit(CMUX_CHANNELS.SIDEBAR, { action: "clear" as const, preferences: loadedPreferences });
@@ -1987,7 +2053,7 @@ export async function pauseAuto(
       // Non-fatal — best-effort closeout on pause
       logWarning("engine", `unit closeout on pause failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
     }
-    s.currentUnit = null;
+    s.clearCurrentUnit();
   }
 
   // Keep STATE.md aligned with the DB-backed state before releasing pause state.
@@ -2094,494 +2160,6 @@ function buildLifecycle(): WorktreeLifecycle {
   return new WorktreeLifecycle(s, buildWorktreeLifecycleDeps());
 }
 
-/**
- * Build the production `DispatchAdapter` used by `createWiredAutoOrchestrationModule`.
- *
- * Exported so tests can verify parity with `runDispatch`'s `resolveDispatch` call —
- * the wired adapter must derive `structuredQuestionsAvailable`, `sessionContextWindow`,
- * `sessionProvider`, and `modelRegistry` the same way phases.ts:runDispatch does.
- */
-export function createWiredDispatchAdapter(
-  ctx: ExtensionContext,
-  pi: ExtensionAPI,
-  dispatchBasePath: string,
-  session?: AutoSession,
-): DispatchAdapter {
-  function getAlreadyClosedDispatchReason(unitType: string, unitId: string): string | null {
-    if (!isDbAvailable()) return null;
-    refreshOpenDatabaseFromDisk();
-    const { milestone, slice, task } = parseUnitId(unitId);
-    if (unitType === "execute-task" && milestone && slice && task) {
-      const row = getTask(milestone, slice, task);
-      return row && isClosedStatus(row.status)
-        ? `execute-task ${unitId} is already ${row.status}`
-        : null;
-    }
-    if (unitType === "complete-slice" && milestone && slice) {
-      const row = getSlice(milestone, slice);
-      return row && isClosedStatus(row.status)
-        ? `complete-slice ${unitId} is already ${row.status}`
-        : null;
-    }
-    return null;
-  }
-
-  function shouldAdoptActiveMilestone(
-    state: GSDState,
-    activeSession: AutoSession | undefined,
-    activeDispatchBasePath: string,
-  ): boolean {
-    const activeMilestoneId = state.activeMilestone?.id;
-    const currentMilestoneId = activeSession?.currentMilestoneId;
-    if (!activeSession || !activeMilestoneId || !currentMilestoneId || activeMilestoneId === currentMilestoneId) {
-      return false;
-    }
-
-    const scopedWorktreeMilestone =
-      (activeSession.basePath ? detectWorktreeName(activeSession.basePath) : null) ??
-      detectWorktreeName(activeDispatchBasePath);
-    if (scopedWorktreeMilestone && scopedWorktreeMilestone !== activeMilestoneId) {
-      return false;
-    }
-
-    const currentMilestone = state.registry.find((milestone) => milestone.id === currentMilestoneId);
-    return !!currentMilestone && isClosedStatus(currentMilestone.status);
-  }
-
-  return {
-    async decideNextUnit(input) {
-      const state = input.stateSnapshot;
-      const active = state.activeMilestone;
-      if (!active) return null;
-
-      const activeSession = input.session ?? session;
-      const activeDispatchBasePath = activeSession?.basePath || dispatchBasePath;
-      if (activeSession && shouldAdoptActiveMilestone(state, activeSession, activeDispatchBasePath)) {
-        activeSession.currentMilestoneId = active.id;
-      }
-      const prefs = loadEffectiveGSDPreferences(activeDispatchBasePath)?.preferences;
-
-      // Derive session-derived dispatch inputs the same way phases.ts:runDispatch does
-      // (#5789). Prefer caller-supplied values when present so test harnesses and
-      // alternative wirings can inject deterministic snapshots; otherwise pull from
-      // the captured pi/ctx references.
-      const sessionProvider = input.sessionProvider ?? ctx.model?.provider;
-      const sessionContextWindow = input.sessionContextWindow ?? ctx.model?.contextWindow;
-      const modelRegistry = input.modelRegistry ?? (ctx.modelRegistry as MinimalModelRegistry | undefined);
-      const authMode =
-        sessionProvider && typeof ctx.modelRegistry?.getProviderAuthMode === "function"
-          ? ctx.modelRegistry.getProviderAuthMode(sessionProvider)
-          : undefined;
-      // Use baseline snapshot — same reason as phases.ts:runDispatch: the live
-      // active set may be narrowed by the prior unit before selectAndApplyModel
-      // restores it, causing false transport-preflight failures (#477 follow-up).
-      const activeTools = getToolBaselineSnapshot(pi);
-      // Mirrors runDispatch: deep-planning keeps approval gates in plain chat
-      // because structured questions can be cancelled outside the chat turn on
-      // some transports.
-      const structuredQuestionsAvailable =
-        input.structuredQuestionsAvailable ??
-        (prefs?.planning_depth === "deep"
-          ? "false"
-          : supportsStructuredQuestions(activeTools, {
-              authMode,
-              baseUrl: ctx.model?.baseUrl,
-            })
-            ? "true"
-            : "false");
-
-      const pendingRetry = session?.pendingVerificationRetryDispatch;
-      if (session && pendingRetry) {
-        session.pendingVerificationRetryDispatch = null;
-        const alreadyClosedReason = getAlreadyClosedDispatchReason(
-          pendingRetry.unitType,
-          pendingRetry.unitId,
-        );
-        if (alreadyClosedReason) {
-          session.pendingOrchestrationDispatch = null;
-          session.pendingVerificationRetry = null;
-          return { kind: "skipped", reason: alreadyClosedReason };
-        }
-        session.pendingOrchestrationDispatch = pendingRetry;
-        return {
-          unitType: pendingRetry.unitType,
-          unitId: pendingRetry.unitId,
-          reason: "verification-retry",
-          preconditions: [],
-        };
-      }
-
-      const action = await resolveDispatch({
-        basePath: activeDispatchBasePath,
-        mid: active.id,
-        midTitle: active.title,
-        state,
-        prefs,
-        session: activeSession,
-        structuredQuestionsAvailable,
-        sessionContextWindow,
-        sessionProvider,
-        modelRegistry,
-        activeTools,
-        sessionAuthMode: authMode,
-        sessionBaseUrl: ctx.model?.baseUrl,
-      });
-
-      if (action.action === "stop") {
-        if (session) session.pendingOrchestrationDispatch = null;
-        return {
-          kind: "blocked",
-          reason: action.reason,
-          action: action.level === "warning" ? "pause" : "stop",
-        };
-      }
-      if (action.action !== "dispatch") {
-        if (session) session.pendingOrchestrationDispatch = null;
-        return {
-          kind: "skipped",
-          reason: action.matchedRule ?? "dispatch-skip",
-        };
-      }
-      const alreadyClosedReason = getAlreadyClosedDispatchReason(action.unitType, action.unitId);
-      if (alreadyClosedReason) {
-        if (session) {
-          session.pendingOrchestrationDispatch = null;
-          session.pendingVerificationRetry = null;
-        }
-        return { kind: "skipped", reason: alreadyClosedReason };
-      }
-      if (session) {
-        const pending: PendingOrchestrationDispatch = {
-          unitType: action.unitType,
-          unitId: action.unitId,
-          prompt: action.prompt,
-          pauseAfterUatDispatch: action.pauseAfterDispatch ?? false,
-          state,
-          mid: active.id,
-          midTitle: active.title,
-        };
-        session.pendingOrchestrationDispatch = pending;
-      }
-      return {
-        unitType: action.unitType,
-        unitId: action.unitId,
-        reason: action.matchedRule ?? "dispatch",
-        preconditions: [],
-      };
-    },
-  };
-}
-
-function isUsableLiveOrchestratorBasePath(basePath: string): boolean {
-  if (!basePath || !existsSync(basePath)) return false;
-  if (!detectWorktreeName(basePath)) return true;
-
-  try {
-    return readFileSync(join(basePath, ".git"), "utf8").trim().startsWith("gitdir: ");
-  } catch {
-    return false;
-  }
-}
-
-export function resolveLiveOrchestratorBasePath(input: {
-  capturedBasePath: string;
-  runtimeBasePath: string;
-  sessionBasePath?: string | null;
-  originalBasePath?: string | null;
-}): string {
-  const primary = input.sessionBasePath || input.capturedBasePath;
-  if (isUsableLiveOrchestratorBasePath(primary)) return primary;
-
-  const fallbacks = [
-    input.originalBasePath,
-    input.runtimeBasePath,
-    resolveProjectRoot(input.capturedBasePath),
-  ];
-
-  for (const candidate of fallbacks) {
-    if (candidate && isUsableLiveOrchestratorBasePath(candidate)) {
-      return candidate;
-    }
-  }
-
-  return input.runtimeBasePath || input.capturedBasePath;
-}
-
-/**
- * Thin entry glue for the new Auto Orchestration module.
- *
- * This intentionally wires only dispatch + error notification today, with
- * no behavior changes to the existing auto loop. It provides a concrete seam
- * the next refactor steps can adopt incrementally.
- */
-export function createWiredAutoOrchestrationModule(
-  ctx: ExtensionContext,
-  pi: ExtensionAPI,
-  dispatchBasePath: string,
-  runtimeBasePath = resolveProjectRoot(dispatchBasePath),
-): AutoOrchestrationModule {
-  const flowId = `auto-orchestrator-${Date.now()}`;
-  let seq = 0;
-  const getLiveDispatchBasePath = () =>
-    resolveLiveOrchestratorBasePath({
-      capturedBasePath: dispatchBasePath,
-      runtimeBasePath,
-      sessionBasePath: s.basePath,
-      originalBasePath: s.originalBasePath,
-    });
-
-  const deps: AutoOrchestratorDeps = {
-    stateReconciliation: {
-      async reconcileBeforeDispatch() {
-        const activeBasePath = getLiveDispatchBasePath();
-        const result = await reconcileBeforeDispatch(activeBasePath);
-        // Failure-path summaries written by gsd_summary_save create
-        // artifact-db-status-divergence blockers for tasks that are still
-        // pending (gsd_task_complete never ran). These tasks can still be
-        // dispatched and the drift self-heals once they complete successfully.
-        const hardBlockers = result.blockers.filter(
-          (b) =>
-            !b.includes("has SUMMARY artifact while DB status is") &&
-            !b.includes("has SUMMARY on disk while DB status is") &&
-            !b.includes("has task SUMMARY artifacts but no DB tasks"),
-        );
-        if (hardBlockers.length > 0) {
-          return {
-            ok: false,
-            reason: hardBlockers[0],
-            stateSnapshot: result.stateSnapshot,
-          };
-        }
-        const repairedKinds = result.repaired.map((d) => d.kind);
-        return {
-          ok: true,
-          reason:
-            repairedKinds.length > 0
-              ? `repaired: ${repairedKinds.join(", ")}`
-              : "clean",
-          stateSnapshot: result.stateSnapshot,
-        };
-      },
-    },
-    dispatch: createWiredDispatchAdapter(ctx, pi, dispatchBasePath, s),
-    recovery: {
-      async classifyAndRecover(input) {
-        const recovery = classifyFailure(input);
-        return { action: recovery.action, reason: recovery.reason };
-      },
-    },
-    toolContract: {
-      async compileUnitToolContract(unitType) {
-        const result = compileUnitToolContract(unitType);
-        if (!result.ok) return { ok: false, reason: result.detail };
-        return { ok: true, reason: result.contract.validationRules.join(", ") };
-      },
-    },
-    worktree: {
-      async prepareForUnit(unitType, unitId) {
-        const manifest = resolveManifest(unitType);
-        if (!manifest) {
-          return {
-            ok: false,
-            reason: `No Unit manifest is registered for ${unitType}`,
-          };
-        }
-        if (getIsolationMode(runtimeBasePath) !== "worktree") {
-          return { ok: true, reason: "not-required" };
-        }
-        const writeScope =
-          manifest.tools.mode === "all" || manifest.tools.mode === "docs"
-            ? "source-writing"
-            : "planning-only";
-        if (getIsolationMode(runtimeBasePath) !== "worktree") {
-          return { ok: true, reason: "isolation-not-worktree" };
-        }
-        const safety = createWorktreeSafetyModule();
-        const activeBasePath = getLiveDispatchBasePath();
-        const snapshot = await deriveState(activeBasePath);
-        const milestoneId = snapshot.activeMilestone?.id ?? null;
-        const expectedBranch = milestoneId ? autoWorktreeBranch(milestoneId) : null;
-        let result = safety.validateUnitRoot({
-          unitType,
-          unitId,
-          writeScope,
-          projectRoot: runtimeBasePath,
-          unitRoot: activeBasePath,
-          milestoneId,
-          isolationMode: getIsolationMode(runtimeBasePath),
-          expectedBranch,
-        });
-        if (!result.ok) {
-          const repaired = await repairAutoWorktreeSafetyFailure({
-            safetyResult: result,
-            projectRoot: runtimeBasePath,
-            activeRoot: activeBasePath,
-            milestoneId,
-            enterMilestone: async (id) => {
-              buildLifecycle().adoptSessionRoot(runtimeBasePath, s.originalBasePath || runtimeBasePath);
-              const enterResult = buildLifecycle().enterMilestone(id, {
-                notify: ctx.ui.notify.bind(ctx.ui),
-              });
-              if (!enterResult.ok) return { ok: false, reason: enterResult.reason };
-              rebuildScope(s.basePath, s.currentMilestoneId);
-              return { ok: true };
-            },
-            revalidate: () => safety.validateUnitRoot({
-              unitType,
-              unitId,
-              writeScope,
-              projectRoot: runtimeBasePath,
-              unitRoot: getLiveDispatchBasePath(),
-              milestoneId,
-              isolationMode: getIsolationMode(runtimeBasePath),
-              expectedBranch,
-            }),
-          });
-          result = repaired.result;
-          if (result.ok) {
-            return { ok: true, reason: repaired.repaired ? `repaired-${result.kind}` : result.kind };
-          }
-          const repairDetail = repaired.repairReason
-            ? ` (repair skipped: ${repaired.repairReason})`
-            : "";
-          return { ok: false, reason: `${result.kind}: ${result.reason}${repairDetail}` };
-        }
-        return { ok: true, reason: result.kind };
-      },
-      async syncAfterUnit() {},
-      async cleanupOnStop() {},
-    },
-    health: {
-      checkResourcesStale() {
-        return checkResourcesStale(s.resourceVersionOnStart);
-      },
-      async preAdvanceGate() {
-        try {
-          const gate = await preDispatchHealthGate(getLiveDispatchBasePath());
-          if (gate.proceed) {
-            return {
-              kind: "pass",
-              fixesApplied: gate.fixesApplied,
-            };
-          }
-          return {
-            kind: "fail",
-            reason: gate.reason ?? "Pre-dispatch health check failed — run /gsd doctor for details.",
-            action: gate.severity ?? "pause",
-          };
-        } catch (error) {
-          return { kind: "threw", error };
-        }
-      },
-      async postAdvanceRecord(result) {
-        if (result.kind === "error") {
-          recordHealthSnapshot(1, 0, 0, [{
-            code: "orchestration-error",
-            message: result.reason ?? "orchestration error",
-            severity: "error",
-            unitId: "orchestration",
-          }], [], "orchestration");
-        } else if (result.kind === "blocked") {
-          recordHealthSnapshot(0, 1, 0, [{
-            code: "orchestration-blocked",
-            message: result.reason ?? "orchestration blocked",
-            severity: "warning",
-            unitId: "orchestration",
-          }], [], "orchestration");
-        }
-      },
-    },
-    runtime: {
-      async ensureLockOwnership() {
-        const status = getSessionLockStatus(runtimeBasePath);
-        if (!status.valid || status.failureReason === "pid-mismatch") {
-          throw new Error("session lock held by another process");
-        }
-      },
-      async journalTransition(event) {
-        const eventType = event.name === "start"
-          ? "orchestrator-iteration-start"
-          : event.name === "resume"
-            ? "orchestrator-iteration-start"
-            : event.name === "advance"
-              ? "orchestrator-dispatch-match"
-              : event.name === "advance-blocked"
-                ? "orchestrator-guard-block"
-                : event.name === "advance-stopped"
-                  ? "orchestrator-dispatch-stop"
-                  : event.name === "advance-error"
-                    ? "orchestrator-iteration-end"
-                    : event.name === "advance-paused" || event.name === "advance-retry"
-                      ? "orchestrator-guard-block"
-                      : event.name === "stop"
-                      ? "orchestrator-terminal"
-                      : "orchestrator-iteration-end";
-
-        _emitJournalEvent(runtimeBasePath, {
-          ts: new Date().toISOString(),
-          flowId,
-          seq: ++seq,
-          eventType,
-          data: {
-            source: "auto-orchestrator",
-            name: event.name,
-            reason: event.reason,
-            unitType: event.unitType,
-            unitId: event.unitId,
-          },
-        });
-      },
-    },
-    notifications: {
-      async notifyLifecycle(event) {
-        if (event.name === "error") {
-          ctx.ui.notify(event.detail ?? "auto orchestration error", "error");
-        }
-      },
-    },
-    uokGate: {
-      async emit(input) {
-        const activeBasePath = getLiveDispatchBasePath();
-        const prefs = loadEffectiveGSDPreferences(activeBasePath)?.preferences;
-        const uokFlags = resolveUokFlags(prefs);
-        if (!uokFlags.gates) return;
-        const milestoneId = input.milestoneId ?? s.currentMilestoneId ?? undefined;
-        try {
-          const { UokGateRunner } = await import("./uok/gate-runner.js");
-          const runner = new UokGateRunner();
-          runner.register({
-            id: input.gateId,
-            type: input.gateType,
-            execute: async () => ({
-              outcome: input.outcome,
-              failureClass: input.failureClass,
-              rationale: input.rationale,
-              findings: input.findings ?? "",
-            }),
-          });
-          await runner.run(input.gateId, {
-            basePath: activeBasePath,
-            traceId: `pre-dispatch:${flowId}`,
-            turnId: `orch-${seq}`,
-            milestoneId,
-            unitType: "pre-dispatch",
-            unitId: `orch-${seq}`,
-          });
-        } catch (err) {
-          logWarning("engine", `uok gate emit failed: ${getErrorMessage(err)}`, {
-            file: "auto.ts",
-            gateId: input.gateId,
-            gateType: input.gateType,
-            ...(milestoneId ? { milestoneId } : {}),
-          });
-        }
-      },
-    },
-  };
-
-  return createAutoOrchestrator(deps);
-}
-
 function notifyResumeBlocked(ctx: ExtensionContext, result: Extract<AutoAdvanceResult, { kind: "blocked" }>): void {
   const resumeCmd = s.stepMode ? "/gsd next" : "/gsd auto";
   ctx.ui.notify(`Auto-mode blocked: ${result.reason}. Fix and run ${resumeCmd} to resume.`, "warning");
@@ -2595,7 +2173,13 @@ function notifyResumeBlocked(ctx: ExtensionContext, result: Extract<AutoAdvanceR
 }
 
 function ensureOrchestrationModule(ctx: ExtensionContext, pi: ExtensionAPI, basePath: string): void {
-  s.orchestration = createWiredAutoOrchestrationModule(ctx, pi, basePath, lockBase());
+  s.orchestration = createAutoOrchestrator({
+    ctx,
+    pi,
+    dispatchBasePath: basePath,
+    runtimeBasePath: lockBase(),
+    session: s,
+  });
 }
 
 /**
@@ -3308,7 +2892,7 @@ export async function dispatchHookUnit(
     s.stepMode = true;
     s.cmdCtx = ctx as ExtensionCommandContext;
     s.autoStartTime = Date.now();
-    s.currentUnit = null;
+    s.clearCurrentUnit();
     s.pendingQuickTasks = [];
   }
 
@@ -3325,12 +2909,12 @@ export async function dispatchHookUnit(
   const hookUnitType = `hook/${hookName}`;
   const hookStartedAt = Date.now();
 
-  s.currentUnit = {
+  s.setCurrentUnit({
     type: triggerUnitType,
     id: triggerUnitId,
     startedAt: hookStartedAt,
     workspaceRoot: s.basePath,
-  };
+  });
 
   const result = await s.cmdCtx!.newSession({ workspaceRoot: s.basePath });
   if (result.cancelled) {
@@ -3338,12 +2922,12 @@ export async function dispatchHookUnit(
     return false;
   }
 
-  s.currentUnit = {
+  s.setCurrentUnit({
     type: hookUnitType,
     id: triggerUnitId,
     startedAt: hookStartedAt,
     workspaceRoot: s.basePath,
-  };
+  });
 
   if (hookModel) {
     const availableModels = ctx.modelRegistry.getAvailable();

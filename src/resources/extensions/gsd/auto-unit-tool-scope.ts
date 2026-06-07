@@ -35,6 +35,17 @@ const EXECUTE_TASK_UNIT_TYPES = new Set([
   "reactive-execute",
 ]);
 
+// These units own quality gates, but their completion handlers persist verdicts
+// from artifact sections. gsd_save_gate_result belongs to gate-evaluate, so keep
+// blocking it here with a calm redirect to the section-write path.
+const SECTION_CLOSE_GATE_UNIT_TYPES = new Set([
+  "execute-task",
+  "execute-task-simple",
+  "reactive-execute",
+  "complete-slice",
+  "validate-milestone",
+]);
+
 const EXTRA_SCOPED_GSD_LIFECYCLE_TOOLS = [
   "gsd_skip_slice",
   "gsd_slice_reopen",
@@ -52,6 +63,8 @@ const SCOPED_GSD_LIFECYCLE_TOOLS = new Set(
 );
 
 export const GSD_PHASE_SCOPE_DISPLAY_REASON = "This GSD phase only allows its scoped workflow tools.";
+export const GSD_SECTION_CLOSE_GATE_DISPLAY_REASON =
+  "Gates here close by writing summary sections — gsd_save_gate_result isn't needed.";
 
 type AutoUnitToolScopeResult = {
   block: boolean;
@@ -87,6 +100,22 @@ function hardBlock(unitType: string, what: string): AutoUnitToolScopeResult {
     block: true,
     reason: hardBlockReason(unitType, what),
     displayReason: GSD_PHASE_SCOPE_DISPLAY_REASON,
+  };
+}
+
+// This stable marker is registered in auto-tool-tracking.ts so auto-mode treats
+// the redirect as deterministic policy, not a retryable execution failure.
+function softGateToolRedirect(unitType: string): AutoUnitToolScopeResult {
+  return {
+    block: true,
+    reason: [
+      `Skip this call — the "${unitType}" phase closes its quality gates by writing summary sections,`,
+      "not by calling gsd_save_gate_result (that tool belongs to the gate-evaluate phase).",
+      "Record each gate by filling its named section in your summary: a populated section records `pass`,",
+      "an empty one records `omitted`. Then call your completion tool and the handler persists every verdict.",
+      "This is expected, not an error — continue without gsd_save_gate_result.",
+    ].join(" "),
+    displayReason: GSD_SECTION_CLOSE_GATE_DISPLAY_REASON,
   };
 }
 
@@ -169,6 +198,10 @@ export function shouldBlockAutoUnitToolCall(
       unitType,
       `GSD lifecycle tool "${canonicalTool}" is not permitted; ${forbiddenReason} Fix unit-tool-contracts.ts or the ${unitType} prompt.`,
     );
+  }
+
+  if (canonicalTool === "gsd_save_gate_result" && SECTION_CLOSE_GATE_UNIT_TYPES.has(unitType)) {
+    return softGateToolRedirect(unitType);
   }
 
   return hardBlock(

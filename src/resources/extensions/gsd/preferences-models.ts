@@ -19,6 +19,9 @@ import type {
   GSDPreferences,
   GSDModelConfigV2,
   GSDPhaseModelConfig,
+  GSDThinkingLevel,
+  GSDModelPhaseKey,
+  GSDThinkingConfig,
   ResolvedModelConfig,
   AutoSupervisorConfig,
 } from "./preferences-types.js";
@@ -37,6 +40,89 @@ export function resolveModelForUnit(unitType: string): string | undefined {
 }
 
 /**
+ * Ordered phase-bucket chain a unit type resolves against, most-specific
+ * first. The first chain entry with a configured value wins; later entries
+ * are siblings the unit falls back to (e.g. `discuss → planning`).
+ *
+ * Single source of truth for the unit-type → phase mapping, shared by model
+ * resolution (`resolveModelWithFallbacksForUnit`) and thinking resolution
+ * (`resolveThinkingLevelForUnit`) so the two never drift (ADR-026).
+ */
+export function phaseChainForUnit(unitType: string): GSDModelPhaseKey[] | undefined {
+  switch (unitType) {
+    case "research-milestone":
+    case "research-slice":
+    // Deep-mode project research orchestrator. Reads PROJECT.md / REQUIREMENTS.md
+    // and fans out research subagents. Routes to the research bucket.
+    case "research-project":
+      return ["research"];
+    case "plan-milestone":
+    case "plan-slice":
+    case "refine-slice":
+    case "replan-slice":
+      return ["planning"];
+    // Deep-mode project-level discussion units route to the same model bucket
+    // as milestone-level discussion (interactive interview style). Workflow
+    // preferences and research-decision are tiny ask_user_questions style units
+    // that share the discuss bucket because they are conversational. All fall
+    // back to planning when no `discuss` bucket is set.
+    case "discuss-milestone":
+    case "discuss-slice":
+    case "discuss-project":
+    case "discuss-requirements":
+    case "workflow-preferences":
+    case "research-decision":
+      return ["discuss", "planning"];
+    case "execute-task":
+    case "reactive-execute":
+      return ["execution"];
+    case "execute-task-simple":
+      return ["execution_simple", "execution"];
+    case "complete-slice":
+    case "complete-milestone":
+    case "worktree-merge":
+      return ["completion"];
+    case "run-uat":
+      return ["uat", "completion"];
+    case "reassess-roadmap":
+    case "rewrite-docs":
+    case "gate-evaluate":
+    case "validate-milestone":
+      return ["validation", "planning"];
+    default:
+      // Subagent unit types (e.g., "subagent", "subagent/scout")
+      if (unitType === "subagent" || unitType.startsWith("subagent/")) {
+        return ["subagent"];
+      }
+      return undefined;
+  }
+}
+
+/**
+ * Find the phase bucket whose `models` entry wins the chain for a unit, plus
+ * that entry. Returns undefined when no phase in the chain is configured.
+ */
+function resolveWinningPhase(
+  models: GSDModelConfigV2 | undefined,
+  chain: GSDModelPhaseKey[],
+): { phase: GSDModelPhaseKey; config: string | GSDPhaseModelConfig } | undefined {
+  if (!models) return undefined;
+  for (const key of chain) {
+    const config = models[key];
+    // Falsy check (not `!= null`) so an empty-string model is treated as
+    // unconfigured and the chain falls through — matches the pre-refactor
+    // switch, which bailed via `if (!phaseConfig)`.
+    if (!config) continue;
+    // An object entry only "wins" if it provides a usable model. A model-less
+    // object (e.g. `{ provider: x }`, or `{}` left after stripping an invalid
+    // `thinking`) must not shadow sibling fallback or yield `{ primary: undefined }`.
+    if (typeof config === "object" && !config.model) continue;
+    return { phase: key, config };
+  }
+  return undefined;
+}
+
+/**
  * Resolve model and fallbacks for a given auto-mode unit type.
  * Returns the primary model and ordered fallbacks, or undefined if not configured.
  *
@@ -46,73 +132,11 @@ export function resolveModelForUnit(unitType: string): string | undefined {
  */
 export function resolveModelWithFallbacksForUnit(unitType: string): ResolvedModelConfig | undefined {
   const prefs = loadEffectiveGSDPreferences(undefined, { availableModelIds: [] });
-  const models = prefs?.preferences?.models;
-  if (!models) return undefined;
-  const m = models as GSDModelConfigV2;
-
-  let phaseConfig: string | GSDPhaseModelConfig | undefined;
-  switch (unitType) {
-    case "research-milestone":
-    case "research-slice":
-      phaseConfig = m.research;
-      break;
-    case "plan-milestone":
-    case "plan-slice":
-    case "refine-slice":
-    case "replan-slice":
-      phaseConfig = m.planning;
-      break;
-    case "discuss-milestone":
-    case "discuss-slice":
-    // Deep-mode project-level discussion units route to the same model
-    // bucket as milestone-level discussion (interactive interview style).
-    case "discuss-project":
-    case "discuss-requirements":
-    // Workflow preferences and research-decision are tiny ask_user_questions
-    // style units; they share the discuss bucket because they are
-    // conversational rather than research/execution. Falling back to planning
-    // when no `discuss` bucket is set keeps parity with the milestone units.
-    case "workflow-preferences":
-    case "research-decision":
-      phaseConfig = m.discuss ?? m.planning;
-      break;
-    // Deep-mode project research orchestrator. Reads PROJECT.md / REQUIREMENTS.md
-    // and fans out research subagents. Routes to the research bucket so it
-    // gets the research-tier model when one is configured.
-    case "research-project":
-      phaseConfig = m.research;
-      break;
-    case "execute-task":
-    case "reactive-execute":
-      phaseConfig = m.execution;
-      break;
-    case "execute-task-simple":
-      phaseConfig = m.execution_simple ?? m.execution;
-      break;
-    case "complete-slice":
-    case "complete-milestone":
-    case "worktree-merge":
-      phaseConfig = m.completion;
-      break;
-    case "run-uat":
-      phaseConfig = m.uat ?? m.completion;
-      break;
-    case "reassess-roadmap":
-    case "rewrite-docs":
-    case "gate-evaluate":
-    case "validate-milestone":
-      phaseConfig = m.validation ?? m.planning;
-      break;
-    default:
-      // Subagent unit types (e.g., "subagent", "subagent/scout")
-      if (unitType === "subagent" || unitType.startsWith("subagent/")) {
-        phaseConfig = m.subagent;
-        break;
-      }
-      return undefined;
-  }
-
-  if (!phaseConfig) return undefined;
+  const chain = phaseChainForUnit(unitType);
+  if (!chain) return undefined;
+  const winner = resolveWinningPhase(prefs?.preferences?.models as GSDModelConfigV2 | undefined, chain);
+  if (!winner) return undefined;
+  const phaseConfig = winner.config;
 
   // Normalize: string -> { model, fallbacks: [] }
   if (typeof phaseConfig === "string") {
@@ -129,6 +153,51 @@ export function resolveModelWithFallbacksForUnit(unitType: string): ResolvedMode
     primary,
     fallbacks: phaseConfig.fallbacks ?? [],
   };
+}
+
+/**
+ * Resolve the explicitly configured reasoning effort for a unit type (ADR-026).
+ *
+ * Thinking travels with the model. The chain is walked most-specific-first up to
+ * and including the phase whose model won; at each level inline
+ * `models.<phase>.thinking` is preferred, then the same phase's `thinking` block
+ * entry. This means:
+ * - a more-specific block key (`thinking.execution_simple`) surfaces even when
+ *   the model only resolves on a less-specific sibling (`models.execution`);
+ * - inline thinking is honored even on a model-less `models.<phase>` entry
+ *   (e.g. `{ thinking: "high" }` with no `model`);
+ * - a unit that claimed its own model bucket never borrows a *less*-specific
+ *   sibling's thinking (the walk stops at the winning phase).
+ * When no model is configured anywhere in the chain, the walk spans the full
+ * chain so inline thinking and the `thinking` block both resolve on their own
+ * sibling chain.
+ *
+ * Returns undefined when nothing explicit is configured — the dispatch path
+ * then falls back to the session/default level and applies the code-writing
+ * floor. Session level, defaults, the floor, and capability clamping are NOT
+ * applied here.
+ */
+export function resolveThinkingLevelForUnit(unitType: string): GSDThinkingLevel | undefined {
+  const prefs = loadEffectiveGSDPreferences(undefined, { availableModelIds: [] })?.preferences;
+  if (!prefs) return undefined;
+  const chain = phaseChainForUnit(unitType);
+  if (!chain) return undefined;
+
+  const models = prefs.models as GSDModelConfigV2 | undefined;
+  const block = prefs.thinking as GSDThinkingConfig | undefined;
+
+  // Walk most-specific-first, up to and including the winning model phase (or
+  // the full chain when no model is configured), checking inline then block.
+  const winner = resolveWinningPhase(models, chain);
+  const limit = winner ? chain.indexOf(winner.phase) + 1 : chain.length;
+  for (let i = 0; i < limit; i++) {
+    const key = chain[i];
+    const entry = models?.[key];
+    if (typeof entry === "object" && entry?.thinking) return entry.thinking; // inline (incl. model-less)
+    const blockLevel = block?.[key];
+    if (blockLevel) return blockLevel;                                       // block
+  }
+  return undefined;
 }
 
 /**

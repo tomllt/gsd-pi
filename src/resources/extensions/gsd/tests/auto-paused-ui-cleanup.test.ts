@@ -21,6 +21,14 @@ function runGit(args: string[], cwd: string): void {
   });
 }
 
+function renderOutcomeWidget(widget: unknown): string {
+  const component = (widget as any)(
+    { requestRender() {} },
+    { fg: (_color: string, text: string) => text, bold: (text: string) => text },
+  );
+  return component.render(100).join("\n");
+}
+
 test("cleanupAfterLoopExit preserves paused auto badge after provider pause", async () => {
   const base = mkdtempSync(join(tmpdir(), "gsd-paused-cleanup-"));
   const previousCwd = process.cwd();
@@ -167,7 +175,43 @@ test("cleanupAfterLoopExit preserves completion closeout surface after stopAuto 
       false,
       "completion cleanup must not replace the closeout surface with a generic outcome card",
     );
-    assert.equal(autoSession.completionStopInProgress, false);
+    assert.equal(
+      autoSession.completionStopInProgress,
+      true,
+      "completion closeout preservation must survive post-loop cleanup until the next agent turn",
+    );
+  } finally {
+    autoSession.reset();
+  }
+});
+
+test("cleanupAfterLoopExit preserves completionStopInProgress even when preserveStepSurfaceAfterLoopExit is also set", async () => {
+  const statusCalls: unknown[] = [];
+  const widgetCalls: unknown[] = [];
+
+  autoSession.reset();
+  autoSession.active = true;
+  autoSession.paused = false;
+  autoSession.completionStopInProgress = true;
+  autoSession.preserveStepSurfaceAfterLoopExit = true;
+
+  try {
+    await cleanupAfterLoopExit({
+      hasUI: true,
+      ui: {
+        setStatus: (...args: unknown[]) => statusCalls.push(args),
+        setWidget: (...args: unknown[]) => widgetCalls.push(args),
+        setHeader: () => {},
+        notify: () => {},
+      },
+    } as any);
+
+    assert.equal(
+      autoSession.completionStopInProgress,
+      true,
+      "completionStopInProgress must survive cleanup even when preserveStepSurfaceAfterLoopExit was also set",
+    );
+    assert.equal(autoSession.preserveStepSurfaceAfterLoopExit, false);
   } finally {
     autoSession.reset();
   }
@@ -610,6 +654,10 @@ test("stopAuto foreground completion closeout reroots session and preserves the 
       "foreground completion stop must not install a replacement roll-up widget over the transcript",
     );
     assert.ok(
+      widgetCalls.some(([key, value]) => key === "gsd-progress" && value === undefined),
+      "foreground completion stop must clear stale progress controls in the rerooted session",
+    );
+    assert.ok(
       notifications.every(message => !message.includes("/gsd auto to resume")),
       "completion stop notification must not tell users to resume a finished auto run",
     );
@@ -617,10 +665,15 @@ test("stopAuto foreground completion closeout reroots session and preserves the 
       notifications.every(message => !message.includes("Auto-mode stopped") && !message.includes("Session:") && !message.includes("Debug log written")),
       "completion stop must not append generic stop/session/debug notifications after the report",
     );
-    assert.ok(
-      widgetCalls.every(([key, value]) => key !== "gsd-outcome" || value === undefined),
-      "foreground completion stop must not replace the transcript with a generic outcome card",
+    const outcome = widgetCalls.find(([key, value]) => key === "gsd-outcome" && typeof value === "function")?.[1];
+    assert.equal(
+      typeof outcome,
+      "function",
+      "foreground completion stop must install a durable closeout outcome in the rerooted session",
     );
+    const rendered = renderOutcomeWidget(outcome);
+    assert.match(rendered, /Milestone M003 complete/);
+    assert.match(rendered, /Review the closeout/);
 
     const widgetCallCountBeforePostLoopCleanup = widgetCalls.length;
     await cleanupAfterLoopExit(ctx);
@@ -790,7 +843,7 @@ test("stopAuto closeout-transcript preservation suppresses generic stop widgets"
   }
 });
 
-test("stopAuto foreground all-complete closeout preserves the transcript surface", async () => {
+test("stopAuto foreground all-complete closeout installs a durable terminal outcome", async () => {
   const base = mkdtempSync(join(tmpdir(), "gsd-all-complete-closeout-"));
   const previousCwd = process.cwd();
   const widgetCalls: Array<[string, unknown]> = [];
@@ -843,8 +896,15 @@ test("stopAuto foreground all-complete closeout preserves the transcript surface
       false,
       "foreground all-complete closeout must not replace the visible transcript with a roll-up widget",
     );
-    const finalOutcome = widgetCalls.filter(([key]) => key === "gsd-outcome").at(-1);
-    assert.equal(finalOutcome?.[1], undefined, "foreground all-complete closeout must not add an outcome replacement");
+    const finalOutcome = widgetCalls.filter(([key]) => key === "gsd-outcome").at(-1)?.[1];
+    assert.equal(
+      typeof finalOutcome,
+      "function",
+      "foreground all-complete closeout must install a durable terminal outcome",
+    );
+    const rendered = renderOutcomeWidget(finalOutcome);
+    assert.match(rendered, /All milestones complete/);
+    assert.match(rendered, /start new work/);
   } finally {
     try { closeDatabase(); } catch { /* noop */ }
     autoSession.reset();

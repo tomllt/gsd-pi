@@ -64,6 +64,14 @@ function addUserMessageComponent(host: InteractiveModeDelegateHost, userComponen
 	host.chatContainer.addChild(userComponent);
 }
 
+function hasAssistantVisibleContent(content: Array<any>, hideThinkingBlock: boolean): boolean {
+	return content.some((c: any) => {
+		if (c?.type === "text" && typeof c.text === "string" && c.text.trim().length > 0) return true;
+		if (!hideThinkingBlock && c?.type === "thinking" && typeof c.thinking === "string" && c.thinking.trim().length > 0) return true;
+		return false;
+	});
+}
+
 function finalizeChatMutation(host: InteractiveModeDelegateHost): void {
 	trimChatHistory(host);
 	reconcileChatTurnConnections(host.chatContainer.children);
@@ -143,6 +151,9 @@ export function addMessageToChat(host: InteractiveModeDelegateHost, message: Age
 				break;
 			}
 			case "assistant": {
+				const hasToolBlocks = message.content.some((c: any) => isToolContentBlock(c));
+				const isAbortOrError = message.stopReason === "aborted" || message.stopReason === "error";
+				if (!hasAssistantVisibleContent(message.content, host.hideThinkingBlock) && !(isAbortOrError && !hasToolBlocks)) break;
 				const connectedToUser = chatTurnFollowsUser(host.chatContainer.children);
 				const assistantComponent = new AssistantMessageComponent(
 					message,
@@ -209,6 +220,8 @@ export function renderSessionContext(host: InteractiveModeDelegateHost,
 
 				for (const segment of replaySegments) {
 					if (segment.kind === "assistant") {
+						const segContent = message.content.slice(segment.startIndex, segment.endIndex + 1);
+						if (!hasAssistantVisibleContent(segContent, host.hideThinkingBlock)) continue;
 						const connectedToUser = chatTurnFollowsUser(host.chatContainer.children);
 						const assistantComponent = new AssistantMessageComponent(
 							message,

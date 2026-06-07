@@ -25,12 +25,12 @@ A milestone adding a small feature to an established codebase needs targeted res
 Then research the codebase and relevant technologies. Narrate key findings and surprises as you go — what exists, what's missing, what constrains the approach.
 1. {{skillActivation}}
 2. **Skill Discovery ({{skillDiscoveryMode}}):**{{skillDiscoveryInstructions}}
-3. Explore relevant code. For small/familiar codebases, use `rg`, `find`, and targeted reads. For large or unfamiliar codebases, use `scout` to build a broad map efficiently before diving in.
+3. **Ground in the preloaded context, do not re-survey.** The Codebase Snapshot and Project Classification above describe current code reality and project size — treat them as authoritative. Do NOT open-endedly survey the tree (`rg`/`find`/`scout`) to rediscover what they already cover. Read a specific file with a targeted `read` only when a research question's answer hinges on that file's exact contents. Match research depth to the classified project size: a tiny project needs a short, targeted research note, not a broad survey.
 4. Use `resolve_library` / `get_library_docs` for unfamiliar libraries — skip this for libraries already used in the codebase
 5. **Web search budget:** You have a limited budget of web searches (max ~15 per session). Use them strategically — prefer `resolve_library` / `get_library_docs` for library documentation. Do NOT repeat the same or similar queries. If a search didn't find what you need, rephrase once or move on. Target 3-5 total web searches for a typical research unit.
 6. Use the **Research** output template from the inlined context above — include only sections that have real content
 7. If `.gsd/REQUIREMENTS.md` exists, research against it. Identify which Active requirements are table stakes, likely omissions, overbuilt risks, or domain-standard behaviors the user may or may not want.
-8. Call `gsd_summary_save` with `milestone_id: {{milestoneId}}`, `artifact_type: "RESEARCH"`, and the full research markdown as `content` — the tool computes the file path and persists to both DB and disk.
+8. Call `gsd_summary_save` with `milestone_id: {{milestoneId}}`, `artifact_type: "RESEARCH"`, and the full research markdown as `content` — the tool computes the file path and persists to both DB and disk. Save **incrementally**: once you have substantive findings, save them, then enrich and re-save as you learn more. This makes your research durable — if this unit is interrupted, a re-dispatch resumes from your last saved draft instead of restarting. If a "Resume — Prior Partial Research" block is present above, extend that draft rather than starting over.
 
 ## Strategic Questions to Answer
 

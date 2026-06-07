@@ -469,6 +469,13 @@ export function shouldValidatePlanningPathReference(raw: string): boolean {
   return shouldValidateInputAsPath(raw);
 }
 
+export function extractPlanningPathReference(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || NON_PATH_SENTINEL_RE.test(trimmed)) return null;
+  if (!shouldValidateInputAsPath(trimmed)) return null;
+  return extractPathFromAnnotation(trimmed);
+}
+
 function shouldValidateInputAsPath(raw: string): boolean {
   const trimmed = raw.trim();
   if (!trimmed) return false;
@@ -483,7 +490,8 @@ function shouldValidateInputAsPath(raw: string): boolean {
   if (URL_SCHEME_PATTERN.test(candidate)) return false;
   if (SCP_PATTERN.test(candidate)) return false;
 
-  if (/^`+[^`]+`+/.test(trimmed)) {
+  const explicitlyWrappedPath = /^`+[^`]+`+/.test(trimmed) || /^(["'])([^"']+)\1$/.test(trimmed);
+  if (explicitlyWrappedPath && looksLikePathOrUrl(candidate)) {
     return true;
   }
 
@@ -496,7 +504,6 @@ function shouldValidateInputAsPath(raw: string): boolean {
     candidate.startsWith("./") ||
     candidate.startsWith("../") ||
     candidate.startsWith("~/") ||
-    /[\\/]/.test(candidate) ||
     /[*?[\]{}]/.test(candidate)
   );
 }

@@ -9,8 +9,8 @@ import {
 } from "../core.js";
 import type { ToolDeps } from "../state.js";
 import {
-	ARTIFACT_ROOT,
 	HAR_FILENAME,
+	getArtifactRoot,
 	getPageRegistry,
 	getActiveFrame,
 	getConsoleLogs,
@@ -315,7 +315,9 @@ export function registerSessionTools(pi: ExtensionAPI, deps: ToolDeps): void {
 				const { page: p } = await deps.ensureBrowser();
 				const startedAt = Date.now();
 				const sessionDir = await deps.ensureSessionArtifactDir();
-				const bundleDir = path.join(ARTIFACT_ROOT, `${deps.formatArtifactTimestamp(startedAt)}-${deps.sanitizeArtifactName(params.name ?? "debug-bundle", "debug-bundle")}`);
+				const bundleName =
+					`${deps.formatArtifactTimestamp(startedAt)}-${deps.sanitizeArtifactName(params.name ?? "debug-bundle", "debug-bundle")}`;
+				const bundleDir = path.join(getArtifactRoot(), bundleName);
 				await ensureDir(bundleDir);
 				const pages = await deps.getLivePagesSnapshot();
 				const actionTimeline = getActionTimeline();

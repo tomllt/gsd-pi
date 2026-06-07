@@ -69,6 +69,7 @@ import {
   nativeCommit,
   nativeCheckoutBranch,
   nativeMergeSquash,
+  nativeMergeRegular,
   nativeConflictFiles,
   nativeCheckoutTheirs,
   nativeAddPaths,
@@ -538,15 +539,16 @@ function removeMergeStateFiles(basePath: string, contextLabel: string): void {
   }
 }
 
-function cleanupSquashConflictState(basePath: string): void {
-  // `git merge --squash` conflicts can leave unmerged index entries without
-  // MERGE_HEAD, so merge-abort alone is not enough. Reset the merge index, then
-  // remove merge message files that native/libgit2 paths may have created.
+function cleanupConflictState(basePath: string): void {
+  // Merge conflicts can leave unmerged index entries; merge-abort alone is not
+  // enough for squash merges (MERGE_HEAD is never written). Reset the merge
+  // index, then remove merge message files that native/libgit2 paths may have
+  // created.
   try {
     nativeMergeAbort(basePath);
   } catch (err) {
-    // Expected for squash conflicts when MERGE_HEAD was never written.
-    debugLog("squash-conflict-cleanup:merge-abort-skipped", {
+    // MERGE_HEAD absent (squash merge path) — abort is a no-op, which is fine.
+    debugLog("conflict-cleanup:merge-abort-skipped", {
       error: err instanceof Error ? err.message : String(err),
     });
   }
@@ -557,9 +559,9 @@ function cleanupSquashConflictState(basePath: string): void {
       encoding: "utf-8",
     });
   } catch (err) {
-    logError("worktree", `git reset --merge failed after squash conflict: ${err instanceof Error ? err.message : String(err)}`);
+    logError("worktree", `git reset --merge failed after merge conflict: ${err instanceof Error ? err.message : String(err)}`);
   }
-  removeMergeStateFiles(basePath, "squash conflict");
+  removeMergeStateFiles(basePath, "conflict");
 }
 
 // ─── Dispatch-Level Sync (project root ↔ worktree) ──────────────────────────
@@ -2161,15 +2163,21 @@ export function mergeMilestoneToMain(
     logWarning("worktree", `git stash failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // 7b. Clean up stale merge state before attempting squash merge (#2912).
+  // 7b. Clean up stale merge state before attempting the merge (#2912).
   // A leftover MERGE_HEAD (from a previous failed merge, libgit2 native path,
-  // or interrupted operation) causes `git merge --squash` to refuse with
+  // or interrupted operation) causes git merge to refuse with
   // "fatal: You have not concluded your merge (MERGE_HEAD exists)".
   // Defensively remove merge artifacts before starting.
   removeMergeStateFiles(originalBasePath_, "pre-merge");
 
-  // 8. Squash merge — auto-resolve .gsd/ state file conflicts (#530)
-  const mergeResult = nativeMergeSquash(originalBasePath_, milestoneBranch);
+  // 8. Merge — respect merge_strategy preference (#549).
+  // "squash" (default): stages changes without a merge commit; caller commits.
+  // "merge": --no-ff --no-commit so caller can supply the commit message while
+  // git records a real merge commit (MERGE_HEAD present when nativeCommit runs).
+  const effectiveStrategy = prefs.merge_strategy === "merge" ? "merge" : "squash";
+  const mergeResult = effectiveStrategy === "merge"
+    ? nativeMergeRegular(originalBasePath_, milestoneBranch)
+    : nativeMergeSquash(originalBasePath_, milestoneBranch);
   if (needsDbCycle && dbPathToReopen) {
     try {
       openDatabase(dbPathToReopen);
@@ -2205,7 +2213,7 @@ export function mergeMilestoneToMain(
         : `Check \`git status\` in the project root for details.`;
       throw new GSDError(
         GSD_GIT_ERROR,
-        `Squash merge of ${milestoneBranch} rejected: working tree has dirty or untracked files ` +
+        `${effectiveStrategy === "merge" ? "Merge" : "Squash merge"} of ${milestoneBranch} rejected: working tree has dirty or untracked files ` +
           `that conflict with the merge. ${fileList}`,
       );
     }
@@ -2231,7 +2239,7 @@ export function mergeMilestoneToMain(
 
       // If there are still real code conflicts, escalate
       if (codeConflicts.length > 0) {
-        cleanupSquashConflictState(originalBasePath_);
+        cleanupConflictState(originalBasePath_);
 
         // Pop stash before throwing so local work is not lost (#2151).
         if (stashed) {
@@ -2250,7 +2258,7 @@ export function mergeMilestoneToMain(
         process.chdir(previousCwd);
         throw new MergeConflictError(
           codeConflicts,
-          "squash",
+          effectiveStrategy,
           milestoneBranch,
           mainBranch,
         );
@@ -2416,7 +2424,7 @@ export function mergeMilestoneToMain(
       process.chdir(previousCwd);
       throw new GSDError(
         GSD_GIT_ERROR,
-        `Squash merge produced nothing to commit but milestone branch "${milestoneBranch}" ` +
+        `${effectiveStrategy === "merge" ? "Merge" : "Squash merge"} produced nothing to commit but milestone branch "${milestoneBranch}" ` +
           `has ${codeChanges.length} code file(s) not on "${mainBranch}". ` +
           `Aborting worktree teardown to prevent data loss.`,
       );

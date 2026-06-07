@@ -335,21 +335,42 @@ function detectDiskSliceIdDivergenceForMilestone(
   return drifts;
 }
 
-export function detectArtifactDbDrift(
-  _state: GSDState,
-  ctx: DriftContext,
-): Array<
+type ArtifactDbDrift =
   | DiskSliceIdDivergenceDrift
   | ArtifactDbStatusDivergenceDrift
-  | CompletedMilestoneReopenedDrift
-> {
+  | CompletedMilestoneReopenedDrift;
+
+// #442 Phase 1.6: the three artifact/DB drift handlers (disk-slice-id,
+// artifact-db-status, completed-milestone-reopened) each call
+// detectArtifactDbDrift and then filter for their own kind — so the full
+// milestone→slice→task walk + artifact SQL + disk scan would run THREE times
+// per detection pass and discard 2/3 of the work. Memoize the result per
+// DriftContext so the three handlers share one computation. The key is the
+// ctx object, which detectAllDrift rebuilds for every pass (and which is
+// unreferenced once the pass ends, so the WeakMap entry is GC'd) — DB/disk
+// state is immutable within a single pass (repairs run only after detection),
+// so this is behavior-preserving. A fresh ctx (e.g. the maintenance command's
+// inline { basePath, state }) always recomputes.
+const _artifactDbDriftMemo = new WeakMap<DriftContext, ArtifactDbDrift[]>();
+
+export function detectArtifactDbDrift(
+  state: GSDState,
+  ctx: DriftContext,
+): ArtifactDbDrift[] {
+  const cached = _artifactDbDriftMemo.get(ctx);
+  if (cached) return cached;
+  const computed = computeArtifactDbDrift(state, ctx);
+  _artifactDbDriftMemo.set(ctx, computed);
+  return computed;
+}
+
+function computeArtifactDbDrift(
+  _state: GSDState,
+  ctx: DriftContext,
+): ArtifactDbDrift[] {
   if (!isDbAvailable()) return [];
 
-  const drifts: Array<
-    | DiskSliceIdDivergenceDrift
-    | ArtifactDbStatusDivergenceDrift
-    | CompletedMilestoneReopenedDrift
-  > = [];
+  const drifts: ArtifactDbDrift[] = [];
 
   for (const milestone of getAllMilestones()) {
     if (isClosedStatus(milestone.status)) continue;

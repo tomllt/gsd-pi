@@ -18,6 +18,7 @@ const PREF_SAMPLE_VALUES: Record<string, unknown> = {
   skill_rules: [{ when: "unit:execute-task", use: ["test-writer-fixer"] }],
   custom_instructions: ["Keep changes focused."],
   models: { execution: "openai/gpt-5" },
+  thinking: { planning: "xhigh", execution: "low" },
   skill_discovery: "auto",
   skill_staleness_days: 7,
   auto_supervisor: { soft_timeout_minutes: 20, idle_timeout_minutes: 10, hard_timeout_minutes: 30 },

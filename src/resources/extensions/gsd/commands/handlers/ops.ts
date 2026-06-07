@@ -19,7 +19,7 @@ import { handleSessionReport } from "../../commands-session-report.js";
 import { handlePrBranch } from "../../commands-pr-branch.js";
 import { currentDirectoryRoot, projectRoot } from "../context.js";
 import { findUnmergedCompletedMilestones } from "../../unmerged-milestone-guard.js";
-import { mergeCompletedMilestone } from "../../parallel-merge.js";
+import { runMergeMilestoneBlocker } from "../../closeout-wizard.js";
 
 async function handleCompletedMilestoneRecovery(
   phase: string,
@@ -37,22 +37,7 @@ async function handleCompletedMilestoneRecovery(
     : blockers[0];
   if (!blocker) return false;
 
-  ctx.ui.notify(
-    `Completing preserved milestone merge for ${blocker.milestoneId} from ${blocker.branch} into ${blocker.integrationBranch}.`,
-    "info",
-  );
-  const result = await mergeCompletedMilestone(basePath, blocker.milestoneId);
-  if (result.success) {
-    ctx.ui.notify(
-      `Milestone ${blocker.milestoneId} merged to ${blocker.integrationBranch}. Run /gsd again when ready.`,
-      "info",
-    );
-  } else {
-    ctx.ui.notify(
-      `Milestone ${blocker.milestoneId} merge recovery failed: ${result.error}`,
-      "error",
-    );
-  }
+  await runMergeMilestoneBlocker(ctx, basePath, blocker);
   return true;
 }
 

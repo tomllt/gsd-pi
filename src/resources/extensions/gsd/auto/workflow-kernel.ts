@@ -284,6 +284,7 @@ const COMPLETE_AND_BREAK_REASONS = [
   "verification-pause",
   "finalize-pre-timeout",
   "finalize-post-timeout",
+  "milestone-complete",
 ] as const;
 
 function isCompleteAndBreakReason(

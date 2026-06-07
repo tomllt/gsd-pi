@@ -796,9 +796,9 @@ describe("stream-adapter — session persistence (#2859)", () => {
 		assert.equal(options.persistSession, true, "persistSession must default to true");
 	});
 
-	test("buildSdkOptions loads project and local settings so approved .mcp.json servers are active", () => {
+	test("buildSdkOptions loads user, project, and local settings so approved Claude Code config is active", () => {
 		const options = buildSdkOptions("claude-sonnet-4-20250514", "test prompt");
-		assert.deepEqual(options.settingSources, ["project", "local"]);
+		assert.deepEqual(options.settingSources, ["user", "project", "local"]);
 	});
 
 	test("buildSdkOptions sets model and prompt correctly", () => {

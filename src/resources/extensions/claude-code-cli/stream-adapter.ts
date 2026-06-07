@@ -38,6 +38,7 @@ import {
 	discoverBrowserMcpServerName,
 	discoverMcpServers,
 	discoverMcpServerNames,
+	discoverUserMcpServerNames,
 	discoverWorkflowMcpServerName,
 	computeMcpDisallowedTools,
 } from "../gsd/mcp-filter.js";
@@ -1658,14 +1659,23 @@ export function buildSdkOptions(
 	const workflowServerName = projectWorkflowServerName ?? injectedWorkflowServerName;
 	const browserServerName = projectBrowserServerName ?? injectedBrowserServerName;
 
-	// If a default GSD MCP server is already declared in the project's .mcp.json
-	// or .claude/settings.json, do not inject it again via mcpServers. Passing the
-	// same server name from two sources causes a duplicate registration conflict
-	// that prevents the MCP server from loading (tools become unavailable).
+	// Non-strict (non-phase) sessions load ~/.claude/settings.json via settingSources
+	// including "user". If the user declared the same server names there, injecting them
+	// again via mcpServers causes duplicate registration and leaves MCP tools unavailable.
+	// Strict (gsdPhase) sessions set settingSources=[] so user settings are not loaded.
+	const userDiscovered = !gsdPhase ? discoverUserMcpServerNames() : [];
+	const allDiscovered = discovered.length > 0 || userDiscovered.length > 0
+		? [...discovered, ...userDiscovered]
+		: discovered;
+
+	// If a default GSD MCP server is already declared in project config or in the user's
+	// ~/.claude/settings.json (when that file will be loaded), do not inject it again via
+	// mcpServers. Passing the same server name from two sources causes a duplicate
+	// registration conflict that prevents the MCP server from loading (tools become unavailable).
 	const workflowAlreadyInProject = projectWorkflowServerName !== undefined
-		|| (injectedWorkflowServerName !== undefined && discovered.includes(injectedWorkflowServerName));
+		|| (injectedWorkflowServerName !== undefined && allDiscovered.includes(injectedWorkflowServerName));
 	const browserAlreadyInProject = projectBrowserServerName !== undefined
-		|| (injectedBrowserServerName !== undefined && discovered.includes(injectedBrowserServerName));
+		|| (injectedBrowserServerName !== undefined && allDiscovered.includes(injectedBrowserServerName));
 	const mcpServersToInject = { ...defaultMcpServers.servers };
 	if (workflowAlreadyInProject && injectedWorkflowServerName) delete mcpServersToInject[injectedWorkflowServerName];
 	if (browserAlreadyInProject && injectedBrowserServerName) delete mcpServersToInject[injectedBrowserServerName];
@@ -1725,9 +1735,9 @@ export function buildSdkOptions(
 	const sdkMcpServers = inlinePhaseMcpServers ?? filteredMcpServers;
 	const strictMcpConfig = !!inlinePhaseMcpServers;
 	// Strict phase configs inline the exact MCP servers GSD needs. Loading
-	// project/local settings at the same time can duplicate those servers and
+	// Claude Code settings at the same time can duplicate those servers and
 	// leave allowed mcp__... tools with no registered backing tool.
-	const settingSources = strictMcpConfig ? [] : ["project", "local"];
+	const settingSources = strictMcpConfig ? [] : ["user", "project", "local"];
 	const exactWorkflowMcpTools = resolveExactWorkflowMcpToolsForPhase(
 		gsdPhase,
 		workflowServerName,

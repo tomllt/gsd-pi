@@ -175,6 +175,36 @@ test("findLatestPinnableText: thinking blocks are not pinnable", () => {
 	assert.equal(findLatestPinnableText(blocks), "");
 });
 
+test("handleAgentEvent: hidden thinking-only updates do not render transcript cards", async () => {
+	initTheme("dark", false);
+	const chatContainer = new Container();
+	const host = createStreamingHost(chatContainer);
+	const message = {
+		id: "a-thinking",
+		role: "assistant",
+		provider: "claude-code",
+		model: "claude-opus-4-8",
+		timestamp: 1,
+		stopReason: "stop",
+		content: [{ type: "thinking", thinking: "I'm thinking through the next step." }],
+	};
+
+	await handleAgentEvent(host, { type: "message_start", message: { ...message, content: [] } } as any);
+	await handleAgentEvent(host, {
+		type: "message_update",
+		message,
+		assistantMessageEvent: {
+			type: "thinking_delta",
+			contentIndex: 0,
+			delta: "I'm thinking through the next step.",
+			partial: message,
+		},
+	} as any);
+	await handleAgentEvent(host, { type: "message_end", message } as any);
+
+	assert.equal(stripAnsi(chatContainer.render(100).join("\n")).trim(), "");
+});
+
 test("handleAgentEvent: agent_start clears stale adaptive blocking error", async () => {
 	initTheme("dark", false);
 	let cleared = false;

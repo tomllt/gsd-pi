@@ -8,7 +8,7 @@ import { renderAllProjections } from "../workflow-projections.js";
 import { writeManifest } from "../workflow-manifest.js";
 import { appendEvent } from "../workflow-events.js";
 import { logWarning } from "../workflow-logger.js";
-import { validatePlanningPathScope } from "../planning-path-scope.js";
+import { validatePathOnlyPlanningFields, validatePlanningPathScope } from "../planning-path-scope.js";
 
 export interface PlanTaskParams {
   milestoneId: string;
@@ -65,6 +65,13 @@ export async function handlePlanTask(
     params = validateParams(rawParams);
   } catch (err) {
     return { error: `validation failed: ${(err as Error).message}` };
+  }
+
+  const pathOnlyError = validatePathOnlyPlanningFields([
+    { field: "expectedOutput", values: params.expectedOutput },
+  ]);
+  if (pathOnlyError) {
+    return { error: `validation failed: ${pathOnlyError}` };
   }
 
   const pathScopeError = validatePlanningPathScope(basePath, [

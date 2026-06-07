@@ -130,3 +130,68 @@ test("buildResearchMilestonePrompt keeps broad project docs on-demand", async (t
   assert.match(prompt, /`\.gsd\/REQUIREMENTS\.md`/);
   assert.match(prompt, /`\.gsd\/DECISIONS\.md`/);
 });
+
+// ─── ADR-029: preload-authoritative research grounding ────────────────
+
+test("ADR-029: research-milestone inlines project classification + codebase snapshot", async (t) => {
+  const base = makeBase();
+  t.after(() => cleanup(base));
+  invalidateAllCaches();
+
+  seed(base, "M001");
+  writeFileSync(join(base, ".gsd", "milestones", "M001", "M001-CONTEXT.md"), "# M001 Context\n");
+  // Give the codebase scan something real to sample.
+  writeFileSync(join(base, "index.html"), "<!doctype html><html><body><h1>hi</h1></body></html>\n");
+  writeFileSync(join(base, "script.js"), "const x = 1;\nasync function go() { await x; }\n");
+
+  const prompt = await buildResearchMilestonePrompt("M001", "Research Test", base);
+
+  // Project-size signal (same block plan-milestone gets).
+  assert.match(prompt, /### Project Classification/);
+  assert.match(prompt, /Workflow sizing:/);
+  // Bounded codebase snapshot grounds research in current code reality.
+  assert.match(prompt, /### Codebase Snapshot \(current code reality\)/);
+  assert.match(prompt, /do NOT re-survey the tree/);
+});
+
+test("ADR-029: codebase snapshot is suppressed when discuss_preparation is false", async (t) => {
+  const base = makeBase();
+  t.after(() => cleanup(base));
+  invalidateAllCaches();
+
+  seed(base, "M001");
+  writeFileSync(join(base, ".gsd", "milestones", "M001", "M001-CONTEXT.md"), "# M001 Context\n");
+  writeFileSync(join(base, ".gsd", "PREFERENCES.md"), "---\ndiscuss_preparation: false\n---\n");
+  invalidateAllCaches();
+
+  const prompt = await buildResearchMilestonePrompt("M001", "Research Test", base);
+
+  // Snapshot opt-out honored; classification (unconditional) still present.
+  assert.doesNotMatch(prompt, /### Codebase Snapshot/);
+  assert.match(prompt, /### Project Classification/);
+});
+
+test("ADR-029: prior partial RESEARCH is inlined as a resume block; absent otherwise", async (t) => {
+  const base = makeBase();
+  t.after(() => cleanup(base));
+  invalidateAllCaches();
+
+  seed(base, "M001");
+  writeFileSync(join(base, ".gsd", "milestones", "M001", "M001-CONTEXT.md"), "# M001 Context\n");
+
+  // No prior research yet → no resume block. (Match the rendered block heading,
+  // not the bare phrase — step 8 of the template references the phrase by name.)
+  const before = await buildResearchMilestonePrompt("M001", "Research Test", base);
+  assert.doesNotMatch(before, /### Resume — Prior Partial Research \(continue, do not redo\)/);
+
+  // A partial RESEARCH draft from a prior (interrupted) attempt.
+  writeFileSync(
+    join(base, ".gsd", "milestones", "M001", "M001-RESEARCH.md"),
+    "# Research\n\n## Findings\n\nPartial finding: the app is a static site.\n",
+  );
+  invalidateAllCaches();
+
+  const after = await buildResearchMilestonePrompt("M001", "Research Test", base);
+  assert.match(after, /Resume — Prior Partial Research \(continue, do not redo\)/);
+  assert.match(after, /Partial finding: the app is a static site/);
+});

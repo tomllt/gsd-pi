@@ -4,11 +4,11 @@
  * and fallback chains.
  */
 
-import type { Api, Model } from "@gsd/pi-ai";
-import { getProviderCapabilities } from "@gsd/pi-ai";
+import type { Api, Model, ModelThinkingLevel } from "@gsd/pi-ai";
+import { getProviderCapabilities, clampThinkingLevel } from "@gsd/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@gsd/pi-coding-agent";
 import type { GSDPreferences } from "./preferences.js";
-import { resolveModelWithFallbacksForUnit, resolveDynamicRoutingConfig } from "./preferences.js";
+import { resolveModelWithFallbacksForUnit, resolveThinkingLevelForUnit, resolveDynamicRoutingConfig } from "./preferences.js";
 import type { ComplexityTier } from "./complexity-classifier.js";
 import { classifyUnitComplexity, extractTaskMetadata, tierLabel } from "./complexity-classifier.js";
 import { resolveModelForComplexity, escalateTier, getEligibleModels, loadCapabilityOverrides, adjustToolSet, filterToolsForProvider } from "./model-router.js";
@@ -57,6 +57,12 @@ export interface ModelSelectionResult {
   routing: { tier: string; modelDowngraded: boolean } | null;
   /** Concrete model applied before dispatch so it can be restored after a fresh session. */
   appliedModel: Model<Api> | null;
+  /**
+   * Reasoning effort applied for this dispatch after per-phase resolution,
+   * floor, and capability clamping (ADR-026). Null when no level was applied
+   * (e.g. no start level captured). Surfaced for metrics/telemetry.
+   */
+  appliedThinkingLevel?: ReturnType<ExtensionAPI["getThinkingLevel"]> | null;
 }
 
 export interface PreferredModelConfig {
@@ -278,12 +284,103 @@ function restoreToolBaseline(pi: ExtensionAPI): void {
   }
 }
 
-function reapplyThinkingLevel(
+/**
+ * Apply the desired reasoning effort for the just-selected model, clamping to
+ * what the model actually supports (ADR-026). An unsupported level is never
+ * sent to the provider — it is clamped via `clampThinkingLevel` and the
+ * mismatch is surfaced once per (model, requested-level). Returns the level
+ * actually applied so callers can record it.
+ */
+export function applyThinkingLevelForModel(
   pi: ExtensionAPI,
+  desired: ReturnType<ExtensionAPI["getThinkingLevel"]> | null | undefined,
+  model: Model<Api>,
+  ctx: ExtensionContext,
+): ReturnType<ExtensionAPI["getThinkingLevel"]> | null | undefined {
+  if (!desired) return desired;
+  // Capability-clamp only when we have a bare string level AND the model
+  // advertises reasoning capability (`reasoning` is always present on real
+  // registry models). Richer host snapshot shapes (e.g. `{ effort: "high" }`)
+  // and partial model objects are applied verbatim — we never coerce an unknown
+  // shape into a string or guess capability we can't see.
+  if (typeof desired === "string" && model != null && typeof model === "object" && "reasoning" in model) {
+    const clamped = clampThinkingLevel(model, desired as ModelThinkingLevel) as ReturnType<ExtensionAPI["getThinkingLevel"]>;
+    pi.setThinkingLevel(clamped);
+    if (clamped !== desired) {
+      const key = `${model.provider}/${model.id}:${desired}`;
+      if (!_warnedThinkingClamp.has(key)) {
+        _warnedThinkingClamp.add(key);
+        ctx.ui.notify(
+          `Thinking level '${desired}' not supported by ${model.provider}/${model.id}; using '${clamped}'.`,
+          "warning",
+        );
+      }
+    }
+    return clamped;
+  }
+  pi.setThinkingLevel(desired);
+  return desired;
+}
+
+/** Warn-once guard for capability clamps, keyed by `provider/id:requested`. */
+const _warnedThinkingClamp = new Set<string>();
+/** Warn-once guard for the execute-task floor punch-through advisory. */
+let _warnedExecuteTaskFloorBypass = false;
+
+type EffectiveThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
+
+/**
+ * Ascending severity order for reasoning levels (matches @gsd/pi-agent-core
+ * `ThinkingLevel`). Used only for floor comparisons below.
+ */
+const THINKING_LEVEL_ORDER: readonly EffectiveThinkingLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as EffectiveThinkingLevel[];
+
+/**
+ * Minimum reasoning level for code-writing units.
+ *
+ * `execute-task` is the only unit that edits source. With a low/minimal
+ * thinking level a model does not plan its edits and compensates by re-reading
+ * the same files dozens of times per task (measured: index.html read ~49× in a
+ * single task on a minimal-thinking model) and shelling out to `nl`/`sed` to
+ * re-locate code after every edit invalidates its line numbers. Flooring the
+ * level for this unit type removes that read/bash thrash. Planning, research,
+ * and lifecycle units are unaffected.
+ */
+const EXECUTE_TASK_MIN_THINKING_LEVEL: EffectiveThinkingLevel = "medium";
+
+function thinkingLevelRank(level: EffectiveThinkingLevel): number {
+  const idx = THINKING_LEVEL_ORDER.indexOf(level);
+  return idx === -1 ? 0 : idx;
+}
+
+/**
+ * Raise (never lower) the thinking level for code-writing units to a sane
+ * floor. Returns the input unchanged for non-`execute-task` units, when no
+ * level was captured, or when the captured level already meets the floor.
+ */
+export function floorThinkingLevelForUnit(
+  unitType: string,
   level: ReturnType<ExtensionAPI["getThinkingLevel"]> | null | undefined,
-): void {
-  if (!level) return;
-  pi.setThinkingLevel(level);
+): ReturnType<ExtensionAPI["getThinkingLevel"]> | null | undefined {
+  if (unitType !== "execute-task") return level;
+  if (!level) return level;
+  // Only act on the recognized string levels. Any other shape (e.g. a richer
+  // host snapshot object) is passed through untouched so we never coerce an
+  // unknown representation into a bare string the host can't apply.
+  if (!THINKING_LEVEL_ORDER.includes(level as EffectiveThinkingLevel)) {
+    return level;
+  }
+  if (thinkingLevelRank(level as EffectiveThinkingLevel) >= thinkingLevelRank(EXECUTE_TASK_MIN_THINKING_LEVEL)) {
+    return level;
+  }
+  return EXECUTE_TASK_MIN_THINKING_LEVEL;
 }
 
 export function resolvePreferredModelConfig(
@@ -354,6 +451,42 @@ export async function selectAndApplyModel(
   autoModeStartThinkingLevel?: ReturnType<ExtensionAPI["getThinkingLevel"]> | null,
 ): Promise<ModelSelectionResult> {
   const uokFlags = resolveUokFlags(prefs);
+  // Resolve reasoning effort for this dispatch (ADR-026). An explicit per-phase
+  // thinking config (inline `models.<phase>.thinking` or the separate `thinking`
+  // block) expresses hard user intent: it bypasses the execute-task floor and is
+  // honored verbatim, then capability-clamped per model at apply time below.
+  // With no explicit level, fall back to the auto-start session level and raise
+  // the code-writing floor — preserving prior behavior exactly. Recomputed per
+  // dispatch so neither the floor nor a phase override leaks to other units.
+  const explicitThinkingLevel =
+    resolveThinkingLevelForUnit(unitType) as ReturnType<ExtensionAPI["getThinkingLevel"]> | undefined;
+  const desiredThinkingLevel = explicitThinkingLevel
+    ?? floorThinkingLevelForUnit(unitType, autoModeStartThinkingLevel);
+  if (explicitThinkingLevel) {
+    if (
+      unitType === "execute-task" &&
+      thinkingLevelRank(explicitThinkingLevel) < thinkingLevelRank(EXECUTE_TASK_MIN_THINKING_LEVEL) &&
+      !_warnedExecuteTaskFloorBypass
+    ) {
+      _warnedExecuteTaskFloorBypass = true;
+      ctx.ui.notify(
+        `Explicit execution thinking '${explicitThinkingLevel}' is below the measured execute-task floor ` +
+        `(${EXECUTE_TASK_MIN_THINKING_LEVEL}); honoring it as configured. Low reasoning on code edits can ` +
+        `cause repeated file re-reads.`,
+        "warning",
+      );
+    }
+  } else if (
+    verbose &&
+    desiredThinkingLevel &&
+    desiredThinkingLevel !== autoModeStartThinkingLevel
+  ) {
+    ctx.ui.notify(
+      `Thinking level raised to ${desiredThinkingLevel} for ${unitType} (was ${autoModeStartThinkingLevel ?? "unset"})`,
+      "info",
+    );
+  }
+  let appliedThinkingLevel: ReturnType<ExtensionAPI["getThinkingLevel"]> | null | undefined = null;
   const effectiveSessionModelOverride = sessionModelOverride === undefined
     ? getSessionModelOverride(ctx.sessionManager.getSessionId())
     : (sessionModelOverride ?? undefined);
@@ -699,7 +832,7 @@ export async function selectAndApplyModel(
       const ok = await pi.setModel(model, { persist: false });
       if (ok) {
         appliedModel = model;
-        reapplyThinkingLevel(pi, autoModeStartThinkingLevel);
+        appliedThinkingLevel = applyThinkingLevelForModel(pi, desiredThinkingLevel, model, ctx);
 
         // ADR-005: Adjust active tool set for the selected model's provider capabilities.
         // Hard-filter incompatible tools, then let extensions override via adjust_tool_set hook.
@@ -759,7 +892,7 @@ export async function selectAndApplyModel(
         const ok = await pi.setModel(model, { persist: false });
         if (!ok) continue;
         appliedModel = model;
-        reapplyThinkingLevel(pi, autoModeStartThinkingLevel);
+        appliedThinkingLevel = applyThinkingLevelForModel(pi, desiredThinkingLevel, model, ctx);
         attemptedPolicyEligible = true;
         if (verbose) {
           ctx.ui.notify(
@@ -805,18 +938,37 @@ export async function selectAndApplyModel(
             const fallbackOk = await pi.setModel(byId, { persist: false });
             if (fallbackOk) {
               appliedModel = byId;
-              reapplyThinkingLevel(pi, autoModeStartThinkingLevel);
+              appliedThinkingLevel = applyThinkingLevelForModel(pi, desiredThinkingLevel, byId, ctx);
             }
           }
         } else {
           appliedModel = startModel;
-          reapplyThinkingLevel(pi, autoModeStartThinkingLevel);
+          appliedThinkingLevel = applyThinkingLevelForModel(pi, desiredThinkingLevel, startModel, ctx);
         }
       }
     }
   }
 
-  return { routing, appliedModel };
+  // If no model branch applied a thinking level (e.g. interactive guided-flow
+  // with a `thinking:` block but no per-phase model and no start model), still
+  // honor an explicitly configured phase thinking level against the current
+  // session model. Only the explicit path runs here — the floored session
+  // default is intentionally left untouched so no-config interactive runs keep
+  // the user's /model thinking level. (ADR-026)
+  if (appliedThinkingLevel == null && explicitThinkingLevel && ctx.model) {
+    // Prefer the full registry model (carries reasoning capability so the level
+    // can be clamped); fall back to ctx.model. Always route through
+    // applyThinkingLevelForModel so the clamp runs whenever capability metadata
+    // exists — never a raw verbatim setThinkingLevel that bypasses it (ADR-026).
+    const current = resolveModelId(
+      `${ctx.model.provider}/${ctx.model.id}`,
+      ctx.modelRegistry?.getAvailable?.() ?? [],
+      ctx.model.provider,
+    ) ?? (ctx.model as Model<Api>);
+    appliedThinkingLevel = applyThinkingLevelForModel(pi, explicitThinkingLevel, current, ctx);
+  }
+
+  return { routing, appliedModel, appliedThinkingLevel };
 }
 
 /**

@@ -26,7 +26,7 @@ test("dark built-in theme uses the terminal card prototype palette", () => {
 	assert.equal(theme.vars?.toolErrorBg, "#241b22");
 	assert.equal(theme.colors.border, "line");
 	assert.equal(theme.colors.borderAccent, "accent");
-	assert.equal(theme.colors.toolRunning, "accent");
+	assert.equal(theme.colors.toolRunning, "#f59e0b");
 	assert.equal(theme.colors.toolSuccess, "green");
 	assert.equal(theme.colors.toolError, "red");
 });

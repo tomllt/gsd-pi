@@ -1,6 +1,7 @@
 // GSD auto-mode runtime state
 import { AutoSession } from "./auto/session.js";
 import type { CurrentUnit } from "./auto/session.js";
+import type { SourceObservationStore } from "./source-observations.js";
 import {
   isDeterministicPolicyError,
   isQueuedUserMessageSkip,
@@ -46,6 +47,10 @@ export function isAutoCompletionStopInProgress(): boolean {
   return autoSession.completionStopInProgress;
 }
 
+export function clearAutoCompletionStopInProgress(): void {
+  autoSession.completionStopInProgress = false;
+}
+
 export function markToolStart(toolCallId: string, toolName?: string): void {
   markTrackedToolStart(toolCallId, autoSession.active, toolName);
 }
@@ -64,4 +69,8 @@ export function recordToolInvocationError(toolName: string, errorMsg: string): v
 export function clearToolInvocationError(): void {
   if (!autoSession.active) return;
   autoSession.lastToolInvocationError = null;
+}
+
+export function getSourceObservationStore(): SourceObservationStore {
+  return autoSession.sourceObservations;
 }

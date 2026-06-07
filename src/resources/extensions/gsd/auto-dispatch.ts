@@ -78,7 +78,7 @@ import {
   checkNeedsReassessment,
   checkNeedsRunUat,
 } from "./auto-prompts.js";
-import { resolveModelWithFallbacksForUnit } from "./preferences-models.js";
+import { resolveModelWithFallbacksForUnit, resolveThinkingLevelForUnit } from "./preferences-models.js";
 import { resolveUokFlags } from "./uok/flags.js";
 import { selectReactiveDispatchBatch } from "./uok/execution-graph.js";
 import { getMilestonePipelineVariant } from "./milestone-scope-classifier.js";
@@ -1165,6 +1165,7 @@ export const DISPATCH_RULES: DispatchRule[] = [
           researchReadySlices,
           basePath,
           resolveModelWithFallbacksForUnit("subagent")?.primary,
+          resolveThinkingLevelForUnit("subagent"),
         ),
       };
     },
@@ -1352,6 +1353,7 @@ export const DISPATCH_RULES: DispatchRule[] = [
           sTitle,
           basePath,
           resolveModelWithFallbacksForUnit("subagent")?.primary,
+          resolveThinkingLevelForUnit("subagent"),
         ),
       };
     },
@@ -1397,6 +1399,7 @@ export const DISPATCH_RULES: DispatchRule[] = [
       if (resolveSliceFile(basePath, mid, sid, "REACTIVE-BLOCKER")) return null;
       const maxParallel = reactiveConfig?.max_parallel ?? 2;
       const subagentModel = reactiveConfig?.subagent_model ?? resolveModelWithFallbacksForUnit("subagent")?.primary;
+      const subagentThinking = resolveThinkingLevelForUnit("subagent");
       // Default-on safety threshold: only activate reactive dispatch when at
       // least N tasks are ready. Users who explicitly enabled reactive_execution
       // keep the legacy threshold of 2 (matches the prior "any parallelism is
@@ -1483,7 +1486,7 @@ export const DISPATCH_RULES: DispatchRule[] = [
             selected,
             basePath,
             subagentModel,
-            { sessionContextWindow, modelRegistry, sessionProvider },
+            { sessionContextWindow, modelRegistry, sessionProvider, subagentThinking },
           ),
         };
       } catch (err) {

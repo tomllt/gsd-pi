@@ -21,8 +21,8 @@ import {
 	registryListPages,
 } from "./core.js";
 import {
-	ARTIFACT_ROOT,
 	getActiveFrame,
+	getArtifactRoot,
 	getActiveTraceSession,
 	getConsoleLogs,
 	getDialogLogs,
@@ -119,7 +119,7 @@ export async function ensureSessionArtifactDir(): Promise<string> {
 		return existing;
 	}
 	const startedAt = ensureSessionStartedAt();
-	const dir = path.join(ARTIFACT_ROOT, `${formatArtifactTimestamp(startedAt)}-session`);
+	const dir = path.join(getArtifactRoot(), `${formatArtifactTimestamp(startedAt)}-session`);
 	setSessionArtifactDir(dir);
 	await ensureDir(dir);
 	return dir;
@@ -159,7 +159,7 @@ export function getActiveFrameMetadata() {
 
 export function getSessionArtifactMetadata() {
 	return {
-		artifactRoot: ARTIFACT_ROOT,
+		artifactRoot: getArtifactRoot(),
 		sessionStartedAt: getSessionStartedAt(),
 		sessionArtifactDir: getSessionArtifactDir(),
 		activeTraceSession: getActiveTraceSession(),

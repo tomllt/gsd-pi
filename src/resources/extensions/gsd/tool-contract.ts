@@ -9,6 +9,10 @@ import {
 } from "./unit-context-manifest.js";
 import { getRequiredWorkflowToolsForAutoUnit } from "./workflow-mcp.js";
 import { getUnitToolSurfaceContract } from "./unit-tool-contracts.js";
+import {
+  WHOLE_FILE_OBSERVATION_MAX_BYTES,
+  WHOLE_FILE_OBSERVATION_MAX_LINES,
+} from "./source-observations.js";
 
 export interface UnitToolContract {
   unitType: string;
@@ -19,12 +23,23 @@ export interface UnitToolContract {
   promptObligations: readonly string[];
   validationRules: readonly string[];
   closeoutTools: readonly string[];
+  sourceObservations: UnitSourceObservationContract;
   artifacts: {
     inline: readonly ArtifactKey[];
     excerpt: readonly ArtifactKey[];
     onDemand: readonly ArtifactKey[];
   };
 }
+
+export type UnitSourceObservationContract =
+  | { mode: "none" }
+  | {
+      mode: "whole-file-active-unit";
+      seedFields: readonly ["task.files", "task.inputs"];
+      excludedFields: readonly ["expectedOutput"];
+      maxBytes: number;
+      maxLines: number;
+    };
 
 export type ToolContractResult =
   | { ok: true; contract: UnitToolContract }
@@ -72,14 +87,27 @@ export function compileUnitToolContract(unitType: string): ToolContractResult {
         "unit-manifest-present",
         "workflow-tool-surface-present",
         ...(requiresCloseoutTool(unitType) ? ["closeout-tool-present"] : []),
+        ...(unitType === "execute-task" ? ["source-observation-contract-present"] : []),
       ],
       closeoutTools,
+      sourceObservations: sourceObservationContractForUnit(unitType),
       artifacts: {
         inline: manifest.artifacts.inline,
         excerpt: manifest.artifacts.excerpt,
         onDemand: manifest.artifacts.onDemand,
       },
     },
+  };
+}
+
+function sourceObservationContractForUnit(unitType: string): UnitSourceObservationContract {
+  if (unitType !== "execute-task") return { mode: "none" };
+  return {
+    mode: "whole-file-active-unit",
+    seedFields: ["task.files", "task.inputs"],
+    excludedFields: ["expectedOutput"],
+    maxBytes: WHOLE_FILE_OBSERVATION_MAX_BYTES,
+    maxLines: WHOLE_FILE_OBSERVATION_MAX_LINES,
   };
 }
 

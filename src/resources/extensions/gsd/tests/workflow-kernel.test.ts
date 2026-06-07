@@ -172,6 +172,13 @@ test("decideFinalizeResult maps step-wizard breaks to completed step exits", () 
   );
 });
 
+test("decideFinalizeResult maps milestone-complete breaks to completed exits", () => {
+  assert.deepEqual(
+    decideFinalizeResult({ action: "break", reason: "milestone-complete" }),
+    { action: "complete-and-break" },
+  );
+});
+
 test("decideFinalizeResult maps finalize pause breaks to completed exits", () => {
   for (const reason of [
     "post-verification-stopped",

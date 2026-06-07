@@ -243,6 +243,54 @@ describe("ModelRegistry", () => {
 			expect(registry.hasConfiguredAuth(model!)).toBe(true);
 		});
 
+		test("MiniMax ignores empty stored key placeholders when checking request readiness", async () => {
+			const originalMinimaxKey = process.env.MINIMAX_API_KEY;
+			const validCredential = ["minimax", "valid", "test", "credential"].join("-");
+
+			try {
+				delete process.env.MINIMAX_API_KEY;
+				authStorage = AuthStorage.inMemory({
+					minimax: { type: "api_key", key: "" },
+				});
+
+				const registryWithoutKey = ModelRegistry.create(authStorage, modelsJsonPath);
+				const minimaxModelWithoutKey = registryWithoutKey.find("minimax", "MiniMax-M2.7");
+
+				expect(minimaxModelWithoutKey).toBeDefined();
+				expect(registryWithoutKey.isProviderRequestReady("minimax")).toBe(false);
+				expect(registryWithoutKey.getProviderAuthStatus("minimax")).toEqual({ configured: false });
+
+				authStorage = AuthStorage.inMemory({
+					minimax: [
+						{ type: "api_key", key: "" },
+						{ type: "api_key", key: validCredential },
+					],
+				});
+
+				const registryWithKey = ModelRegistry.create(authStorage, modelsJsonPath);
+				const minimaxModelWithKey = registryWithKey.find("minimax", "MiniMax-M2.7");
+
+				expect(minimaxModelWithKey).toBeDefined();
+				const auth = await registryWithKey.getApiKeyAndHeaders(minimaxModelWithKey!);
+
+				expect(registryWithKey.isProviderRequestReady("minimax")).toBe(true);
+				expect(registryWithKey.getProviderAuthStatus("minimax")).toEqual({
+					configured: true,
+					source: "stored",
+				});
+				expect(auth.ok).toBe(true);
+				if (auth.ok) {
+					expect(auth.apiKey).toBe(validCredential);
+				}
+			} finally {
+				if (originalMinimaxKey === undefined) {
+					delete process.env.MINIMAX_API_KEY;
+				} else {
+					process.env.MINIMAX_API_KEY = originalMinimaxKey;
+				}
+			}
+		});
+
 		test("Anthropic Vertex built-in models are available when project auth is configured", () => {
 			const originalProjectId = process.env.ANTHROPIC_VERTEX_PROJECT_ID;
 

@@ -15,6 +15,8 @@ export interface AgentConfig {
 	description: string;
 	tools?: string[];
 	model?: string;
+	/** Default reasoning effort for this agent, forwarded as `--thinking` (#508). */
+	thinking?: string;
 	conflictsWith?: string[];
 	systemPrompt: string;
 	source: "user" | "project";
@@ -31,6 +33,7 @@ interface AgentFrontmatter extends Record<string, unknown> {
 	description?: string;
 	tools?: string | string[];
 	model?: string;
+	thinking?: string;
 	conflicts_with?: string;
 }
 
@@ -100,6 +103,7 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 			description: frontmatter.description,
 			tools: tools && tools.length > 0 ? tools : undefined,
 			model: frontmatter.model,
+			thinking: typeof frontmatter.thinking === "string" ? frontmatter.thinking : undefined,
 			conflictsWith,
 			systemPrompt: body,
 			source,

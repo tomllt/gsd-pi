@@ -1,9 +1,12 @@
 name: Build Native Binaries
 
+# NOTE: no `push: tags: v*` trigger. The production release (npm-publish.yml,
+# channel=latest) already builds and publishes all @opengsd/engine-* packages
+# from the release commit, then pushes the v* tag. Re-triggering here on that tag
+# caused a redundant 5x native rebuild + publish/verify and confusing parallel
+# red runs on otherwise-successful releases. This workflow is now manual-only,
+# for bootstrapping missing platform packages.
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       publish:
@@ -69,13 +72,13 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Add Rust compilation target
         run: rustup target add ${{ matrix.target }}
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           shared-key: native-${{ matrix.platform }}
           workspaces: |
@@ -113,7 +116,7 @@ jobs:
           copy native\target\${{ matrix.target }}\release\gsd_engine.dll artifacts\gsd_engine.node
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: native-${{ matrix.platform }}
           path: artifacts/gsd_engine.node
@@ -121,7 +124,7 @@ jobs:
 
   publish:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+    if: github.event.inputs.publish == 'true'
     # npm trusted publishing + provenance require GitHub-hosted runners (not Blacksmith).
     runs-on: ubuntu-latest
     name: Publish platform packages
@@ -129,15 +132,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 10.12.1
 
+      # No `cache: pnpm` here. In platform_packages_only bootstrap mode the
+      # "Install dependencies" step is skipped, so `pnpm install` never creates a
+      # store — and setup-node's post-job cache save then fails the whole job with
+      # "Path Validation Error: Path(s) specified for caching do(es) not exist",
+      # even though every publish step succeeded. The publish job's single install
+      # gains little from caching, so drop it for reliability.
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-          cache: pnpm
 
       - name: Verify npm publish toolchain
         run: |
@@ -153,7 +161,7 @@ jobs:
           fi
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -212,11 +220,12 @@ jobs:
             fi
           done
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ github.event.inputs.platform_packages_only }}" != "true" ]; then
-            for pkg in @opengsd/contracts @opengsd/rpc-client @opengsd/mcp-server; do
+            while IFS= read -r entry; do
+              pkg="${entry%%:*}"
               if ! npm view "${pkg}" name >/dev/null 2>&1; then
                 MISSING+=("${pkg}")
               fi
-            done
+            done < <(node scripts/lib/npm-release-packages.cjs --workspace-dirs)
           fi
           if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "::error::These npm packages do not exist on npm yet:"
@@ -291,8 +300,13 @@ jobs:
       - name: Install dependencies
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
         run: |
+          # Install WITH optional deps. The web host build (next/tailwind) needs
+          # lightningcss's platform-native binary, which ships as an optionalDependency;
+          # --no-optional skips it and breaks `next build` with
+          # "Cannot find module '../lightningcss.linux-x64-gnu.node'". The @opengsd/engine-*
+          # optional deps are already published by this point, so a full install resolves.
           pnpm install --lockfile-only
-          pnpm install --frozen-lockfile --no-optional
+          pnpm install --frozen-lockfile
 
       - name: Build
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
@@ -306,6 +320,10 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
         run: pnpm run validate-pack
 
+      # Bootstrap path. Uses the SAME derived, complete package list as the
+      # production release (scripts/publish-workspace-packages.sh) so the two
+      # paths can't diverge — the old inline "contracts rpc-client mcp-server"
+      # list here is what dropped cloud-mcp-gateway + daemon from npm.
       - name: Publish workspace packages
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'
         env:
@@ -314,34 +332,7 @@ jobs:
         run: |
           node scripts/prepack-resolve-workspace.cjs
           trap 'node scripts/postpack-restore-workspace.cjs' EXIT
-          VERSION=$(node -p "require('./package.json').version")
-          wait_for_workspace_package() {
-            PACKAGE="$1"
-            DELAY=5
-            for attempt in $(seq 1 5); do
-              PUBLISHED=$(npm view "${PACKAGE}@${VERSION}" version 2>/dev/null || echo "")
-              if [ "${PUBLISHED}" = "${VERSION}" ]; then
-                echo "  ✓ ${PACKAGE}@${VERSION} visible on npm (attempt ${attempt})"
-                return 0
-              fi
-              if [ "$attempt" = "5" ]; then
-                echo "::error::${PACKAGE}@${VERSION} not visible on npm after 5 attempts"
-                exit 1
-              fi
-              echo "  Attempt ${attempt}: ${PACKAGE}@${VERSION} not visible yet, retrying in ${DELAY}s..."
-              sleep "$DELAY"
-              DELAY=$((DELAY * 2))
-              if [ "$DELAY" -gt 30 ]; then DELAY=30; fi
-            done
-          }
-          for workspace in @opengsd/contracts @opengsd/rpc-client @opengsd/mcp-server; do
-            if npm view "${workspace}@${VERSION}" version >/dev/null 2>&1; then
-              echo "${workspace}@${VERSION} already published, skipping"
-              continue
-            fi
-            npm publish --workspace "${workspace}" --ignore-scripts ${TAG_FLAG}
-            wait_for_workspace_package "${workspace}"
-          done
+          bash scripts/publish-workspace-packages.sh
 
       - name: Publish main package
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform_packages_only != 'true'

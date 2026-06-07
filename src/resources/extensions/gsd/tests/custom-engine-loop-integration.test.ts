@@ -8,7 +8,7 @@
 
 import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -18,7 +18,7 @@ import type { LoopDeps } from "../auto/loop-deps.js";
 import { WorktreeStateProjection } from "../worktree-state-projection.js";
 import type { SessionLockStatus } from "../session-lock.js";
 import { writeGraph, readGraph, type WorkflowGraph, type GraphStep } from "../graph.ts";
-import { writeFileSync } from "node:fs";
+import { SourceObservationStore } from "../source-observations.js";
 import { stringify } from "yaml";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -115,6 +115,7 @@ function makeLoopSession(overrides?: Record<string, unknown>) {
     currentMilestoneId: null,
     currentUnit: null,
     currentUnitRouting: null,
+    sourceObservations: new SourceObservationStore(),
     completedUnits: [],
     resourceVersionOnStart: null,
     lastPromptCharCount: undefined,
@@ -138,6 +139,19 @@ function makeLoopSession(overrides?: Record<string, unknown>) {
     cmdCtx: {
       newSession: () => Promise.resolve({ cancelled: false }),
       getContextUsage: () => ({ percent: 10, tokens: 1000, limit: 10000 }),
+    },
+    setCurrentUnit(this: any, unit: any) {
+      this.currentUnit = unit;
+      this.sourceObservations.beginUnit({
+        unitType: unit.type,
+        unitId: unit.id,
+        startedAt: unit.startedAt,
+        basePath: unit.workspaceRoot ?? this.basePath,
+      });
+    },
+    clearCurrentUnit(this: any) {
+      this.currentUnit = null;
+      this.sourceObservations.clear();
     },
     clearTimers: () => {},
     lockBasePath: "/tmp/project",

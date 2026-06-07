@@ -1751,7 +1751,7 @@ export function serializePreferencesToFrontmatter(prefs: Record<string, unknown>
   // Ordered keys for consistent output
   const orderedKeys = [
     "version", "mode", "always_use_skills", "prefer_skills", "avoid_skills",
-    "skill_rules", "custom_instructions", "models", "skill_discovery",
+    "skill_rules", "custom_instructions", "models", "thinking", "skill_discovery",
     "skill_staleness_days", "auto_supervisor", "uat_dispatch", "unique_milestone_ids",
     "budget_ceiling", "budget_enforcement", "context_pause_threshold",
     "notifications", "cmux", "remote_questions", "git",

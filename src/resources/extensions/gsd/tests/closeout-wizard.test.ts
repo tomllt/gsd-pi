@@ -8,6 +8,7 @@ import {
   buildCloseoutMenuActions,
   buildIdleMenuSummary,
   getPrimaryCloseoutRecommendation,
+  showMilestoneMergeCloseout,
 } from "../closeout-wizard.ts";
 import { buildGsdHomeModel } from "../gsd-command-home.ts";
 import type { GSDState } from "../types.ts";
@@ -118,4 +119,47 @@ test("/gsd home recommends merge milestone when closeout is pending", () => {
   const merge = model.actions.find((action) => action.id === "finish_milestone");
   assert.equal(merge?.recommended, true);
   assert.equal(merge?.enabled, true);
+});
+
+test("milestone merge closeout clears stale timer controls and installs the closeout outcome", () => {
+  const statuses: Array<[string, string | undefined]> = [];
+  const widgets: Array<[string, unknown]> = [];
+
+  showMilestoneMergeCloseout({
+    hasUI: true,
+    ui: {
+      setStatus: (key: string, value: string | undefined) => {
+        statuses.push([key, value]);
+      },
+      setWidget: (key: string, value: unknown) => {
+        widgets.push([key, value]);
+      },
+    },
+  } as any, {
+    milestoneId: "M004",
+    branch: "milestone/M004",
+    integrationBranch: "main",
+    files: ["src/app.ts"],
+    dirtyOverlap: [],
+  });
+
+  assert.deepEqual(statuses, [
+    ["gsd-auto", undefined],
+    ["gsd-step", undefined],
+  ]);
+  assert.ok(
+    widgets.some(([key, value]) => key === "gsd-progress" && value === undefined),
+    "stale progress/timer widget should be cleared",
+  );
+  const outcome = widgets.find(([key]) => key === "gsd-outcome")?.[1];
+  assert.equal(typeof outcome, "function");
+
+  const component = (outcome as any)(
+    { requestRender() {} },
+    { fg: (_color: string, text: string) => text, bold: (text: string) => text },
+  );
+  const rendered = component.render(100).join("\n");
+  assert.match(rendered, /Milestone M004 merged/);
+  assert.match(rendered, /Review the closeout/);
+  assert.doesNotMatch(rendered, /\/gsd auto/);
 });

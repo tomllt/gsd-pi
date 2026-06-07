@@ -45,6 +45,14 @@ type LockResult<T> = {
 	next?: string;
 };
 
+function isUsableApiKeyCredential(credential: AuthCredential): credential is ApiKeyCredential {
+	return credential.type === "api_key" && credential.key.trim().length > 0;
+}
+
+function isUsableStoredCredential(credential: AuthCredential): boolean {
+	return credential.type === "oauth" || isUsableApiKeyCredential(credential);
+}
+
 export interface AuthStorageBackend {
 	withLock<T>(fn: (current: string | undefined) => LockResult<T>): T;
 	withLockAsync<T>(fn: (current: string | undefined) => Promise<LockResult<T>>): Promise<T>;
@@ -347,7 +355,7 @@ export class AuthStorage {
 	 */
 	hasAuth(provider: string): boolean {
 		if (this.runtimeOverrides.has(provider)) return true;
-		if (this.getCredentialsForProvider(provider).length > 0) return true;
+		if (this.getCredentialsForProvider(provider).some(isUsableStoredCredential)) return true;
 		if (getEnvApiKey(provider)) return true;
 		if (this.fallbackResolver?.(provider)) return true;
 		return false;
@@ -383,7 +391,7 @@ export class AuthStorage {
 	 * Return auth status without exposing credential values or refreshing tokens.
 	 */
 	getAuthStatus(provider: string): AuthStatus {
-		if (this.getCredentialsForProvider(provider).length > 0) {
+		if (this.getCredentialsForProvider(provider).some(isUsableStoredCredential)) {
 			return { configured: true, source: "stored" };
 		}
 
@@ -511,7 +519,9 @@ export class AuthStorage {
 		}
 
 		const creds = this.getCredentialsForProvider(providerId);
-		const cred = creds.find((entry) => entry.type === "api_key") ?? creds.find((entry) => entry.type === "oauth");
+		const apiKeyCredential = creds.find(isUsableApiKeyCredential);
+		const oauthCredential = creds.find((entry) => entry.type === "oauth");
+		const cred = apiKeyCredential ?? oauthCredential;
 
 		if (cred?.type === "api_key") {
 			return resolveConfigValue(cred.key);

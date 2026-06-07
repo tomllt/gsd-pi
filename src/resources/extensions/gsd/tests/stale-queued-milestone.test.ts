@@ -100,6 +100,7 @@ describe("stale queued milestone selection (#3470)", () => {
     const state = await deriveStateFromDb(base);
 
     assert.equal(state.activeMilestone?.id, "M068", "Queued milestone with draft should become active");
+    assert.equal(state.phase, "needs-discussion", "Queued milestone with draft should resume discussion");
   });
 
   test("queued milestone WITH slices can still be selected as active", async () => {
@@ -143,5 +144,47 @@ describe("stale queued milestone selection (#3470)", () => {
       assert.ok(entry, `${id} should be in registry`);
       assert.equal(entry!.status, "pending", `${id} should be pending, not active`);
     }
+  });
+
+  test("queued milestone with stale CONTEXT-DRAFT does not block real active milestone", async () => {
+    base = createFixtureBase();
+    openDatabase(":memory:");
+
+    // M068: queued, no slices, has a CONTEXT-DRAFT (abandoned discussion)
+    insertMilestone({ id: "M068", title: "Abandoned Draft", status: "queued" });
+    writeFile(base, "milestones/M068/M068-CONTEXT-DRAFT.md", "# M068: Abandoned Draft\n\nDraft left over from an abandoned session.");
+
+    // M070: real active milestone with execution artifacts
+    insertMilestone({ id: "M070", title: "Real Active", status: "active" });
+    insertSlice({ id: "S01", milestoneId: "M070", title: "Slice One", status: "active", risk: "low", depends: [] });
+    insertTask({ id: "T01", sliceId: "S01", milestoneId: "M070", title: "Task One", status: "pending" });
+
+    writeFile(base, "milestones/M070/M070-CONTEXT.md", "# M070: Real Active\n\nThis is the real milestone.");
+    writeFile(base, "milestones/M070/M070-ROADMAP.md", "# M070: Real Active\n\n## Slices\n\n- [ ] **S01: Slice One**");
+    writeFile(base, "milestones/M070/slices/S01/S01-PLAN.md", "# S01: Slice One\n\n## Tasks\n\n- [ ] **T01: Task One**");
+
+    invalidateStateCache();
+    const state = await deriveStateFromDb(base);
+
+    assert.equal(state.activeMilestone?.id, "M070", "Stale draft on M068 must not block real active M070");
+
+    const m068Entry = state.registry.find((e: any) => e.id === "M068");
+    assert.ok(m068Entry, "M068 should still appear in registry");
+    assert.equal(m068Entry!.status, "pending", "M068 with stale draft should be pending, not active");
+  });
+
+  test("queued milestone with CONTEXT-DRAFT becomes active with needs-discussion phase when nothing else is active", async () => {
+    base = createFixtureBase();
+    openDatabase(":memory:");
+
+    // M068: queued, no slices, has a CONTEXT-DRAFT — should resume discussion
+    insertMilestone({ id: "M068", title: "Draft Only", status: "queued" });
+    writeFile(base, "milestones/M068/M068-CONTEXT-DRAFT.md", "# M068: Draft Only\n\nPartial context from first question round.");
+
+    invalidateStateCache();
+    const state = await deriveStateFromDb(base);
+
+    assert.equal(state.activeMilestone?.id, "M068", "Queued milestone with draft should become active when nothing else is");
+    assert.equal(state.phase, "needs-discussion", "Should resume discussion for queued milestone with draft");
   });
 });

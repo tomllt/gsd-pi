@@ -156,6 +156,22 @@ describe("AuthStorage", () => {
 			expect(apiKey).toBe("literal_api_key_value");
 		});
 
+		test("empty apiKey placeholders are skipped when resolving stored keys", async () => {
+			const validCredential = ["minimax", "valid", "test", "credential"].join("-");
+
+			writeAuthJson({
+				minimax: [
+					{ type: "api_key", key: "" },
+					{ type: "api_key", key: validCredential },
+				],
+			});
+
+			authStorage = AuthStorage.create(authJsonPath);
+			const apiKey = await authStorage.getApiKey("minimax");
+
+			expect(apiKey).toBe(validCredential);
+		});
+
 		test("apiKey command can use shell features like pipes", async () => {
 			writeAuthJson({
 				anthropic: { type: "api_key", key: "!echo 'hello world' | tr ' ' '-'" },
@@ -456,6 +472,16 @@ describe("AuthStorage", () => {
 			expect(JSON.stringify(authStorage.getAuthStatus("anthropic"))).not.toContain("secret-api-key");
 			expect(JSON.stringify(authStorage.getAuthStatus("openai"))).not.toContain("secret-access-token");
 			expect(JSON.stringify(authStorage.getAuthStatus("openai"))).not.toContain("secret-refresh-token");
+		});
+
+		test("empty stored API keys do not count as configured auth", () => {
+			authStorage = AuthStorage.inMemory({
+				"custom-provider": { type: "api_key", key: "" },
+			});
+
+			expect(authStorage.has("custom-provider")).toBe(true);
+			expect(authStorage.hasAuth("custom-provider")).toBe(false);
+			expect(authStorage.getAuthStatus("custom-provider")).toEqual({ configured: false });
 		});
 	});
 

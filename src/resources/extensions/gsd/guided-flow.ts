@@ -1387,8 +1387,8 @@ async function buildDiscussPreparationContext(
     if (parts.length === 0) return "";
 
     const guidance = mode === "milestone"
-      ? "Use these findings as background only — they describe what already exists, NOT what the user wants next. After investigation, send **one** message: a short recap (at most 2-3 sentences) plus 1-3 focused questions, then **stop**. Do not dump a feature-menu brainstorm or send a second message restating the same question."
-      : "Use these findings as background context — they describe what already exists, NOT what the user wants to build. Always ask the user what they want to build first.";
+      ? "Use these findings as background only — they describe what already exists, NOT what the user wants next. This snapshot already covers code reality: do NOT survey the codebase before asking. Send **one** message: a short recap (at most 2-3 sentences) plus 1-3 focused questions, then **stop**. Do not dump a feature-menu brainstorm or send a second message restating the same question."
+      : "Use these findings as background context — they describe what already exists, NOT what the user wants to build. This snapshot already covers code reality: do NOT survey the codebase before asking. Always ask the user what they want to build first.";
     return `\n\n## Preparation Context\n\nThe system analyzed the codebase before this discussion. ${guidance}\n\n${parts.join("\n\n")}`;
   } catch (err) {
     logWarning("guided", `preparation failed, proceeding without context: ${(err as Error).message}`);

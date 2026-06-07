@@ -146,8 +146,9 @@ function markFirstVisibleAssistantOutput(
 	host.session?.markFirstVisibleTurnLatency?.(kind, data);
 }
 
-function getVisibleTextLikeBlockType(block: any): "text" | "thinking" | undefined {
+function getVisibleTextLikeBlockType(block: any, hideThinkingBlock = false): "text" | "thinking" | undefined {
 	if (block?.type === "text" && typeof block.text === "string" && block.text.trim().length > 0) return "text";
+	if (hideThinkingBlock) return undefined;
 	if (block?.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim().length > 0) return "thinking";
 	return undefined;
 }
@@ -291,7 +292,7 @@ function shouldSuppressRedundantHandoffText(
 
 function buildDesiredSegments(
 	blocks: Array<any>,
-	options: { shouldSkipTextBlock?: (block: any, index: number) => boolean } = {},
+	options: { hideThinkingBlock?: boolean; shouldSkipTextBlock?: (block: any, index: number) => boolean } = {},
 ): DesiredSegment[] {
 	const desired: DesiredSegment[] = [];
 	let runStart = -1;
@@ -308,7 +309,7 @@ function buildDesiredSegments(
 
 	for (let i = 0; i < blocks.length; i++) {
 		const block = blocks[i];
-		const blockType = getVisibleTextLikeBlockType(block);
+		const blockType = getVisibleTextLikeBlockType(block, options.hideThinkingBlock);
 		const isInvisibleTextLike = blockType === undefined && (block?.type === "text" || block?.type === "thinking");
 		const isTool = block?.type === "toolCall" || block?.type === "serverToolUse";
 
@@ -397,20 +398,24 @@ function getProvisionalPreToolPrunePlan(message: { provider?: string; content: A
 	};
 }
 
-function buildDesiredSegmentsForMessage(message: { provider?: string; content: Array<any> }): DesiredSegment[] {
+function buildDesiredSegmentsForMessage(
+	message: { provider?: string; content: Array<any> },
+	options: { hideThinkingBlock?: boolean } = {},
+): DesiredSegment[] {
 	const { shouldPrune, firstToolIdx } = getProvisionalPreToolPrunePlan(message);
 	return buildDesiredSegments(message.content, {
+		hideThinkingBlock: options.hideThinkingBlock,
 		shouldSkipTextBlock: (block: any, index: number) => {
 			if (!shouldPrune || firstToolIdx < 0 || index >= firstToolIdx) return false;
-			if (getVisibleTextLikeBlockType(block) !== "text") return false;
+			if (getVisibleTextLikeBlockType(block, options.hideThinkingBlock) !== "text") return false;
 			const textValue = typeof block?.text === "string" ? block.text : "";
 			return isProvisionalPreToolProse(textValue);
 		},
 	});
 }
 
-function hasVisibleAssistantContent(message: { content: Array<any> }): boolean {
-	return message.content.some((c) => getVisibleTextLikeBlockType(c) !== undefined);
+function hasVisibleAssistantContent(message: { content: Array<any> }, hideThinkingBlock = false): boolean {
+	return message.content.some((c) => getVisibleTextLikeBlockType(c, hideThinkingBlock) !== undefined);
 }
 
 function hasAssistantToolBlocks(message: { content: Array<any> }): boolean {
@@ -817,7 +822,9 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					// so MCP tool-only windows do not blank the assistant content.
 					const { shouldPrune: shouldPruneProvisionalPreToolProse } =
 						getProvisionalPreToolPrunePlan(host.streamingMessage);
-					let desired = buildDesiredSegmentsForMessage(host.streamingMessage);
+					let desired = buildDesiredSegmentsForMessage(host.streamingMessage, {
+						hideThinkingBlock: host.hideThinkingBlock,
+					});
 					desired = filterRedundantDiscussTextRuns(desired, blocks);
 
 					// Claude Code MCP can emit provisional pre-tool prose that gets
@@ -1048,18 +1055,19 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				if (event.message.role === "assistant") {
 					host.streamingMessage = event.message;
 					let errorMessage: string | undefined;
-				if (host.streamingMessage.stopReason === "aborted") {
-					const retryAttempt = host.session.retryAttempt;
-					errorMessage = retryAttempt > 0
-						? `Aborted after ${retryAttempt} retry attempt${retryAttempt > 1 ? "s" : ""}`
-						: "Operation aborted";
-					host.streamingMessage.errorMessage = errorMessage;
-				}
+					if (host.streamingMessage.stopReason === "aborted") {
+						const retryAttempt = host.session.retryAttempt;
+						errorMessage = retryAttempt > 0
+							? `Aborted after ${retryAttempt} retry attempt${retryAttempt > 1 ? "s" : ""}`
+							: "Operation aborted";
+						host.streamingMessage.errorMessage = errorMessage;
+					}
 
-					const shouldRenderAssistant = hasVisibleAssistantContent(host.streamingMessage)
-						|| (
-							(host.streamingMessage.stopReason === "aborted" || host.streamingMessage.stopReason === "error")
-							&& !hasAssistantToolBlocks(host.streamingMessage)
+					const shouldRenderAssistant =
+						hasVisibleAssistantContent(host.streamingMessage, host.hideThinkingBlock) ||
+						(
+							(host.streamingMessage.stopReason === "aborted" || host.streamingMessage.stopReason === "error") &&
+							!hasAssistantToolBlocks(host.streamingMessage)
 						);
 					const suppressRedundantHandoff = shouldSuppressRedundantHandoffText(
 						host.session.messages,
@@ -1075,7 +1083,9 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					if (renderedSegments.length > 0) {
 						const finalBlocks = host.streamingMessage.content;
 						const desired = filterRedundantDiscussTextRuns(
-							buildDesiredSegmentsForMessage(host.streamingMessage),
+							buildDesiredSegmentsForMessage(host.streamingMessage, {
+								hideThinkingBlock: host.hideThinkingBlock,
+							}),
 							finalBlocks,
 						);
 

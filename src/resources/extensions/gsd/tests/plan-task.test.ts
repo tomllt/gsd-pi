@@ -96,6 +96,25 @@ test('handlePlanTask explains string IO fields must be arrays', async () => {
   }
 });
 
+test('handlePlanTask rejects prose expectedOutput entries', async () => {
+  const base = makeTmpBase();
+  openDatabase(join(base, '.gsd', 'gsd.db'));
+
+  try {
+    seedParent();
+    const result = await handlePlanTask({
+      ...validParams(),
+      expectedOutput: ['Browser UI supports due-date add/edit flows and mixed-list urgency rendering.'],
+    }, base);
+    assert.ok('error' in result);
+    assert.match(result.error, /validation failed: expectedOutput must contain only file paths/);
+    assert.doesNotMatch(result.error, /outside allowed repository roots/);
+    assert.equal(getTask('M001', 'S02', 'T02'), null, 'invalid output contract must not persist the task');
+  } finally {
+    cleanup(base);
+  }
+});
+
 test('handlePlanTask rejects absolute task IO paths outside the active worktree', async () => {
   const base = makeTmpBase();
   openDatabase(join(base, '.gsd', 'gsd.db'));

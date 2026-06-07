@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-import { ModelPolicyDispatchBlockedError, resolvePreferredModelConfig, resolveModelId, selectAndApplyModel } from "../auto-model-selection.js";
+import { ModelPolicyDispatchBlockedError, resolvePreferredModelConfig, resolveModelId, selectAndApplyModel, floorThinkingLevelForUnit } from "../auto-model-selection.js";
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -532,6 +532,304 @@ test("selectAndApplyModel re-applies captured thinking level after setModel succ
   );
 
   assert.deepEqual(thinkingLevels, [{ effort: "high" }]);
+});
+
+// ─── floorThinkingLevelForUnit (#read-bash-thrash) ─────────────────────
+test("floorThinkingLevelForUnit raises minimal/low to the floor for execute-task", () => {
+  assert.equal(floorThinkingLevelForUnit("execute-task", "off" as any), "medium");
+  assert.equal(floorThinkingLevelForUnit("execute-task", "minimal" as any), "medium");
+  assert.equal(floorThinkingLevelForUnit("execute-task", "low" as any), "medium");
+});
+
+test("floorThinkingLevelForUnit never lowers a level already at/above the floor", () => {
+  assert.equal(floorThinkingLevelForUnit("execute-task", "medium" as any), "medium");
+  assert.equal(floorThinkingLevelForUnit("execute-task", "high" as any), "high");
+  assert.equal(floorThinkingLevelForUnit("execute-task", "xhigh" as any), "xhigh");
+});
+
+test("floorThinkingLevelForUnit leaves non-execute-task units untouched", () => {
+  for (const unit of ["plan-slice", "plan-milestone", "research-milestone", "complete-slice", "validate-milestone"]) {
+    assert.equal(floorThinkingLevelForUnit(unit, "minimal" as any), "minimal");
+  }
+});
+
+test("floorThinkingLevelForUnit passes through null/undefined and unrecognized shapes", () => {
+  assert.equal(floorThinkingLevelForUnit("execute-task", null), null);
+  assert.equal(floorThinkingLevelForUnit("execute-task", undefined), undefined);
+  // A richer host snapshot object must not be coerced into a bare string.
+  const snapshot = { effort: "minimal" } as any;
+  assert.deepEqual(floorThinkingLevelForUnit("execute-task", snapshot), snapshot);
+});
+
+test("selectAndApplyModel raises minimal thinking to the floor for execute-task", async (t) => {
+  const originalCwd = process.cwd();
+  const tempProject = makeTempDir("gsd-routing-thinking-floor-");
+  const thinkingLevels: unknown[] = [];
+  t.after(() => {
+    process.chdir(originalCwd);
+    rmSync(tempProject, { recursive: true, force: true });
+  });
+
+  mkdirSync(join(tempProject, ".gsd"), { recursive: true });
+  writeFileSync(
+    join(tempProject, ".gsd", "PREFERENCES.md"),
+    ["---", "models:", "  execute-task: claude-sonnet-4-6", "---"].join("\n"),
+    "utf-8",
+  );
+  process.chdir(tempProject);
+
+  await selectAndApplyModel(
+    {
+      modelRegistry: { getAvailable: () => [{ id: "claude-sonnet-4-6", provider: "anthropic", api: "anthropic-messages" }] },
+      sessionManager: { getSessionId: () => "test-session" },
+      ui: { notify: () => {} },
+      model: { provider: "anthropic", id: "claude-sonnet-4-6", api: "anthropic-messages" },
+    } as any,
+    {
+      setModel: async () => true,
+      setThinkingLevel: (level: unknown) => { thinkingLevels.push(level); },
+      emitBeforeModelSelect: async () => undefined,
+      getActiveTools: () => [],
+      emitAdjustToolSet: async () => undefined,
+      setActiveTools: () => {},
+    } as any,
+    "execute-task",
+    "M001/S01/T01",
+    tempProject,
+    undefined,
+    false,
+    { provider: "anthropic", id: "claude-sonnet-4-6" },
+    undefined,
+    true,
+    undefined,
+    "minimal" as any,
+  );
+
+  assert.deepEqual(thinkingLevels, ["medium"]);
+});
+
+test("selectAndApplyModel capability-clamps an unsupported thinking level (ADR-026)", async (t) => {
+  const originalCwd = process.cwd();
+  const tempProject = makeTempDir("gsd-routing-thinking-clamp-");
+  const thinkingLevels: unknown[] = [];
+  t.after(() => {
+    process.chdir(originalCwd);
+    rmSync(tempProject, { recursive: true, force: true });
+  });
+
+  // Reasoning-capable model whose map omits xhigh → xhigh must clamp to high.
+  const model = {
+    id: "claude-sonnet-4-6",
+    provider: "anthropic",
+    api: "anthropic-messages",
+    reasoning: true,
+    thinkingLevelMap: { low: "low", medium: "medium", high: "high" },
+  };
+  mkdirSync(join(tempProject, ".gsd"), { recursive: true });
+  writeFileSync(
+    join(tempProject, ".gsd", "PREFERENCES.md"),
+    ["---", "models:", "  planning: claude-sonnet-4-6", "---"].join("\n"),
+    "utf-8",
+  );
+  process.chdir(tempProject);
+
+  await selectAndApplyModel(
+    {
+      modelRegistry: { getAvailable: () => [model] },
+      sessionManager: { getSessionId: () => "test-session" },
+      ui: { notify: () => {} },
+      model: { provider: "anthropic", id: "claude-sonnet-4-6", api: "anthropic-messages" },
+    } as any,
+    {
+      setModel: async () => true,
+      setThinkingLevel: (level: unknown) => { thinkingLevels.push(level); },
+      emitBeforeModelSelect: async () => undefined,
+      getActiveTools: () => [],
+      emitAdjustToolSet: async () => undefined,
+      setActiveTools: () => {},
+    } as any,
+    "plan-slice",
+    "M001/S01",
+    tempProject,
+    undefined,
+    false,
+    { provider: "anthropic", id: "claude-sonnet-4-6" },
+    undefined,
+    true,
+    undefined,
+    "xhigh" as any,
+  );
+
+  assert.deepEqual(thinkingLevels, ["high"]);
+});
+
+test("selectAndApplyModel applies an explicit per-phase thinking level (ADR-026)", async (t) => {
+  const originalCwd = process.cwd();
+  const tempProject = makeTempDir("gsd-routing-thinking-explicit-");
+  const thinkingLevels: unknown[] = [];
+  t.after(() => {
+    process.chdir(originalCwd);
+    rmSync(tempProject, { recursive: true, force: true });
+  });
+
+  const model = {
+    id: "claude-sonnet-4-6",
+    provider: "anthropic",
+    api: "anthropic-messages",
+    reasoning: true,
+    thinkingLevelMap: { low: "low", medium: "medium", high: "high", xhigh: "xhigh" },
+  };
+  mkdirSync(join(tempProject, ".gsd"), { recursive: true });
+  writeFileSync(
+    join(tempProject, ".gsd", "PREFERENCES.md"),
+    ["---", "models:", "  planning:", "    model: claude-sonnet-4-6", "    thinking: xhigh", "---"].join("\n"),
+    "utf-8",
+  );
+  process.chdir(tempProject);
+
+  await selectAndApplyModel(
+    {
+      modelRegistry: { getAvailable: () => [model] },
+      sessionManager: { getSessionId: () => "test-session" },
+      ui: { notify: () => {} },
+      model: { provider: "anthropic", id: "claude-sonnet-4-6", api: "anthropic-messages" },
+    } as any,
+    {
+      setModel: async () => true,
+      setThinkingLevel: (level: unknown) => { thinkingLevels.push(level); },
+      emitBeforeModelSelect: async () => undefined,
+      getActiveTools: () => [],
+      emitAdjustToolSet: async () => undefined,
+      setActiveTools: () => {},
+    } as any,
+    "plan-slice",
+    "M001/S01",
+    tempProject,
+    undefined,
+    false,
+    { provider: "anthropic", id: "claude-sonnet-4-6" },
+    undefined,
+    true,
+    undefined,
+    // Session level is "low"; the explicit planning thinking (xhigh) must win.
+    "low" as any,
+  );
+
+  assert.deepEqual(thinkingLevels, ["xhigh"]);
+});
+
+test("selectAndApplyModel applies explicit thinking with no model pin (interactive, ADR-026)", async (t) => {
+  const originalCwd = process.cwd();
+  const tempProject = makeTempDir("gsd-routing-thinking-nomodel-");
+  const thinkingLevels: unknown[] = [];
+  t.after(() => {
+    process.chdir(originalCwd);
+    rmSync(tempProject, { recursive: true, force: true });
+  });
+
+  const model = {
+    id: "claude-sonnet-4-6",
+    provider: "anthropic",
+    api: "anthropic-messages",
+    reasoning: true,
+    thinkingLevelMap: { low: "low", medium: "medium", high: "high", xhigh: "xhigh" },
+  };
+  mkdirSync(join(tempProject, ".gsd"), { recursive: true });
+  // A `thinking:` block with NO models config — the interactive guided-flow
+  // scenario the bug report flagged (no per-phase model, no start model).
+  writeFileSync(
+    join(tempProject, ".gsd", "PREFERENCES.md"),
+    ["---", "thinking:", "  planning: high", "---"].join("\n"),
+    "utf-8",
+  );
+  process.chdir(tempProject);
+
+  await selectAndApplyModel(
+    {
+      modelRegistry: { getAvailable: () => [model] },
+      sessionManager: { getSessionId: () => "test-session" },
+      ui: { notify: () => {} },
+      model: { provider: "anthropic", id: "claude-sonnet-4-6", api: "anthropic-messages" },
+    } as any,
+    {
+      setModel: async () => true,
+      setThinkingLevel: (level: unknown) => { thinkingLevels.push(level); },
+      emitBeforeModelSelect: async () => undefined,
+      getActiveTools: () => [],
+      emitAdjustToolSet: async () => undefined,
+      setActiveTools: () => {},
+    } as any,
+    "plan-slice",
+    "M001/S01",
+    tempProject,
+    undefined,
+    false,
+    null,            // no autoModeStartModel
+    undefined,
+    false,           // isAutoMode = false (interactive)
+    undefined,
+    undefined,       // no captured session thinking level
+  );
+
+  // No model branch runs, but the explicit block thinking must still apply.
+  assert.deepEqual(thinkingLevels, ["high"]);
+});
+
+test("selectAndApplyModel clamps explicit no-model thinking via ctx.model when registry lookup fails (ADR-026)", async (t) => {
+  const originalCwd = process.cwd();
+  const tempProject = makeTempDir("gsd-routing-thinking-ctxmodel-");
+  const thinkingLevels: unknown[] = [];
+  t.after(() => {
+    process.chdir(originalCwd);
+    rmSync(tempProject, { recursive: true, force: true });
+  });
+
+  // ctx.model carries reasoning capability (map omits xhigh) but the registry
+  // returns nothing, so resolveModelId fails and ctx.model is the clamp source.
+  const ctxModel = {
+    id: "claude-sonnet-4-6",
+    provider: "anthropic",
+    api: "anthropic-messages",
+    reasoning: true,
+    thinkingLevelMap: { low: "low", medium: "medium", high: "high" },
+  };
+  mkdirSync(join(tempProject, ".gsd"), { recursive: true });
+  writeFileSync(
+    join(tempProject, ".gsd", "PREFERENCES.md"),
+    ["---", "thinking:", "  planning: xhigh", "---"].join("\n"),
+    "utf-8",
+  );
+  process.chdir(tempProject);
+
+  await selectAndApplyModel(
+    {
+      modelRegistry: { getAvailable: () => [] },   // registry lookup fails
+      sessionManager: { getSessionId: () => "test-session" },
+      ui: { notify: () => {} },
+      model: ctxModel,
+    } as any,
+    {
+      setModel: async () => true,
+      setThinkingLevel: (level: unknown) => { thinkingLevels.push(level); },
+      emitBeforeModelSelect: async () => undefined,
+      getActiveTools: () => [],
+      emitAdjustToolSet: async () => undefined,
+      setActiveTools: () => {},
+    } as any,
+    "plan-slice",
+    "M001/S01",
+    tempProject,
+    undefined,
+    false,
+    null,
+    undefined,
+    false,
+    undefined,
+    undefined,
+  );
+
+  // xhigh is unsupported by ctx.model → clamped to high, never sent verbatim.
+  assert.deepEqual(thinkingLevels, ["high"]);
 });
 
 test("resolveModelId: anthropic wins over claude-code when session provider is not claude-code", () => {

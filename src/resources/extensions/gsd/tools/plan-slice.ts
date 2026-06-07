@@ -1,5 +1,5 @@
 import { existsSync, rmSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { clearParseCache } from "../files.js";
 import { isClosedStatus, isDeferredStatus } from "../status-guards.js";
 import { isNonEmptyString, validateStringArray } from "../validation.js";
@@ -25,7 +25,7 @@ import { renderAllProjections } from "../workflow-projections.js";
 import { writeManifest } from "../workflow-manifest.js";
 import { appendEvent } from "../workflow-events.js";
 import { logWarning } from "../workflow-logger.js";
-import { validatePlanningPathScope } from "../planning-path-scope.js";
+import { validatePathOnlyPlanningFields, validatePlanningPathScope } from "../planning-path-scope.js";
 import { checkFilePathConsistency, checkTaskOrdering } from "../pre-execution-checks.js";
 import type { TaskRow } from "../db-task-slice-rows.js";
 import { buildTaskFileName, gsdProjectionRoot } from "../paths.js";
@@ -257,11 +257,21 @@ function toTaskRows(params: PlanSliceParams, defaultTargets: string[]): TaskRow[
   }));
 }
 
-function validateTaskPathsBeforePersist(params: PlanSliceParams, basePath: string, defaultTargets: string[]): string | null {
+function validateTaskPathsBeforePersist(
+  params: PlanSliceParams,
+  basePath: string,
+  defaultTargets: string[],
+  allowedRoots: string[],
+): string | null {
   const taskRows = toTaskRows(params, defaultTargets);
+  const baseRoot = resolve(basePath);
+  const additionalRoots = allowedRoots
+    .map((root) => resolve(root))
+    .filter((root) => root !== baseRoot);
+  const context = additionalRoots.length > 0 ? { additionalRoots } : undefined;
   const checks = [
-    ...checkFilePathConsistency(taskRows, basePath),
-    ...checkTaskOrdering(taskRows, basePath),
+    ...checkFilePathConsistency(taskRows, basePath, context),
+    ...checkTaskOrdering(taskRows, basePath, context),
   ];
   const blocking = checks.filter((check) => !check.passed && check.blocking);
 
@@ -301,6 +311,16 @@ export async function handlePlanSlice(
 
   const allowedAbsoluteRoots = resolveAllowedRootsForPathScope(params, repositoryRegistry, defaultTargets);
 
+  const pathOnlyError = validatePathOnlyPlanningFields(
+    params.tasks.map((task, index) => ({
+      field: `tasks[${index}].expectedOutput`,
+      values: task.expectedOutput,
+    })),
+  );
+  if (pathOnlyError) {
+    return { error: `validation failed: ${pathOnlyError}` };
+  }
+
   const pathScopeError = validatePlanningPathScope(
     basePath,
     params.tasks.flatMap((task, index) => [
@@ -314,7 +334,7 @@ export async function handlePlanSlice(
     return { error: `validation failed: ${pathScopeError}` };
   }
 
-  const pathError = validateTaskPathsBeforePersist(params, basePath, defaultTargets);
+  const pathError = validateTaskPathsBeforePersist(params, basePath, defaultTargets, allowedAbsoluteRoots);
   if (pathError) {
     return { error: `pre-execution validation failed:\n${pathError}` };
   }

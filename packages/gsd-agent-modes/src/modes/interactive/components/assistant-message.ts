@@ -34,7 +34,7 @@ export class AssistantMessageComponent extends Container {
 
 	constructor(
 		message?: AssistantMessage,
-		hideThinkingBlock = false,
+		hideThinkingBlock = true,
 		markdownTheme: MarkdownTheme = getMarkdownTheme(),
 		timestampFormat: TimestampFormat = "date-time-iso",
 		range?: ContentRange,
@@ -116,9 +116,10 @@ export class AssistantMessageComponent extends Container {
 		const end = this.range?.endIndex ?? message.content.length - 1;
 		const slice = message.content.slice(start, end + 1);
 
-		const hasVisibleContent = slice.some(
-			(c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()),
-		);
+		const hasVisibleContent = slice.some((content) => {
+			if (content.type === "text") return content.text.trim().length > 0;
+			return !this.hideThinkingBlock && content.type === "thinking" && content.thinking.trim().length > 0;
+		});
 		const hasTextContent = message.content.some((c) => c.type === "text" && c.text.trim().length > 0);
 		const hasToolContent = message.content.some((c) => isToolContentBlock(c));
 		// Claude Code often emits long reasoning blocks ahead of user-visible text/tool
@@ -134,33 +135,25 @@ export class AssistantMessageComponent extends Container {
 				// Set paddingY=0 to avoid extra spacing before tool executions
 				this.contentContainer.addChild(new Markdown(content.text.trim(), 1, 0, this.markdownTheme));
 			} else if (content.type === "thinking" && content.thinking.trim()) {
+				if (this.hideThinkingBlock) continue;
 				// Add spacing only when another visible assistant content block follows.
 				// This avoids a superfluous blank line before separately-rendered tool execution blocks.
 				const hasVisibleContentAfter = slice
 					.slice(i + 1)
 					.some((c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()));
 
-				if (this.hideThinkingBlock) {
-					// Show static "Thinking..." label when hidden
-					this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", "Thinking...")), 1, 0));
-					if (hasVisibleContentAfter) {
-						this.contentContainer.addChild(new Spacer(1));
-					}
-				} else {
-					// Thinking traces in thinkingText color, italic
-					const thinkingMarkdown = new Markdown(content.thinking.trim(), 1, 0, this.markdownTheme, {
-						color: (text: string) => theme.fg("thinkingText", text),
-						italic: true,
-					});
-					// Keep visible chat output readable when thinking traces are long.
-					// Tool-bearing turns can stream text in a later assistant message.
-					if (shouldCapThinking) {
-						thinkingMarkdown.maxLines = 8;
-					}
-					this.contentContainer.addChild(thinkingMarkdown);
-					if (hasVisibleContentAfter) {
-						this.contentContainer.addChild(new Spacer(1));
-					}
+				const thinkingMarkdown = new Markdown(content.thinking.trim(), 1, 0, this.markdownTheme, {
+					color: (text: string) => theme.fg("thinkingText", text),
+					italic: true,
+				});
+				// Keep visible chat output readable when thinking traces are long.
+				// Tool-bearing turns can stream text in a later assistant message.
+				if (shouldCapThinking) {
+					thinkingMarkdown.maxLines = 8;
+				}
+				this.contentContainer.addChild(thinkingMarkdown);
+				if (hasVisibleContentAfter) {
+					this.contentContainer.addChild(new Spacer(1));
 				}
 			}
 		}
@@ -200,6 +193,7 @@ export class AssistantMessageComponent extends Container {
 		const frameWidth = Math.max(20, width);
 		const contentWidth = Math.max(1, frameWidth - 3);
 		const lines = super.render(contentWidth);
+		if (lines.length === 0) return [];
 		const metaParts = [];
 		if (this.lastMessage?.model) metaParts.push(this.lastMessage.model);
 		if (this.showMetadata && this.lastMessage?.timestamp != null) {

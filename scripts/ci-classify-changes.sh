@@ -21,7 +21,7 @@ echo "$FILES"
 
 is_core_file() {
   case "$1" in
-    src/*|packages/*|native/*|scripts/*|web/*|extensions/*|tests/*|docker/*|Dockerfile|package.json|pnpm-lock.yaml|tsconfig*.json) return 0 ;;
+    src/*|packages/*|native/*|scripts/*|web/*|extensions/*|tests/*|docker/*|Dockerfile|package.json|pnpm-lock.yaml|tsconfig*.json|.github/*) return 0 ;;
     packages/*/tsconfig.json) return 0 ;;
     *) return 1 ;;
   esac

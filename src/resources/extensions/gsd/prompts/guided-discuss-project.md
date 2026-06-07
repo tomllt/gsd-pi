@@ -38,9 +38,7 @@ Persist the verdict through `gsd_summary_save` with `artifact_type: "PROJECT"` i
 
 ### Before deeper rounds
 
-Investigate enough to avoid assumption-driven questions:
-- Scout code with `rg`, `find`, or `scout` for greenfield/brownfield and framework signals.
-- Check prior `.planning/` or `.gsd/` artifacts.
+Ground your questions in the **Preparation Context snapshot above** (stack, structure, greenfield/brownfield and framework signals) plus any prior `.planning/` or `.gsd/` artifacts — those are authoritative. **Do not survey the codebase** with `rg`/`find`/`scout` before asking; read a specific file only when a question's answer genuinely hinges on it.
 - Use `resolve_library` / `get_library_docs` for unfamiliar mentioned libraries.
 
 **Web search budget:** typically 3-5 per turn. Prefer docs tools; use 2-3 searches first and save the rest.
@@ -53,13 +51,13 @@ Ask **1–3 questions per round**, one focus at a time: what, who, core value, a
 
 **Shape-dependent cadence:**
 - **`simple`**: 1-2 plain-text rounds; use `ask_user_questions` only for concrete alternatives; reach the depth checklist quickly.
-- **`complex`**: full investigation, multiple rounds, structured questions when meaningful alternatives exist.
+- **`complex`**: ground in the snapshot and prior artifacts, multiple rounds, structured questions when meaningful alternatives exist.
 
 **If `{{structuredQuestionsAvailable}}` is `true` and you use `ask_user_questions`:** ask 1-3 questions per call. Every question needs stable lowercase `id`. Keep labels short (3-5 words). In **`complex`** mode, multi-choice questions MUST offer **3 or 4 concrete, researched options** plus **"Other — let me discuss"**; options must be grounded in the investigation, not placeholders. In **`simple`** mode, 2 options is fine. Binary depth-check/wrap-up gates are exempt. Wait for each tool result before the next round.
 
 **If `{{structuredQuestionsAvailable}}` is `false`:** ask questions in plain text. Keep each round to 1–3 focused questions.
 
-After each round, investigate only new unknowns, then ask the next round.
+After each round, resolve only new unknowns from context (read a specific file only if one is needed), then ask the next round.
 
 ### Round cadence
 

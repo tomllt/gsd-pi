@@ -267,12 +267,18 @@ export async function preDispatchHealthGate(basePath: string): Promise<PreDispat
     // Non-fatal — dispatch continues without STATE.md if rebuild fails
   }
 
+  // #442 Phase 1.7: resolve repo-ness once per gate. ensureWorkspaceGitReady
+  // has already run, and nothing below initializes/deinitializes the repo, so
+  // the two downstream blocks (integration-branch check, stale-changes
+  // snapshot) can share one nativeIsRepo result instead of querying twice.
+  const isRepo = nativeIsRepo(basePath);
+
   // ── Integration branch existence check ──
   // If the active milestone's recorded integration branch no longer exists in
   // git, the merge-back at the end of the milestone will fail. Block dispatch
   // now to surface this before work is lost.
   try {
-    if (nativeIsRepo(basePath)) {
+    if (isRepo) {
       const state = await deriveState(basePath);
       if (state.activeMilestone) {
         const gitPrefs = loadEffectiveGSDPreferences()?.preferences?.git ?? {};
@@ -296,7 +302,7 @@ export async function preDispatchHealthGate(basePath: string): Promise<PreDispat
   // If the working tree is dirty and no commit has happened recently,
   // create a safety snapshot so work isn't lost if the next unit crashes.
   try {
-    if (nativeIsRepo(basePath)) {
+    if (isRepo) {
       const prefs = loadEffectiveGSDPreferences()?.preferences ?? {};
       // `git.snapshots: false` is the canonical toggle that disables WIP
       // snapshot commits — honour it before touching the threshold path (#4420).

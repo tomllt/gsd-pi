@@ -1583,7 +1583,7 @@ const planTaskParams = {
   files: z.array(z.string()).describe("Files likely touched"),
   verify: nonEmptyString("verify").describe("Verification command or block"),
   inputs: z.array(z.string()).describe("Input files or references"),
-  expectedOutput: z.array(z.string()).describe("Expected output files or artifacts"),
+  expectedOutput: z.array(z.string()).describe("Files this task creates or overwrites"),
   observabilityImpact: optionalNonEmptyString("observabilityImpact").describe("Task observability impact"),
 };
 const planTaskSchema = z.object(planTaskParams);

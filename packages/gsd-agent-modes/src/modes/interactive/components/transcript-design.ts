@@ -18,6 +18,10 @@ export function chatMessageWidth(width: number): number {
 
 /** Outer indent for user turns and tool/work cards in the connected transcript. */
 export const TRANSCRIPT_CARD_INDENT = 4;
+const RUNNING_RAIL_FRAME_MS = 70;
+const RUNNING_RAIL_TRAIL = 5;
+const HORIZONTAL_RAIL = "─";
+const HORIZONTAL_RAIL_HEAD = "━";
 
 export function headerLabel(text: string): string {
 	return text.toUpperCase();
@@ -33,6 +37,45 @@ function indentSpaces(cols: number): string {
 
 function connectedRuleFill(width: number, indent = TRANSCRIPT_CARD_INDENT): string {
 	return "─".repeat(Math.max(16, Math.min(40, width - indent - 1)));
+}
+
+function runningRailFrame(): number {
+	return Math.floor(Date.now() / RUNNING_RAIL_FRAME_MS);
+}
+
+function trianglePosition(frame: number, maxPosition: number): number {
+	const max = Math.max(0, maxPosition);
+	if (max === 0) return 0;
+	const period = max * 2;
+	const step = frame % period;
+	return step <= max ? step : period - step;
+}
+
+function renderRailText(text: string, railColor: ThemeColor, sweepFrame?: number): string {
+	if (sweepFrame === undefined) return theme.fg(railColor, text);
+
+	const railCells = Array.from(text).filter((char) => char === HORIZONTAL_RAIL).length;
+	const head = trianglePosition(sweepFrame, railCells - 1);
+	let railIndex = -1;
+	let rendered = "";
+
+	for (const char of text) {
+		if (char !== HORIZONTAL_RAIL) {
+			rendered += theme.fg(railColor, char);
+			continue;
+		}
+
+		railIndex++;
+		const distance = Math.abs(railIndex - head);
+		if (distance === 0) {
+			rendered += theme.fg(railColor, theme.bold(HORIZONTAL_RAIL_HEAD));
+		} else if (distance <= RUNNING_RAIL_TRAIL) {
+			rendered += theme.fg(railColor, HORIZONTAL_RAIL_HEAD);
+		} else {
+			rendered += theme.fg(railColor, HORIZONTAL_RAIL);
+		}
+	}
+	return rendered;
 }
 
 export function renderChatTurnBridge(
@@ -64,12 +107,14 @@ export function renderConnectedCard(
 		titleColor?: ThemeColor;
 		bodyBg?: ThemeBg;
 		closeBottom?: boolean;
+		railSweep?: boolean;
 	} = {},
 ): string[] {
 	const indent = opts.indent ?? TRANSCRIPT_CARD_INDENT;
 	const prefix = indentSpaces(indent);
 	const railColor = opts.railColor ?? "borderAccent";
-	const rail = (text: string) => theme.fg(railColor, text);
+	const sweepFrame = opts.railSweep ? runningRailFrame() : undefined;
+	const rail = (text: string) => renderRailText(text, railColor, sweepFrame);
 	const resolvedTitleColor =
 		opts.titleColor ??
 		(title.includes("✕") ? "error" : title.includes("✓") ? "success" : railColor);
@@ -90,7 +135,7 @@ export function renderConnectedCard(
 	}
 	const paintBody = (line: string) => {
 		const innerWidth = Math.max(1, width - indent);
-		const inner = padRight(truncateToWidth("   " + line, innerWidth, ""), innerWidth);
+		const inner = padRight("   " + line, innerWidth);
 		const painted = opts.bodyBg ? theme.bg(opts.bodyBg, inner) : inner;
 		return prefix + painted;
 	};
@@ -321,16 +366,32 @@ export function renderUserRail(
  * Render a single titled rule line — the collapsed form of a tool/command
  * card on the "open" surface. `title` and `right` must be pre-styled.
  */
-function openRuleLine(title: string, right: string, width: number, tone: ThemeColor): string {
-	let surface = style()
-		.border("open")
-		.borderColor((text) => theme.fg(tone, text))
-		.title(title);
-	if (right) {
-		surface = surface.titleRight(right);
+function openRuleLine(title: string, right: string, width: number, tone: ThemeColor, sweep = false): string {
+	const w = Math.max(20, width);
+	if (!right) {
+		const clippedTitle = truncateToWidth(title, Math.max(0, w - 6), "");
+		const fill = Math.max(1, w - 5 - visibleWidth(clippedTitle));
+		return padLine(renderRailText("─── ", tone) + clippedTitle + renderRailText(` ${"─".repeat(fill)}`, tone), w);
 	}
-	// render([]) yields [topRule, emptyBody, bottomRule] — we want the rule.
-	return surface.render([], Math.max(20, width))[0];
+
+	const titleBudget = Math.max(0, w - 11);
+	const rightReserve = titleBudget > 1 && visibleWidth(right) > 0 ? 1 : 0;
+	const leftBudget = Math.min(visibleWidth(title), Math.max(0, titleBudget - rightReserve));
+	const rightBudget = Math.max(0, titleBudget - leftBudget);
+	const clippedTitle = truncateToWidth(title, leftBudget, "");
+	const clippedRight = truncateToWidth(right, rightBudget, "");
+	const fixed = 4 + visibleWidth(clippedTitle) + 2 + visibleWidth(clippedRight) + 4;
+	const fill = Math.max(1, w - fixed);
+	const sweepFrame = sweep ? runningRailFrame() : undefined;
+
+	return padLine(
+		renderRailText("─── ", tone) +
+			clippedTitle +
+			renderRailText(` ${"─".repeat(fill)} `, tone, sweepFrame) +
+			clippedRight +
+			renderRailText(" ───", tone),
+		w,
+	);
 }
 
 function indentRenderedLines(lines: string[], indent: number, width: number): string[] {
@@ -365,6 +426,7 @@ export function renderTranscriptCard(
 		indent,
 		titleRight,
 		railColor: tone,
+		railSweep: opts.tone === "running",
 	});
 }
 
@@ -382,7 +444,7 @@ export function renderToolLineCard(
 	}`;
 	const statusText = opts.hidden ? `${opts.status} · output hidden · ctrl+o expand` : opts.status;
 	const right = theme.fg(opts.tone === "success" ? "success" : tone, statusText);
-	const rule = openRuleLine(titleText, right, innerWidth, tone);
+	const rule = openRuleLine(titleText, right, innerWidth, tone, opts.tone === "running");
 	const line = opts.bg ? theme.bg(opts.bg, rule) : rule;
 	return indentRenderedLines([line], indent, width);
 }
@@ -400,7 +462,7 @@ export function renderCommandCard(
 		? `${opts.progress} ${opts.status}`
 		: `${opts.status} · output hidden · ctrl+o expand`;
 	const right = theme.fg(opts.tone === "success" ? "success" : tone, statusText);
-	return indentRenderedLines([openRuleLine(titleText, right, innerWidth, tone)], indent, width);
+	return indentRenderedLines([openRuleLine(titleText, right, innerWidth, tone, opts.tone === "running")], indent, width);
 }
 
 export function renderProgressBar(done: number, total: number, width: number, tone: StatusTone = "success"): string {

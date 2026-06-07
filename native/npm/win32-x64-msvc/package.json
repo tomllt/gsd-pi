@@ -1,6 +1,6 @@
 {
   "name": "@opengsd/engine-win32-x64-msvc",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "GSD native engine binary for Windows x64 (MSVC)",
   "os": [
     "win32"
@@ -16,5 +16,8 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/open-gsd/gsd-pi.git"
+  },
+  "publishConfig": {
+    "provenance": true
   }
 }

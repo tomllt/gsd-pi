@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 
 import type { ClaudeCodeMcpConfig } from "./preferences-types.js";
@@ -113,6 +114,12 @@ export function discoverBrowserMcpServerName(projectDir: string): string | undef
 
 export function discoverMcpServerNames(projectDir: string): string[] {
   return discoverMcpServers(projectDir).map((server) => server.name);
+}
+
+export function discoverUserMcpServerNames(): string[] {
+  const userSettingsPath = resolve(homedir(), ".claude", "settings.json");
+  const userSettings = readJsonFile(userSettingsPath, true) as ClaudeSettingsFile | undefined;
+  return collectServerEntries(userSettings?.mcpServers).map((s) => s.name);
 }
 
 export function computeMcpDisallowedTools(

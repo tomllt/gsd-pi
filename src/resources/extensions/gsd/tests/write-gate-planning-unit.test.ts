@@ -9,7 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join, sep } from 'node:path';
 
-import { GSD_PHASE_SCOPE_DISPLAY_REASON } from '../auto-unit-tool-scope.ts';
+import { GSD_PHASE_SCOPE_DISPLAY_REASON, GSD_SECTION_CLOSE_GATE_DISPLAY_REASON } from '../auto-unit-tool-scope.ts';
 import { ALLOWED_PLANNING_DISPATCH_AGENTS, shouldBlockPlanningUnit } from '../bootstrap/write-gate.ts';
 import { extractSubagentAgentClasses } from '../bootstrap/subagent-input.ts';
 import { isDeterministicPolicyError } from '../auto-tool-tracking.ts';
@@ -377,12 +377,24 @@ test('auto-unit scope: execute-task allows only its task completion lifecycle to
   );
   assert.strictEqual(allowed.block, false);
 
+  // execute-task closes gates from summary sections, so gsd_save_gate_result gets
+  // the softer deterministic redirect instead of the normal HARD BLOCK wall.
   const blocked = shouldBlockPlanningUnit('gsd_save_gate_result', '', BASE, 'execute-task', ALL);
   assert.strictEqual(blocked.block, true);
-  assert.match(blocked.reason!, /HARD BLOCK/);
+  assert.doesNotMatch(blocked.reason!, /HARD BLOCK/);
   assert.match(blocked.reason!, /gsd_save_gate_result/);
-  assert.strictEqual(blocked.displayReason, GSD_PHASE_SCOPE_DISPLAY_REASON);
+  assert.match(blocked.reason!, /summary sections/);
+  assert.strictEqual(blocked.displayReason, GSD_SECTION_CLOSE_GATE_DISPLAY_REASON);
   assert.strictEqual(isDeterministicPolicyError(blocked.reason!), true);
+});
+
+test('auto-unit scope: section-close gate units get the calm gsd_save_gate_result redirect', () => {
+  for (const unit of ['execute-task', 'complete-slice', 'validate-milestone']) {
+    const r = shouldBlockPlanningUnit('gsd_save_gate_result', '', BASE, unit, ALL);
+    assert.strictEqual(r.block, true, `${unit} should still block the call`);
+    assert.doesNotMatch(r.reason!, /HARD BLOCK/, `${unit} should use the calm redirect`);
+    assert.strictEqual(isDeterministicPolicyError(r.reason!), true, `${unit} redirect must stay deterministic`);
+  }
 });
 
 test('auto-unit scope: execute-task blocks sibling task completion', () => {

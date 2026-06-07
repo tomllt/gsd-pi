@@ -17,14 +17,25 @@ import { getGateIdsForTurn } from "./gate-registry.js";
 import {
   KNOWN_PREFERENCE_KEYS,
   KNOWN_UNIT_LABELS,
+  GSD_MODEL_PHASE_KEYS,
 
   SKILL_ACTIONS,
   type WorkflowMode,
   type GSDPreferences,
   type GSDSkillRule,
+  type GSDThinkingLevel,
 } from "./preferences-types.js";
 
 const VALID_TOKEN_PROFILES = new Set<TokenProfile>(["budget", "balanced", "quality", "burn-max"]);
+const VALID_THINKING_LEVELS = new Set<GSDThinkingLevel>([
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+]);
+const KNOWN_MODEL_PHASE_KEYS = new Set<string>(GSD_MODEL_PHASE_KEYS);
 const VALID_UOK_TURN_ACTIONS = new Set<"commit" | "snapshot" | "status-only">([
   "commit",
   "snapshot",
@@ -392,9 +403,63 @@ export function validatePreferences(preferences: GSDPreferences): {
   // ─── Models ─────────────────────────────────────────────────────────
   if (preferences.models !== undefined) {
     if (preferences.models && typeof preferences.models === "object") {
-      validated.models = preferences.models;
+      // Static check for inline per-phase thinking (ADR-026). The resolved
+      // model isn't known until dispatch, so capability is clamped there; here
+      // we warn on illegal level strings AND strip them, so a typo can't reach
+      // resolveThinkingLevelForUnit and be treated as explicit configuration.
+      const sanitizedModels: Record<string, unknown> = {};
+      for (const [phase, entry] of Object.entries(preferences.models as Record<string, unknown>)) {
+        if (entry && typeof entry === "object" && "thinking" in entry) {
+          const level = (entry as { thinking?: unknown }).thinking;
+          if (level !== undefined && !VALID_THINKING_LEVELS.has(level as GSDThinkingLevel)) {
+            warnings.push(
+              `models.${phase}.thinking "${String(level)}" is not a valid thinking level ` +
+              `(off, minimal, low, medium, high, xhigh) — ignored`,
+            );
+            const { thinking: _ignored, ...rest } = entry as Record<string, unknown>;
+            // If stripping the bad thinking leaves no usable model, drop the
+            // phase entirely rather than storing a hollow `{}` / `{ provider }`
+            // entry that resolveWinningPhase would otherwise treat as configured.
+            if (rest.model) {
+              sanitizedModels[phase] = rest;
+            }
+            continue;
+          }
+        }
+        sanitizedModels[phase] = entry;
+      }
+      validated.models = sanitizedModels as GSDPreferences["models"];
     } else {
       errors.push("models must be an object");
+    }
+  }
+
+  // ─── Thinking (separate per-phase block, ADR-026) ───────────────────
+  if (preferences.thinking !== undefined) {
+    if (preferences.thinking && typeof preferences.thinking === "object" && !Array.isArray(preferences.thinking)) {
+      const validatedThinking: Record<string, GSDThinkingLevel> = {};
+      for (const [phase, level] of Object.entries(preferences.thinking as Record<string, unknown>)) {
+        if (!KNOWN_MODEL_PHASE_KEYS.has(phase)) {
+          warnings.push(
+            `unknown thinking phase "${phase}" — must be one of: ` +
+            `${[...KNOWN_MODEL_PHASE_KEYS].join(", ")} — ignored`,
+          );
+          continue;
+        }
+        if (!VALID_THINKING_LEVELS.has(level as GSDThinkingLevel)) {
+          warnings.push(
+            `thinking.${phase} "${String(level)}" is not a valid thinking level ` +
+            `(off, minimal, low, medium, high, xhigh) — ignored`,
+          );
+          continue;
+        }
+        validatedThinking[phase] = level as GSDThinkingLevel;
+      }
+      if (Object.keys(validatedThinking).length > 0) {
+        validated.thinking = validatedThinking;
+      }
+    } else {
+      errors.push("thinking must be an object");
     }
   }
 

@@ -183,7 +183,9 @@ describe("AssistantMessageComponent open surface", () => {
 		} as unknown as AssistantMessage;
 		const component = new AssistantMessageComponent(message, true);
 
-		assert.match(component.render(80).map((line) => stripAnsi(line)).join("\n"), /Thinking\.\.\./);
+		const hiddenThinking = component.render(80).map((line) => stripAnsi(line)).join("\n");
+		assert.doesNotMatch(hiddenThinking, /Thinking\.\.\./);
+		assert.doesNotMatch(hiddenThinking, /Private reasoning trace/);
 
 		component.setHideThinkingBlock(false);
 		const expandedThinking = component.render(80).map((line) => stripAnsi(line)).join("\n");

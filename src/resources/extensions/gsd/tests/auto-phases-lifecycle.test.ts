@@ -207,6 +207,7 @@ test("runFinalize merges a verified complete-milestone immediately and only once
   const startedAt = Date.now();
   let lifecycleMergeCalls = 0;
   let resolverMergeCalls = 0;
+  const stopAutoCalls: Array<{ reason?: string; options?: unknown }> = [];
   s.basePath = base;
   s.originalBasePath = base;
   s.currentMilestoneId = "M001";
@@ -219,6 +220,9 @@ test("runFinalize merges a verified complete-milestone immediately and only once
   const result = await runFinalizeWithDeps(s, {
     preflightCleanRoot: () => ({ stashPushed: false }),
     postflightPopStash: () => ({ needsManualRecovery: false }),
+    stopAuto: async (_ctx: unknown, _pi: unknown, reason?: string, options?: unknown) => {
+      stopAutoCalls.push({ reason, options });
+    },
     resolver: {
       mergeAndExit() {
         resolverMergeCalls++;
@@ -232,10 +236,19 @@ test("runFinalize merges a verified complete-milestone immediately and only once
     },
   });
 
-  assert.equal(result.action, "next");
+  assert.equal(result.action, "break");
+  assert.equal(result.reason, "milestone-complete");
   assert.equal(lifecycleMergeCalls, 1);
   assert.equal(resolverMergeCalls, 0);
   assert.equal(s.milestoneMergedInPhases, true);
+  assert.equal(stopAutoCalls.length, 1);
+  assert.equal(stopAutoCalls[0]?.reason, "Milestone M001 complete");
+  assert.deepEqual(stopAutoCalls[0]?.options, {
+    completionWidget: {
+      milestoneId: "M001",
+      milestoneTitle: "Milestone",
+    },
+  });
 
   s.currentUnit = {
     type: "complete-milestone",
@@ -245,6 +258,9 @@ test("runFinalize merges a verified complete-milestone immediately and only once
   const second = await runFinalizeWithDeps(s, {
     preflightCleanRoot: () => ({ stashPushed: false }),
     postflightPopStash: () => ({ needsManualRecovery: false }),
+    stopAuto: async (_ctx: unknown, _pi: unknown, reason?: string, options?: unknown) => {
+      stopAutoCalls.push({ reason, options });
+    },
     resolver: {
       mergeAndExit() {
         resolverMergeCalls++;
@@ -258,9 +274,11 @@ test("runFinalize merges a verified complete-milestone immediately and only once
     },
   });
 
-  assert.equal(second.action, "next");
+  assert.equal(second.action, "break");
+  assert.equal(second.reason, "milestone-complete");
   assert.equal(lifecycleMergeCalls, 1);
   assert.equal(resolverMergeCalls, 0);
+  assert.equal(stopAutoCalls.length, 2);
 });
 
 test("runFinalize does not render next-phase handoff for complete-milestone", async (t) => {
@@ -302,11 +320,65 @@ test("runFinalize does not render next-phase handoff for complete-milestone", as
     },
   );
 
-  assert.equal(result.action, "next");
+  assert.equal(result.action, "break");
   assert.equal(
     widgetCalls.some(([key]) => key === "gsd-outcome"),
     false,
     "complete-milestone finalize should leave terminal completion UI to stopAuto",
+  );
+});
+
+test("runFinalize clears gsd-step and gsd-progress before stopAuto on complete-milestone", async (t) => {
+  const base = mkdtempSync(join(tmpdir(), "gsd-finalize-stale-widget-"));
+  t.after(() => {
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  const s = new AutoSession();
+  s.basePath = base;
+  s.originalBasePath = base;
+  s.currentMilestoneId = "M001";
+  s.currentUnit = {
+    type: "complete-milestone",
+    id: "M001",
+    startedAt: Date.now(),
+  };
+
+  const statusCalls: Array<[string, unknown]> = [];
+  const widgetCalls: Array<[string, unknown]> = [];
+
+  await runFinalizeWithDeps(
+    s,
+    {
+      preflightCleanRoot: () => ({ stashPushed: false }),
+      postflightPopStash: () => ({ needsManualRecovery: false }),
+      lifecycle: {
+        exitMilestone() {
+          return { ok: true, merged: true, codeFilesChanged: false };
+        },
+      },
+    },
+    {
+      hasUI: true,
+      ui: {
+        notify() {},
+        setStatus(key: string, value: unknown) {
+          statusCalls.push([key, value]);
+        },
+        setWidget(key: string, value: unknown) {
+          widgetCalls.push([key, value]);
+        },
+      },
+    },
+  );
+
+  assert.ok(
+    statusCalls.some(([key, val]) => key === "gsd-step" && val === undefined),
+    "gsd-step status should be cleared before stopAuto",
+  );
+  assert.ok(
+    widgetCalls.some(([key, val]) => key === "gsd-progress" && val === undefined),
+    "gsd-progress widget should be cleared before stopAuto",
   );
 });
 

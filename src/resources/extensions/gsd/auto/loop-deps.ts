@@ -259,6 +259,7 @@ export interface LoopDeps {
   ) => Promise<{
     routing: { tier: string; modelDowngraded: boolean } | null;
     appliedModel: { provider: string; id: string } | null;
+    appliedThinkingLevel?: ReturnType<ExtensionAPI["getThinkingLevel"]> | null;
   }>;
   resolveModelId: <T extends { id: string; provider: string }>(
     modelId: string,
