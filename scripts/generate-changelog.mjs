@@ -39,6 +39,17 @@ if (!rawLog) {
   process.exit(1);
 }
 
+// Full commit bodies (NUL-separated) so footer-style breaking-change markers
+// like `BREAKING CHANGE:` / `BREAKING-CHANGE:` are detected, not just the `!:`
+// subject convention. A footer marker on a non-`!` commit is still a major bump.
+const rawBodies = execSync(
+  `git log ${range} --pretty=format:"%B%x00" --no-merges`,
+  { cwd: root, encoding: "utf-8" }
+);
+const hasBreakingFooter = rawBodies
+  .split("\0")
+  .some((body) => /^BREAKING[ -]CHANGE:/m.test(body));
+
 // ---------------------------------------------------------------------------
 // 3. Parse conventional commits
 // ---------------------------------------------------------------------------
@@ -55,7 +66,7 @@ const TYPE_MAP = {
   revert: "Removed",
 };
 
-let hasBreaking = false;
+let hasBreaking = hasBreakingFooter;
 let hasFeat = false;
 let userFacingCount = 0;
 

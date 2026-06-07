@@ -25,7 +25,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Group per-PR (head_ref) so pushing to a PR cancels its stale run, but fall
+  # back to the unique run_id on branch pushes so an in-flight main/dev CI is
+  # never cancelled by a later push.
+  group: ci-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -75,7 +78,7 @@ jobs:
         run: bash scripts/ci-classify-changes.sh
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 
@@ -122,7 +125,7 @@ jobs:
           git checkout --force --detach "$GITHUB_SHA"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 
@@ -169,6 +172,9 @@ jobs:
 
       - name: Verify workspace coverage (every linkable package has tests)
         run: pnpm run verify:workspace-coverage
+
+      - name: Verify extension coverage (parity with verify:merge)
+        run: pnpm run verify:extension-coverage
 
       - name: Compile test artifacts
         run: pnpm run test:compile
@@ -233,7 +239,7 @@ jobs:
           git checkout --force --detach "$GITHUB_SHA"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.12.1
 
@@ -279,6 +285,14 @@ jobs:
           export GSD_SMOKE_BINARY="$(pwd)/dist/loader.js"
           pnpm run test:e2e:windows-smoke
 
+      - name: Flag Windows e2e smoke failure
+        # continue-on-error keeps this non-blocking, but a silent failure means a
+        # broken Windows loader stays green forever. Surface it as an annotation.
+        if: steps.windows-smoke-e2e.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning title=Windows e2e smoke failed::The non-blocking Windows e2e smoke suite failed. See the e2e-artifacts-windows artifact."
+
       - name: Upload Windows e2e artifacts on failure
         if: steps.windows-smoke-e2e.outcome == 'failure'
         uses: actions/upload-artifact@v5
@@ -287,3 +301,91 @@ jobs:
           path: test-results/e2e
           if-no-files-found: ignore
           retention-days: 7
+
+  # Validate the declared engines floor (package.json engines.node ">=22.0.0").
+  # The main build/test lanes run on Node 24, so without this lane the supported
+  # minor (22.x) is never exercised. Cheap: reuse the build artifacts and just run
+  # the smoke suite against the built binary on Node 22.
+  node22-smoke:
+    name: node22-smoke
+    timeout-minutes: 15
+    needs: [fast-gates, build]
+    if: needs.fast-gates.outputs.heavy-code-changed == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Checkout repository without GITHUB_TOKEN
+        shell: bash
+        env:
+          FETCH_DEPTH: '1'
+        run: |
+          set -euo pipefail
+          git init "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          git -c protocol.version=2 fetch --no-tags --prune --depth="$FETCH_DEPTH" origin \
+            "+${GITHUB_REF}:refs/checkout-ref"
+          git checkout --force --detach "$GITHUB_SHA"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.12.1
+
+      - name: Setup Node.js 22 (engines floor)
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+          GSD_SKIP_RTK_INSTALL: '1'
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - uses: ./.github/actions/restore-ci-build-artifacts
+
+      - name: Run smoke suite on Node 22
+        shell: bash
+        run: |
+          chmod +x dist/loader.js
+          export GSD_SMOKE_BINARY="$(pwd)/dist/loader.js"
+          pnpm run test:smoke
+
+  # Single aggregate gate. Make THIS the only required status check in branch
+  # protection. Because it always runs, branch protection always has a concrete
+  # pass/fail signal — a conditionally-skipped `build`/`windows-portability` job
+  # can no longer read as a neutral "required check never reported" state.
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: [fast-gates, build, windows-portability, node22-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert no upstream job failed or was cancelled
+        env:
+          FAST_GATES: ${{ needs.fast-gates.result }}
+          BUILD: ${{ needs.build.result }}
+          WINDOWS: ${{ needs.windows-portability.result }}
+          NODE22: ${{ needs.node22-smoke.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "fast-gates=$FAST_GATES build=$BUILD windows-portability=$WINDOWS node22-smoke=$NODE22"
+          # 'skipped' is an acceptable result (job legitimately not needed).
+          # Only 'failure' / 'cancelled' must block the merge.
+          status=0
+          for result in "$FAST_GATES" "$BUILD" "$WINDOWS" "$NODE22"; do
+            case "$result" in
+              success|skipped) ;;
+              *) status=1 ;;
+            esac
+          done
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=CI gate failed::One or more required CI jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "All required CI jobs passed (or were legitimately skipped)."

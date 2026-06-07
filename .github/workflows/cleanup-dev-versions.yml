@@ -42,9 +42,19 @@ jobs:
 
           REMOVED=0
           while IFS= read -r VERSION; do
-            PUBLISH_TIME=$(npm view "${PACKAGE}@${VERSION}" time --json 2>/dev/null | node -e "
+            # `npm view pkg@ver time --json` returns the FULL time map
+            # ({created, modified, "<ver>": "<iso>"}), not a single timestamp —
+            # `new Date(map)` is NaN, which silently disabled this whole job.
+            # Index the map by the specific version (fall back to `modified`).
+            PUBLISH_TIME=$(TARGET_VERSION="${VERSION}" npm view "${PACKAGE}@${VERSION}" time --json 2>/dev/null | node -e "
               const data = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-              console.log(Math.floor(new Date(data).getTime() / 1000));
+              const iso = data[process.env.TARGET_VERSION] ?? data.modified;
+              const ts = Math.floor(new Date(iso).getTime() / 1000);
+              if (!Number.isFinite(ts)) {
+                console.error('Could not resolve publish time for ' + process.env.TARGET_VERSION + ' from: ' + JSON.stringify(data));
+                process.exit(1);
+              }
+              console.log(ts);
             " 2>/dev/null || echo "0")
 
             if [ "${PUBLISH_TIME}" -gt 0 ] && [ "${PUBLISH_TIME}" -lt "${CUTOFF}" ]; then

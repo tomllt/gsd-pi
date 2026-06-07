@@ -24,6 +24,33 @@ const DROP_INTERNAL_DEPS_PACKAGE_JSONS = new Set([
   STANDALONE_WEB_PACKAGE_JSON,
 ]);
 
+// Recover from a backup left behind by a previous prepack that was hard-killed
+// before postpack could restore (SIGKILL skips the EXIT trap). The manifests on
+// disk are in the mutated (^version / dropped-deps) state; restore the canonical
+// workspace:* originals from the leftover backup BEFORE doing any new work, so we
+// never re-resolve already-resolved manifests or — worse — delete the only copy
+// of the originals further down when nothing appears to need resolving.
+function restoreFromBackupDir(currentDir, relativeDir = '') {
+  for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+    const relPath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
+    const sourcePath = path.join(currentDir, entry.name);
+    if (entry.isDirectory()) {
+      restoreFromBackupDir(sourcePath, relPath);
+      continue;
+    }
+    const targetPath = path.join(ROOT, relPath);
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+
+function recoverStaleBackup() {
+  if (!fs.existsSync(BACKUP_DIR)) return;
+  console.warn('[prepack] Found a stale .prepack-backup from an interrupted run; restoring originals before resolving.');
+  restoreFromBackupDir(BACKUP_DIR);
+  fs.rmSync(BACKUP_DIR, { recursive: true, force: true });
+}
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -95,6 +122,8 @@ function resolvePackageJson(filePath) {
   }
   return changed;
 }
+
+recoverStaleBackup();
 
 let resolvedAny = false;
 for (const filePath of TARGET_PACKAGE_JSONS) {

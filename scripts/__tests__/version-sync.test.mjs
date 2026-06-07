@@ -11,10 +11,15 @@ import test from "node:test";
 const require = createRequire(import.meta.url);
 const { RELEASE_WORKSPACE_PACKAGE_DIRS, resolveEngineOptionalDependencyVersion, syncVersionSurfaces } = require("../lib/version-sync.cjs");
 
-test("resolveEngineOptionalDependencyVersion keeps dev publishes on stable engine packages", () => {
+test("resolveEngineOptionalDependencyVersion keeps prerelease publishes on stable engine packages", () => {
+  // dev and next channels both reuse the stable engine packages — neither
+  // builds per-platform engines, so the suffix must be stripped to the base
+  // X.Y.Z that actually exists on npm.
   assert.equal(resolveEngineOptionalDependencyVersion("1.0.2-dev.adee50b"), "1.0.2");
+  assert.equal(resolveEngineOptionalDependencyVersion("1.0.2-next.adee50b"), "1.0.2");
   assert.equal(resolveEngineOptionalDependencyVersion("1.0.2"), "1.0.2");
-  assert.equal(resolveEngineOptionalDependencyVersion("1.0.2-next.3"), "1.0.2-next.3");
+  // A non-dev/next prerelease (e.g. a real custom channel) is left intact.
+  assert.equal(resolveEngineOptionalDependencyVersion("1.0.2-rc.1"), "1.0.2-rc.1");
 });
 
 test("version sync includes cloud-mcp-gateway so dev stamps keep workspace links", () => {
